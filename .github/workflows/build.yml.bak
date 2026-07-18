@@ -1,12 +1,8 @@
 name: CI
 
 on:
-  push:
-    branches:
-      - master
-      - upcoming
-  pull_request:
-
+  workflow_dispatch:
+  
 env:
   GAME_REVISION: 0
   GAME_LANGUAGE: ENGLISH
