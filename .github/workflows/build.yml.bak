@@ -2,13 +2,15 @@ name: CI
 
 on:
   workflow_dispatch:
-  
+
 env:
   GAME_REVISION: 0
   GAME_LANGUAGE: ENGLISH
   COMPARE: 0
   UNUSED_ERROR: 1
   DEPRECATED_ERROR: 1
+  # 告诉 ccache 把缓存放在哪里，方便 Actions 收集
+  CCACHE_DIR: ${{ github.workspace }}/.ccache
 
 jobs:
   build-emerald:
@@ -18,11 +20,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 1. 安装依赖时顺便加上 ccache
       - name: Install binutils
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends binutils-arm-none-eabi gcc-arm-none-eabi libnewlib-arm-none-eabi libpng-dev python3
+          sudo apt-get install -y --no-install-recommends binutils-arm-none-eabi gcc-arm-none-eabi libnewlib-arm-none-eabi libpng-dev python3 ccache
 
+      # 2. 现有的工具缓存（保持不变）
       - name: Cache build tools
         uses: actions/cache@v4
         with:
@@ -43,13 +47,26 @@ jobs:
             tools/wav2agb/wav2agb
           key: tools-${{ runner.os }}-${{ hashFiles('tools/*/Makefile', 'tools/**/*.c', 'tools/**/*.cpp', 'tools/**/*.h') }}
 
+      # 3. 新增：源码编译缓存 (ccache)
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          # 键名包含 commit 系统的 hash，保证每次都能更新缓存
+          key: ccache-${{ runner.os }}-${{ github.sha }}
+          # 如果没有精确命中，就继承上一次的缓存
+          restore-keys: |
+            ccache-${{ runner.os }}-
+
+      # 4. 编译 ROM（通过环境变量或命令劫持 gcc/g++）
       - name: ROM (Emerald)
         env:
           GAME_VERSION: EMERALD
-        run: make -j$(nproc) -O all
+        run: |
+          ccache -M 500M # 限制缓存大小为 500MB，防止撑爆
+          make -j$(nproc) -O all CC="ccache arm-none-eabi-gcc"
 
-  # Gate job: 满足分支保护规则。
-  # 仅在绿宝石编译成功时通过。
+  # Gate job
   build:
     if: github.actor != 'allcontributors[bot]'
     runs-on: ubuntu-latest
