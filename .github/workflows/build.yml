@@ -19,7 +19,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 1. 安装依赖 + ccache
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -27,7 +26,6 @@ jobs:
             binutils-arm-none-eabi gcc-arm-none-eabi libnewlib-arm-none-eabi \
             libpng-dev python3 ccache
 
-      # 2. 工具缓存（保持不变）
       - name: Cache build tools
         uses: actions/cache@v4
         with:
@@ -48,7 +46,6 @@ jobs:
             tools/wav2agb/wav2agb
           key: tools-${{ runner.os }}-${{ hashFiles('tools/*/Makefile', 'tools/**/*.c', 'tools/**/*.cpp', 'tools/**/*.h') }}
 
-      # 3. ccache 缓存（重点优化）
       - name: Cache ccache
         uses: actions/cache@v4
         with:
@@ -62,33 +59,29 @@ jobs:
         env:
           GAME_VERSION: EMERALD
         run: |
-          # 确保目录存在
           mkdir -p ${{ env.CCACHE_DIR }}
 
-          # ==================== ccache 配置 ====================
+          # ccache 配置
           export CCACHE_DIR=${{ env.CCACHE_DIR }}
           export CCACHE_MAXSIZE=500M
           export CCACHE_SLOPPINESS="time_macros,include_file_mtime,include_file_ctime,pch_defines,locale,modules"
           export CCACHE_COMPILERCHECK=content
-          # export CCACHE_DEBUG=1          # 调试时打开
 
           ccache -M 500M
           echo "=== 编译前 Ccache 状态 ==="
           ccache -s
 
-          # ==================== 核心修复 ====================
-          export CC="ccache arm-none-eabi-gcc"
-          # 保留 cc1 作为 fallback（部分 Makefile 路径可能仍会用到）
-          REAL_CC1=$(arm-none-eabi-gcc --print-prog-name=cc1)
-          export CC1="ccache $REAL_CC1"
+          # ==================== 关键修复 ====================
+          # 只在游戏编译时使用 ccache + arm-none-eabi-gcc
+          # 工具构建仍然使用原生 gcc
+          echo "=== 开始构建工具 ==="
+          make tools   # 先正常构建工具（使用宿主 gcc）
 
-          # 开始编译
+          echo "=== 开始编译 ROM ==="
           make -j$(nproc) all \
             CC="ccache arm-none-eabi-gcc" \
+            CXX="ccache arm-none-eabi-g++" \
             KEEP_TEMPS=1
 
           echo "=== 编译后 Ccache 状态 ==="
           ccache -s
-
-      - name: All builds passed
-        run: echo "Emerald build passed."
