@@ -223,6 +223,7 @@ void StartTimer1(void)
 
 void SeedRngAndSetTrainerId(void)
 {
+#ifndef PORTABLE
     u32 val;
 
     REG_TM1CNT_H = 0;
@@ -231,6 +232,12 @@ void SeedRngAndSetTrainerId(void)
     val |= REG_TM1CNT_L;
     SeedRng(val);
     sTrainerId = Random();
+#else
+    // PC/Android 平台的简化逻辑
+    u16 val = Platform_GetKeyInput(); // 或者使用平台相关的随机源
+    SeedRng(val);
+    sTrainerId = val;
+#endif
 }
 
 u16 GetGeneratedTrainerIdLower(void)
