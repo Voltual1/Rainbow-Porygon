@@ -58,14 +58,32 @@ jobs:
           restore-keys: |
             ccache-${{ runner.os }}-
 
-      # 4. 编译 ROM
+# 4. 编译 ROM（针对复杂的 cc1 管道特制版）
       - name: ROM (Emerald)
         env:
           GAME_VERSION: EMERALD
         run: |
-          ccache -M 500M # 限制缓存大小为 500MB，防止撑爆
-          make -j$(nproc) -O all CC="ccache arm-none-eabi-gcc"
-
+          # 确保缓存目录存在
+          mkdir -p ${{ env.CCACHE_DIR }}
+          
+          # 关键配置 1：允许 ccache 包装非 gcc 的独立程序（如 cc1）
+          export CCACHE_COMPILERCHECK=none
+          # 关键配置 2：允许 ccache 处理直接传入核心编译器的参数
+          export CCACHE_EXTRAFILES=${{ github.workspace }}/charmap.txt
+          
+          # 限制缓存大小并查看初始状态
+          ccache -M 500M
+          echo "=== 编译前 Ccache 状态 ==="
+          ccache -s
+          
+          # 核心修复：通过查找系统中真实的 cc1 位置，并用 ccache 包裹它传递给 make
+          REAL_CC1=$(arm-none-eabi-gcc --print-prog-name=cc1)
+          make -j$(nproc) -O all CC1="ccache $REAL_CC1"
+          
+          # 打印编译后状态，肉眼检查命中率
+          echo "=== 编译后 Ccache 状态 ==="
+          ccache -s
+          
       # 5. 最终状态同步
       - name: All builds passed
         run: echo "Emerald build passed."
