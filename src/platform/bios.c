@@ -1,16 +1,16 @@
 #include "global.h"
 
-#ifdef PORTABLE
+//  canceling hardware macros from headers so bios.c can define its own variables and functions
 #undef INTR_CHECK
 #undef INTR_VECTOR
 #undef REG_BASE
 #undef PLTT
 #undef VRAM_
 #undef OAM
+#undef FLASH_BASE
 #undef SOUND_INFO_PTR
 #undef CpuSet
 #undef CpuFastSet
-#endif
 
 // BIOS function implementations are based on the VBA-M source code.
 

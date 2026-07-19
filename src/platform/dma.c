@@ -1,9 +1,7 @@
 #include "global.h"
 #include "platform/dma.h"
 
-#ifdef PORTABLE
 #undef DmaSet
-#endif
 
 struct DMATransfer {
     union {
