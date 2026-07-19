@@ -21,7 +21,7 @@ jobs:
           fetch-depth: 0
           submodules: recursive # 必须递归初始化 SDL2 等子模块
 
-      # 1. 安装 GBA 编译器与依赖工具（用于构建 mapjson 等生成器及预处理汇编）
+      # 1. 安装 GBA 编译器与依赖工具
       - name: Install GBA Toolchain dependencies
         run: |
           sudo apt-get update
@@ -41,11 +41,12 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      # 2. 核心修复步骤：先编译 GBA 工具，然后生成所有地图、野生怪分布等动态 H 头文件
-      - name: Build GBA Tools & Generate Headers
+      # 2. 核心修复步骤：编译 GBA 工具，并完整运行一次 GBA 编译。
+      # 这将在源文件目录中原地（in-place）生成所有 Android 编译所需的 .gbapal、.4bpp 等资源。
+      - name: Build GBA ROM & Generate All Assets
         run: |
           make -j$(nproc) tools
-          make generated
+          make -j$(nproc)
 
       - name: Decode Keystore
         if: github.event_name != 'pull_request'
@@ -87,7 +88,7 @@ jobs:
             ### Android 构建成功
             - 提交: `${{ github.sha }}`
             - 构建时间: `${{ steps.version.outputs.TIMESTAMP }}`
-            - 已经通过预编译生成了所有的地图和数据资产头文件。
+            - 通过预先编译 GBA 资产，所有的调色板和图像数据都已就绪。
           draft: true
           files: |
             android/app/build/outputs/apk/release/*.apk
