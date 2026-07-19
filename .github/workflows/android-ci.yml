@@ -5,8 +5,7 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
-  release:
-    types: [ published ]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -21,6 +20,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      # 关键步骤：安装 GBA 编译器，因为 Android 编译过程需要调用它来处理 GBA 汇编
+      - name: Install GBA Toolchain dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            binutils-arm-none-eabi gcc-arm-none-eabi libnewlib-arm-none-eabi \
+            libpng-dev python3 ccache
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -33,17 +40,22 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
+      # 预构建工具（gbagfx, scaninc 等），Android 编译过程中 CMake 可能会调用它们
+      - name: Build GBA Tools
+        run: |
+          make -j$(nproc) tools
+
       - name: Decode Keystore
         if: github.event_name != 'pull_request'
         env:
           ENCODED_STRING: ${{ secrets.SIGNING_KEY }}
         run: |
-          # 将签名文件解码到 android 目录下，注意路径要与 build.gradle 对应
           echo $ENCODED_STRING | base64 -d > android/release.keystore
 
-      - name: Build with Gradle
+      - name: Build Android APK
         run: |
           chmod +x android/SDL2/android-project/gradlew
+          # 使用项目特有的路径和参数执行编译
           android/SDL2/android-project/gradlew -p android :app:assembleRelease
         env:
           KEYSTORE_PATH: ../../release.keystore
@@ -58,10 +70,10 @@ jobs:
           echo "BUILD_VERSION=android-build-$(date +%Y%m%d_%H%M%S)-${GITHUB_SHA:0:8}" >> $GITHUB_OUTPUT
           echo "TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")" >> $GITHUB_OUTPUT
 
-      - name: Upload APK
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pokeemerald-android-apk
+          name: pokeemerald-android-release
           path: android/app/build/outputs/apk/release/*.apk
 
       - name: Create Draft Release
@@ -71,10 +83,10 @@ jobs:
           tag_name: ${{ steps.version.outputs.BUILD_VERSION }}
           name: "Android Auto Build ${{ steps.version.outputs.BUILD_VERSION }}"
           body: |
-            ### Android 构建信息
+            ### Android 构建成功
             - 提交: `${{ github.sha }}`
             - 构建时间: `${{ steps.version.outputs.TIMESTAMP }}`
-            - 目标平台: `armeabi-v7a` (API 36)
+            - 包含 GBA 汇编逻辑的原生 Android 移植版。
           draft: true
           files: |
             android/app/build/outputs/apk/release/*.apk
