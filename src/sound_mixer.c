@@ -468,14 +468,16 @@ static s8 sub_82DF758(struct MixerSource *chan, u32 current) {
     //In route 102 lotad wild battle when it growls crashes the game because it decompresses out of bounds data
     //I gave it its own printf error so it wouldn't get forgotten as this needs a more proper fix
     if (chan->wav->size < blockOffset * 0x21) {
-            DBGPRINTF("Out of bounds decompress in %s wav->size = %u blockPtr = %u\n", __func__, chan->wav->size, blockOffset * 0x21);
+            // %u 强转匹配 u32 (long unsigned int)
+            DBGPRINTF("Out of bounds decompress in %s wav->size = %u blockPtr = %u\n", __func__, (unsigned int)chan->wav->size, (unsigned int)(blockOffset * 0x21));
             return gBDPCMBlockBuffer[current & 63];
     }
     
     if(chan->blockCount != blockOffset) { // decode block if not decoded
         s32 s;
         chan->blockCount = blockOffset;
-        blockPtr = chan->wav->data + chan->blockCount * 0x21;
+        // s8* 转换为 u8* 加上强制转换
+        blockPtr = (u8 *)(chan->wav->data + chan->blockCount * 0x21);
         gBDPCMBlockBuffer[0] = s = (s8)*blockPtr++;
         gBDPCMBlockBuffer[1] = s += gDeltaEncodingTable[*blockPtr++ & 0xF];
         for(i = 2; i < 64; i+=2) {
