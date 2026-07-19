@@ -41,12 +41,13 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      # 2. 核心修复步骤：编译 GBA 工具，并完整运行一次 GBA 编译。
-      # 这将在源文件目录中原地（in-place）生成所有 Android 编译所需的 .gbapal、.4bpp 等资源。
-      - name: Build GBA ROM & Generate All Assets
+      # 2. 核心修复步骤：完整运行一次 GBA 编译，并将生成的 assets 复制回源码目录，以兼容 Android 的 preproc 寻址
+      - name: Build GBA ROM & Sync Assets to Source Tree
         run: |
           make -j$(nproc) tools
           make -j$(nproc)
+          # 将 build/assets/ 目录下的所有编译后资产（.gbapal, .4bpp 等）同步回源码树
+          cp -r build/assets/* .
 
       - name: Decode Keystore
         if: github.event_name != 'pull_request'
@@ -88,7 +89,7 @@ jobs:
             ### Android 构建成功
             - 提交: `${{ github.sha }}`
             - 构建时间: `${{ steps.version.outputs.TIMESTAMP }}`
-            - 通过预先编译 GBA 资产，所有的调色板和图像数据都已就绪。
+            - 资产已被同步至源码目录，通过了 preproc 预处理器检验。
           draft: true
           files: |
             android/app/build/outputs/apk/release/*.apk
