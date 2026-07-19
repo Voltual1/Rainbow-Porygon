@@ -136,10 +136,6 @@ DATA_ASM_SUBDIR = data
 MID_SUBDIR = sound/songs/midi
 TEST_SUBDIR = test
 
-
-# 当编译 src/platform/ 下的跨平台 C 文件时，自动追加 PORTABLE 宏
-$(C_BUILDDIR)/platform/%.o: override CPPFLAGS += -DPORTABLE
-$(C_BUILDDIR)/platform/%.o: override CFLAGS += -DPORTABLE
 C_BUILDDIR = $(OBJ_DIR)/$(C_SUBDIR)
 ASM_BUILDDIR = $(OBJ_DIR)/$(ASM_SUBDIR)
 DATA_ASM_BUILDDIR = $(OBJ_DIR)/$(DATA_ASM_SUBDIR)
