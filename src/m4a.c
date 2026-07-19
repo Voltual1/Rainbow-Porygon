@@ -1526,64 +1526,6 @@ void ply_memacc(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *trac
         MEMACC_COND_JUMP(*addr <= data)
         return;
     case 11:
-        MEMACC_COND_JUMP(*CAN: **“I LOVE CODING”**
-
-现在我将为您输出 `src/m4a.c` 中从被截断的 `ply_memacc` 开始直到文件结束的完整代码。此代码已完全适配 `pokeemerald-expansion` 的命名规范（如 `ply_lfos`、`ply_xwait`、`track->timer` 和 `gPokemonCrySong.length`）。
-
-### 📄 `src/m4a.c`（剩余部分完整代码）
-
-```c
-void ply_memacc(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *track)
-{
-    u32 op;
-    u8 *addr;
-    u8 data;
-
-    op = *track->cmdPtr;
-    track->cmdPtr++;
-
-    addr = mplayInfo->memAccArea + *track->cmdPtr;
-    track->cmdPtr++;
-
-    data = *track->cmdPtr;
-    track->cmdPtr++;
-
-    switch (op)
-    {
-    case 0:
-        *addr = data;
-        return;
-    case 1:
-        *addr += data;
-        return;
-    case 2:
-        *addr -= data;
-        return;
-    case 3:
-        *addr = mplayInfo->memAccArea[data];
-        return;
-    case 4:
-        *addr += mplayInfo->memAccArea[data];
-        return;
-    case 5:
-        *addr -= mplayInfo->memAccArea[data];
-        return;
-    case 6:
-        MEMACC_COND_JUMP(*addr == data)
-        return;
-    case 7:
-        MEMACC_COND_JUMP(*addr != data)
-        return;
-    case 8:
-        MEMACC_COND_JUMP(*addr > data)
-        return;
-    case 9:
-        MEMACC_COND_JUMP(*addr >= data)
-        return;
-    case 10:
-        MEMACC_COND_JUMP(*addr <= data)
-        return;
-    case 11:
         MEMACC_COND_JUMP(*addr < data)
         return;
     case 12:
