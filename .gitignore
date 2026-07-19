@@ -1,6 +1,7 @@
 *.exe
 *.o
 *.i
+*.bak
 *.elf
 *.gba
 !data/*.gba

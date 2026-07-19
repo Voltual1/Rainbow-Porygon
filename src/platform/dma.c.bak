@@ -1,6 +1,8 @@
 #include "global.h"
 #include "platform/dma.h"
 
+#undef DmaSet
+
 struct DMATransfer {
     union {
         const void *src;

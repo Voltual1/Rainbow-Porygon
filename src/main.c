@@ -98,8 +98,8 @@ void AgbMain(void)
     *(vu16 *)BG_PLTT = RGB_WHITE; // Set the backdrop to white on startup
     InitGpuRegManager();
     REG_WAITCNT = WAITCNT_PREFETCH_ENABLE
-        | WAITCNT_WS0_S_1 | WAITCNT_WS0_N_3
-        | WAITCNT_WS1_S_1 | WAITCNT_WS1_N_3;
+ WAITCNT_WS0_S_1 | WAITCNT_WS0_N_3
+ WAITCNT_WS1_S_1 | WAITCNT_WS1_N_3;
     InitKeys();
     InitIntrHandlers();
     m4aSoundInit();
@@ -490,3 +490,19 @@ void ClearPokemonCrySongs(void)
 {
     CpuFill16(0, gPokemonCrySongs, MAX_POKEMON_CRIES * sizeof(struct PokemonCrySong));
 }
+
+#ifndef PORTABLE
+// GBA 硬件端构建存根：阻断标准库对 libnosys.a(sbrk) 的自动拉取，完全避开对 end 符号的依赖。
+void *_sbrk(int incr)
+{
+    return (void *)-1;
+}
+int _close(int file) { return -1; }
+int _fstat(int file, void *st) { return -1; }
+int _getpid(void) { return 1; }
+int _isatty(int file) { return 1; }
+int _kill(int pid, int sig) { return -1; }
+int _lseek(int file, int ptr, int dir) { return 0; }
+int _read(int file, char *ptr, int len) { return 0; }
+int _write(int file, char *ptr, int len) { return 0; }
+#endif
