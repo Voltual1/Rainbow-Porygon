@@ -2,19 +2,19 @@ cmake_minimum_required(VERSION 3.22)
 project(pokeemerald_android C ASM)
 
 set(ROOT "${CMAKE_CURRENT_LIST_DIR}/../../../../..")
-find_program(ARM_NONE_EABI_AS arm-none-eabi-as
-    HINTS "$ENV{ARM_NONE_EABI_TOOLCHAIN}/bin"
-    REQUIRED)
-find_program(ARM_NONE_EABI_LD arm-none-eabi-ld
-    HINTS "$ENV{ARM_NONE_EABI_TOOLCHAIN}/bin"
-    REQUIRED)
-find_program(ARM_NONE_EABI_OBJCOPY arm-none-eabi-objcopy
-    HINTS "$ENV{ARM_NONE_EABI_TOOLCHAIN}/bin"
-    REQUIRED)
+
+# 寻找 GBA 工具链
+find_program(ARM_NONE_EABI_AS arm-none-eabi-as REQUIRED)
+find_program(ARM_NONE_EABI_LD arm-none-eabi-ld REQUIRED)
+find_program(ARM_NONE_EABI_OBJCOPY arm-none-eabi-objcopy REQUIRED)
+
 set(SDL_STATIC ON CACHE BOOL "" FORCE)
 set(SDL_SHARED ON CACHE BOOL "" FORCE)
 set(SDL_TEST OFF CACHE BOOL "" FORCE)
 add_subdirectory("${ROOT}/android/SDL2" "${CMAKE_BINARY_DIR}/SDL2")
+
+# 设置资源搜索路径，与 GBA Makefile 保持一致
+set(ASSETS_DIR "build/assets")
 
 file(GLOB_RECURSE GAME_C CONFIGURE_DEPENDS
     "${ROOT}/src/*.c"
@@ -29,7 +29,8 @@ foreach(SOURCE IN LISTS GAME_C)
     add_custom_command(
         OUTPUT "${OUTPUT}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${OUTPUT_DIR}"
-        COMMAND /bin/sh -c "cd '${ROOT}' && '${CMAKE_C_COMPILER}' --target=${CMAKE_C_COMPILER_TARGET} --sysroot='${CMAKE_SYSROOT}' -E -std=gnu99 -iquote'${ROOT}/include' -iquote'${ROOT}/gflib' -I'${ROOT}/android/SDL2/include' -DNONMATCHING -DPORTABLE -DPLATFORM_SDL2 -DRENDERER_EASY_DRAW -DMODERN=1 -DUBFIX '${SOURCE}' -o '${OUTPUT}.i' && '${ROOT}/tools/preproc/preproc' '${OUTPUT}.i' '${ROOT}/charmap.txt' > '${OUTPUT}'"
+        # 修复点：加入 -i 和 -g 参数，使 preproc 能够找到生成的资产
+        COMMAND /bin/sh -c "cd '${ROOT}' && '${CMAKE_C_COMPILER}' --target=${CMAKE_C_COMPILER_TARGET} --sysroot='${CMAKE_SYSROOT}' -E -std=gnu99 -iquote'${ROOT}/include' -iquote'${ROOT}/gflib' -I'${ROOT}/android/SDL2/include' -DNONMATCHING -DPORTABLE -DPLATFORM_SDL2 -DRENDERER_EASY_DRAW -DMODERN=1 -DUBFIX '${SOURCE}' -o '${OUTPUT}.i' && '${ROOT}/tools/preproc/preproc' -i -g '${ASSETS_DIR}' '${OUTPUT}.i' '${ROOT}/charmap.txt' > '${OUTPUT}'"
         DEPENDS "${SOURCE}" "${ROOT}/tools/preproc/preproc" "${ROOT}/charmap.txt"
         VERBATIM)
     list(APPEND GENERATED_C "${OUTPUT}")
@@ -39,12 +40,15 @@ file(GLOB DATA_ASM CONFIGURE_DEPENDS "${ROOT}/data/*.s")
 file(GLOB SONG_ASM CONFIGURE_DEPENDS "${ROOT}/sound/songs/*.s" "${ROOT}/sound/songs/midi/*.s")
 set(GENERATED_ASM)
 set(SPECIAL_IDS "${CMAKE_BINARY_DIR}/generated/special_ids.inc")
+
+# 修复点：改进 awk 正则以适配新版 specials.inc 格式
 add_custom_command(
     OUTPUT "${SPECIAL_IDS}"
     COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_BINARY_DIR}/generated"
-    COMMAND /bin/sh -c "awk '/^[[:space:]]+def_special[[:space:]]/ { printf \".set SPECIAL_%s, %d\\n\", $2, id++ }' '${ROOT}/data/specials.inc' > '${SPECIAL_IDS}'"
+    COMMAND /bin/sh -c "awk 'BEGIN { id=0 } /^[[:space:]]*def_special[[:space:]]+/ { gsub(/,/, \"\", $2); printf \".set SPECIAL_%s, %d\\n\", $2, id++ }' '${ROOT}/data/specials.inc' > '${SPECIAL_IDS}'"
     DEPENDS "${ROOT}/data/specials.inc"
     VERBATIM)
+
 foreach(SOURCE IN LISTS DATA_ASM SONG_ASM)
     file(RELATIVE_PATH RELATIVE_SOURCE "${ROOT}" "${SOURCE}")
     set(OUTPUT "${CMAKE_BINARY_DIR}/generated/${RELATIVE_SOURCE}.o")
@@ -60,7 +64,8 @@ foreach(SOURCE IN LISTS DATA_ASM SONG_ASM)
         add_custom_command(
             OUTPUT "${OUTPUT}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${OUTPUT_DIR}"
-            COMMAND /bin/sh -c "cd '${ROOT}' && { printf \".include \\\"${SPECIAL_IDS}\\\"\\n\"; '${ROOT}/tools/preproc/preproc' '${SOURCE}' '${ROOT}/charmap.txt' | /usr/bin/cpp -I'${ROOT}/include' -DMODERN=1 -DPORTABLE -DUBFIX | '${ROOT}/tools/preproc/preproc' -ie '${SOURCE}' '${ROOT}/charmap.txt'; } > '${OUTPUT}.s' && '${ARM_NONE_EABI_AS}' -march=armv7-a -I'${ROOT}' -I'${ROOT}/sound' -o '${OUTPUT}' '${OUTPUT}.s'"
+            # 修复点：汇编预处理同样需要 -i 和 -g
+            COMMAND /bin/sh -c "cd '${ROOT}' && { printf \".include \\\"${SPECIAL_IDS}\\\"\\n\"; '${ROOT}/tools/preproc/preproc' -i -g '${ASSETS_DIR}' '${SOURCE}' '${ROOT}/charmap.txt' | /usr/bin/cpp -I'${ROOT}/include' -DMODERN=1 -DPORTABLE -DUBFIX | '${ROOT}/tools/preproc/preproc' -ie -g '${ASSETS_DIR}' '${SOURCE}' '${ROOT}/charmap.txt'; } > '${OUTPUT}.s' && '${ARM_NONE_EABI_AS}' -march=armv7-a -I'${ROOT}' -I'${ROOT}/sound' -o '${OUTPUT}' '${OUTPUT}.s'"
             DEPENDS "${SOURCE}" "${ROOT}/tools/preproc/preproc" "${ROOT}/charmap.txt" "${SPECIAL_IDS}"
             VERBATIM)
     endif()
@@ -77,8 +82,10 @@ add_custom_command(
 set_source_files_properties("${GAME_DATA_OBJECT}" PROPERTIES GENERATED TRUE EXTERNAL_OBJECT TRUE)
 
 add_library(main SHARED ${GENERATED_C} "${GAME_DATA_OBJECT}")
+# 修复点：显式加入平台目录作为 include 搜索路径
 target_include_directories(main PRIVATE
     "${ROOT}"
+    "${ROOT}/src/platform"
     "${ROOT}/sound"
     "${ROOT}/android/SDL2/include")
 target_compile_definitions(main PRIVATE

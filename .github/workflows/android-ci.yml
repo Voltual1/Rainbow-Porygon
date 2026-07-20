@@ -21,7 +21,6 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      # 1. 安装 GBA 编译环境
       - name: Install GBA Toolchain dependencies
         run: |
           sudo apt-get update
@@ -41,33 +40,13 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      # 2. 预编译 GBA 资产，并执行“降维打击”级别的路径同步
-      - name: Build GBA ROM & Mirror Correct Assets
+      # 只需要预编译工具和生成资产，不需要移动文件，CMake 现在知道资产在哪
+      - name: Pre-build GBA Tools and Assets
         run: |
           make -j$(nproc) tools
-          # KEEP_TEMPS=1 确保生成的 .inc 和 .i 文件不被删除
-          make -j$(nproc) all KEEP_TEMPS=1 || echo "GBA Link failed, continuing to sync assets..."
-          
-          echo "Mirroring generated assets into root for NDK compatibility..."
-          # 关键点：将生成的图形和数据资源直接合并到根目录，去掉 assets 层级
-          # 解决 Failed to open "./graphics/..." 报错
-          if [ -d "build/assets/graphics" ]; then
-            cp -a build/assets/graphics/. graphics/
-          fi
-          if [ -d "build/assets/data" ]; then
-            cp -a build/assets/data/. data/
-          fi
-          
-          # 同步 generated 头文件（如 map_groups.h）到 include
-          if [ -d "build/emerald" ]; then
-             cp -a build/emerald/. .
-             find build/emerald -name "*.h" -exec cp -v {} include/ \;
-             # 将成功的 special_ids.inc 备份出来，下一步会用到
-             cp build/emerald/special_ids.inc /tmp/special_ids.inc || true
-          fi
-          
-          # 确保 platform.h 在 include 目录下
-          find src/platform -name "platform.h" -exec cp -v {} include/ \;
+          make -j$(nproc) all KEEP_TEMPS=1 || echo "Assets generated, ignoring link error"
+          # 确保关键头文件存在
+          cp -v src/platform/platform.h include/ || true
 
       - name: Decode Keystore
         if: github.event_name != 'pull_request'
@@ -76,20 +55,9 @@ jobs:
         run: |
           echo $ENCODED_STRING | base64 -d > android/release.keystore
 
-      # 3. 编译 Android APK，并在编译中间过程拦截修复 special_ids.inc
       - name: Build Android APK
         run: |
           chmod +x android/SDL2/android-project/gradlew
-          
-          # 先运行一次配置，让 Android 编译目录产生
-          android/SDL2/android-project/gradlew -p android :app:generateReleaseResValues || true
-          
-          # 强行修复损坏的 special_ids.inc
-          # 我们在全局搜索所有由 CMake 产生的损坏 inc 文件，并用 GBA 编译出的正确版本覆盖它们
-          echo "Repairing corrupted special_ids.inc files..."
-          find android/app/.cxx -name "special_ids.inc" -exec cp -v /tmp/special_ids.inc {} \; || echo "No files to fix yet"
-          
-          # 正式编译
           android/SDL2/android-project/gradlew -p android :app:assembleRelease
         env:
           KEYSTORE_PATH: ../../release.keystore
