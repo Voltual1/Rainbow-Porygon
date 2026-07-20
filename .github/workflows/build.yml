@@ -1,7 +1,11 @@
 name: CI
 
 on:
-  workflow_dispatch: # 方便手动触发
+  workflow_dispatch:
+
+# 显式增加写入权限以解决 403 错误
+permissions:
+  contents: write
 
 env:
   GAME_REVISION: 0
@@ -79,7 +83,6 @@ jobs:
           echo "=== 编译后 Ccache 状态 ==="
           ccache -s
 
-      # 修复步骤：先打包输出到 /tmp/，避开当前文件夹的写入检测
       - name: Package entire workspace
         run: |
           echo "Packaging workspace to /tmp..."
@@ -93,7 +96,6 @@ jobs:
         run: |
           echo "BUILD_TAG=debug-dump-$(date +%Y%m%d_%H%M%S)" >> $GITHUB_OUTPUT
 
-      # 上传至 Release 草稿
       - name: Create Debug Release Draft
         uses: softprops/action-gh-release@v2
         with:
@@ -103,8 +105,8 @@ jobs:
             ### 自动化调试包
             此包包含了完整的 `build/` 目录以及所有被 `gbagfx` 生成的资源。
             请解压后重点检查：
-            1. `build/assets/` 下是否有 `.gbapal` 文件？
-            2. `graphics/` 源码目录下是否出现了 `.gbapal` 文件？
+            1. `build/assets/graphics/` 或 `build/emerald/graphics/` 下是否有 `.gbapal` 文件？
+            2. 源码根目录下的 `graphics/` 目录中是否生成了对应的编译后资源？
           draft: true
           files: workspace_debug_dump.tar.gz
         env:
