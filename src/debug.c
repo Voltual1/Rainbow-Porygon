@@ -508,7 +508,8 @@ static const s32 sPowersOfTen[] =
     1000000000,
 };
 
-static const u32 (*generateListFunctions[])(const struct DebugMenuOption *) =
+// 修复 1：修正函数指针数组类型，修饰符从 const u32 (*) 改为 u32 (*const [])
+static u32 (*const generateListFunctions[])(const struct DebugMenuOption *) =
 {
     [DEBUG_BASIC_MENU] = Debug_GenerateListBasicMenu,
     [DEBUG_FLAGS_MENU] = Debug_GenerateListFlagsMenu,
@@ -517,35 +518,36 @@ static const u32 (*generateListFunctions[])(const struct DebugMenuOption *) =
 
 // *******************************
 // Menu Actions. Make sure that submenus are defined before the menus that call them.
+// 修复 2：在结构体静态初始化中直接使用 COMPOUND_STRING，避免 C 语言不允许非编译期常量的报错
 static const struct DebugMenuOption sDebugMenu_Actions_TimeMenu_TimesOfDay[] =
 {
-    [TIME_MORNING] = { gTimeOfDayStringsTable[TIME_MORNING], DebugAction_TimeMenu_ChangeTimeOfDay },
-    [TIME_DAY]     = { gTimeOfDayStringsTable[TIME_DAY],     DebugAction_TimeMenu_ChangeTimeOfDay },
-    [TIME_EVENING] = { gTimeOfDayStringsTable[TIME_EVENING], DebugAction_TimeMenu_ChangeTimeOfDay },
-    [TIME_NIGHT]   = { gTimeOfDayStringsTable[TIME_NIGHT],   DebugAction_TimeMenu_ChangeTimeOfDay },
+    [TIME_MORNING] = { COMPOUND_STRING("Morning"), DebugAction_TimeMenu_ChangeTimeOfDay },
+    [TIME_DAY]     = { COMPOUND_STRING("Day"),     DebugAction_TimeMenu_ChangeTimeOfDay },
+    [TIME_EVENING] = { COMPOUND_STRING("Evening"), DebugAction_TimeMenu_ChangeTimeOfDay },
+    [TIME_NIGHT]   = { COMPOUND_STRING("Night"),   DebugAction_TimeMenu_ChangeTimeOfDay },
     { NULL }
 };
 
 static const struct DebugMenuOption sDebugMenu_Actions_TimeMenu_Weekdays[] =
 {
-    [WEEKDAY_SUN] = { gDayNameStringsTable[WEEKDAY_SUN], DebugAction_TimeMenu_ChangeWeekdays },
-    [WEEKDAY_MON] = { gDayNameStringsTable[WEEKDAY_MON], DebugAction_TimeMenu_ChangeWeekdays },
-    [WEEKDAY_TUE] = { gDayNameStringsTable[WEEKDAY_TUE], DebugAction_TimeMenu_ChangeWeekdays },
-    [WEEKDAY_WED] = { gDayNameStringsTable[WEEKDAY_WED], DebugAction_TimeMenu_ChangeWeekdays },
-    [WEEKDAY_THU] = { gDayNameStringsTable[WEEKDAY_THU], DebugAction_TimeMenu_ChangeWeekdays },
-    [WEEKDAY_FRI] = { gDayNameStringsTable[WEEKDAY_FRI], DebugAction_TimeMenu_ChangeWeekdays },
-    [WEEKDAY_SAT] = { gDayNameStringsTable[WEEKDAY_SAT], DebugAction_TimeMenu_ChangeWeekdays },
+    [WEEKDAY_SUN] = { COMPOUND_STRING("Sunday"),    DebugAction_TimeMenu_ChangeWeekdays },
+    [WEEKDAY_MON] = { COMPOUND_STRING("Monday"),    DebugAction_TimeMenu_ChangeWeekdays },
+    [WEEKDAY_TUE] = { COMPOUND_STRING("Tuesday"),   DebugAction_TimeMenu_ChangeWeekdays },
+    [WEEKDAY_WED] = { COMPOUND_STRING("Wednesday"), DebugAction_TimeMenu_ChangeWeekdays },
+    [WEEKDAY_THU] = { COMPOUND_STRING("Thursday"),  DebugAction_TimeMenu_ChangeWeekdays },
+    [WEEKDAY_FRI] = { COMPOUND_STRING("Friday"),    DebugAction_TimeMenu_ChangeWeekdays },
+    [WEEKDAY_SAT] = { COMPOUND_STRING("Saturday"),  DebugAction_TimeMenu_ChangeWeekdays },
     { NULL }
 };
 
 static const struct DebugMenuOption sDebugMenu_Actions_FollowerNPCMenu_Create[] =
 {
-    [DEBUG_FNPC_BRENDAN] = { gFollowerNPCStringsTable[DEBUG_FNPC_BRENDAN], DebugAction_CreateFollowerNPC },
-    [DEBUG_FNPC_MAY] =     { gFollowerNPCStringsTable[DEBUG_FNPC_MAY],     DebugAction_CreateFollowerNPC },
-    [DEBUG_FNPC_STEVEN] =  { gFollowerNPCStringsTable[DEBUG_FNPC_STEVEN],  DebugAction_CreateFollowerNPC },
-    [DEBUG_FNPC_WALLY] =   { gFollowerNPCStringsTable[DEBUG_FNPC_WALLY],   DebugAction_CreateFollowerNPC },
-    [DEBUG_FNPC_RED] =     { gFollowerNPCStringsTable[DEBUG_FNPC_RED],     DebugAction_CreateFollowerNPC },
-    [DEBUG_FNPC_LEAF] =    { gFollowerNPCStringsTable[DEBUG_FNPC_LEAF],    DebugAction_CreateFollowerNPC },
+    [DEBUG_FNPC_BRENDAN] = { COMPOUND_STRING("Brendan"), DebugAction_CreateFollowerNPC },
+    [DEBUG_FNPC_MAY]     = { COMPOUND_STRING("May"),     DebugAction_CreateFollowerNPC },
+    [DEBUG_FNPC_STEVEN]  = { COMPOUND_STRING("Steven"),  DebugAction_CreateFollowerNPC },
+    [DEBUG_FNPC_WALLY]   = { COMPOUND_STRING("Wally"),   DebugAction_CreateFollowerNPC },
+    [DEBUG_FNPC_RED]     = { COMPOUND_STRING("Red"),     DebugAction_CreateFollowerNPC },
+    [DEBUG_FNPC_LEAF]    = { COMPOUND_STRING("Leaf"),    DebugAction_CreateFollowerNPC },
     { NULL }
 };
 
@@ -863,10 +865,10 @@ static const struct DebugMenuOption *Debug_GetCurrentCallbackMenu(void)
 static bool32 IsSubMenuAction(const void *action)
 {
     return action == DebugAction_OpenSubMenu
-        || action == DebugAction_OpenSubMenuFlagsVars
-        || action == DebugAction_OpenSubMenuFakeRTC
-        || action == DebugAction_OpenSubMenuCreateFollowerNPC
-        || action == DebugAction_OpenSubMenuTrainers;
+| action == DebugAction_OpenSubMenuFlagsVars
+| action == DebugAction_OpenSubMenuFakeRTC
+| action == DebugAction_OpenSubMenuCreateFollowerNPC
+| action == DebugAction_OpenSubMenuTrainers;
 }
 
 static u32 Debug_GenerateListBasicMenu(const struct DebugMenuOption *items)
@@ -1644,14 +1646,20 @@ static u8 *ConvertQ22_10ToDecimalString(u8 *string, u32 q22_10, u32 decimalDigit
     return string;
 }
 
+// 修复 3：添加 #if PORTABLE 条件屏蔽在 Android/PC 移植版中不存在的 ROM 物理映射地址
 void CheckROMSize(struct ScriptContext *ctx)
 {
+#if PORTABLE
+    ConvertQ22_10ToDecimalString(gStringVar1, 0, 2, ROUND_CEILING);
+    ConvertQ22_10ToDecimalString(gStringVar2, 0, 2, ROUND_FLOOR);
+#else
     extern u8 __rom_end[];
     u32 currROMSizeB = __rom_end - (const u8 *)ROM_START;
     u32 currROMSizeKB = (currROMSizeB + 1023) / 1024;
     u32 currROMFreeKB = ((const u8 *)ROM_END - __rom_end) / 1024;
     ConvertQ22_10ToDecimalString(gStringVar1, currROMSizeKB, 2, ROUND_CEILING);
     ConvertQ22_10ToDecimalString(gStringVar2, currROMFreeKB, 2, ROUND_FLOOR);
+#endif
 }
 
 static void DebugAction_Util_Weather(u8 taskId)
@@ -3065,7 +3073,7 @@ static void DebugAction_Give_Pokemon_SelectShiny(u8 taskId)
     }
 }
 
-static void Debug_Display_Ability(u32 abilityNum, u32 digit, u8 windowId)//(u32 natureId, u32 digit, u8 windowId)
+static void Debug_Display_Ability(u32 abilityNum, u32 digit, u8 windowId)
 {
     enum Ability abilityId = GetAbilityBySpecies(sDebugMonData->species, abilityNum);
     StringCopy(gStringVar2, gText_DigitIndicator[digit]);
