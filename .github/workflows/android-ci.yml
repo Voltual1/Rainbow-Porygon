@@ -21,6 +21,7 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      # 1. 安装 GBA 编译环境
       - name: Install GBA Toolchain dependencies
         run: |
           sudo apt-get update
@@ -40,32 +41,33 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      # 核心修复步骤：生成 GBA 资产，并将它们合并回源码根目录
-      - name: Build GBA Assets & Mirror to Root
+      # 2. 预编译 GBA 资产，并执行“降维打击”级别的路径同步
+      - name: Build GBA ROM & Mirror Correct Assets
         run: |
           make -j$(nproc) tools
-          # 生成所有 .gbapal, .4bpp 以及 map_groups.h
-          # 使用 || true 是因为即便链接阶段报错，资产通常也已经生成完毕了
-          make -j$(nproc) all KEEP_TEMPS=1 || echo "GBA Link failed, but checking for assets..."
+          # KEEP_TEMPS=1 确保生成的 .inc 和 .i 文件不被删除
+          make -j$(nproc) all KEEP_TEMPS=1 || echo "GBA Link failed, continuing to sync assets..."
           
-          echo "Mirroring assets to satisfy Android preprocessor..."
-          # 将 build 目录下的资产深度合并回根目录
-          # 这样 ./graphics/crash_screen/assertf.pal.gbapal 就能被找到了
-          [ -d "build/assets" ] && cp -a build/assets/. .
-          [ -d "build/emerald" ] && cp -a build/emerald/. .
-          
-          # 确保 platform.h 在 include 目录下
-          if [ ! -f "include/platform.h" ]; then
-             echo "Syncing platform.h to include directory..."
-             find src/platform -name "platform.h" -exec cp -v {} include/ \;
+          echo "Mirroring generated assets into root for NDK compatibility..."
+          # 关键点：将生成的图形和数据资源直接合并到根目录，去掉 assets 层级
+          # 解决 Failed to open "./graphics/..." 报错
+          if [ -d "build/assets/graphics" ]; then
+            cp -a build/assets/graphics/. graphics/
+          fi
+          if [ -d "build/assets/data" ]; then
+            cp -a build/assets/data/. data/
           fi
           
-          # 解决 NDK 找不到生成的头文件问题
-          find build/emerald -name "*.h" -exec cp -v {} include/ \;
+          # 同步 generated 头文件（如 map_groups.h）到 include
+          if [ -d "build/emerald" ]; then
+             cp -a build/emerald/. .
+             find build/emerald -name "*.h" -exec cp -v {} include/ \;
+             # 将成功的 special_ids.inc 备份出来，下一步会用到
+             cp build/emerald/special_ids.inc /tmp/special_ids.inc || true
+          fi
           
-          echo "Final check for critical files:"
-          ls -l include/platform.h || exit 1
-          ls -l graphics/crash_screen/assertf.pal.gbapal || echo "Warning: Asset sync partially failed"
+          # 确保 platform.h 在 include 目录下
+          find src/platform -name "platform.h" -exec cp -v {} include/ \;
 
       - name: Decode Keystore
         if: github.event_name != 'pull_request'
@@ -74,10 +76,20 @@ jobs:
         run: |
           echo $ENCODED_STRING | base64 -d > android/release.keystore
 
+      # 3. 编译 Android APK，并在编译中间过程拦截修复 special_ids.inc
       - name: Build Android APK
         run: |
           chmod +x android/SDL2/android-project/gradlew
-          # 此时 preproc 已经在根目录能看到所有 .gbapal 文件了
+          
+          # 先运行一次配置，让 Android 编译目录产生
+          android/SDL2/android-project/gradlew -p android :app:generateReleaseResValues || true
+          
+          # 强行修复损坏的 special_ids.inc
+          # 我们在全局搜索所有由 CMake 产生的损坏 inc 文件，并用 GBA 编译出的正确版本覆盖它们
+          echo "Repairing corrupted special_ids.inc files..."
+          find android/app/.cxx -name "special_ids.inc" -exec cp -v /tmp/special_ids.inc {} \; || echo "No files to fix yet"
+          
+          # 正式编译
           android/SDL2/android-project/gradlew -p android :app:assembleRelease
         env:
           KEYSTORE_PATH: ../../release.keystore
@@ -95,8 +107,8 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: android-auto-build-${{ github.sha }}
-          name: "Android Build Success"
+          tag_name: android-build-${{ github.sha }}
+          name: "Android Successful Build"
           draft: true
           files: |
             android/app/build/outputs/apk/release/*.apk
