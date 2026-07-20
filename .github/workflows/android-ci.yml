@@ -40,13 +40,11 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      # 只需要预编译工具和生成资产，不需要移动文件，CMake 现在知道资产在哪
-      - name: Pre-build GBA Tools and Assets
+      # 只需运行预编译生成资产和头文件，无需移动位置
+      - name: Build GBA Assets
         run: |
           make -j$(nproc) tools
-          make -j$(nproc) all KEEP_TEMPS=1 || echo "Assets generated, ignoring link error"
-          # 确保关键头文件存在
-          cp -v src/platform/platform.h include/ || true
+          make -j$(nproc) all KEEP_TEMPS=1 || echo "Assets generated, link error ignored"
 
       - name: Decode Keystore
         if: github.event_name != 'pull_request'
