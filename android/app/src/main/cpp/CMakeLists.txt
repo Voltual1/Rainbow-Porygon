@@ -29,24 +29,24 @@ foreach(SOURCE IN LISTS GAME_C)
     add_custom_command(
         OUTPUT "${OUTPUT}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${OUTPUT_DIR}"
-        # 修正1：C 预处理，只使用 -g ASSETS_DIR 传入生成的 .i 文件
+        # 修正1：C 文件预处理，不再使用 -i，仅使用 -g 定位资产
         COMMAND /bin/sh -c "cd '${ROOT}' && '${CMAKE_C_COMPILER}' --target=${CMAKE_C_COMPILER_TARGET} --sysroot='${CMAKE_SYSROOT}' -E -std=gnu99 -iquote'${ROOT}/include' -iquote'${ROOT}/gflib' -iquote'${ROOT}/src/platform' -I'${ROOT}/android/SDL2/include' -DNONMATCHING -DPORTABLE -DPLATFORM_SDL2 -DRENDERER_EASY_DRAW -DMODERN=1 -DUBFIX '${SOURCE}' -o '${OUTPUT}.i' && '${ROOT}/tools/preproc/preproc' -g '${ASSETS_DIR}' '${OUTPUT}.i' '${ROOT}/charmap.txt' > '${OUTPUT}'"
         DEPENDS "${SOURCE}" "${ROOT}/tools/preproc/preproc" "${ROOT}/charmap.txt"
         VERBATIM)
     list(APPEND GENERATED_C "${OUTPUT}")
 endforeach()
 
-# 修正2：补全 "${ROOT}/sound/*.s" ，不再漏掉音色库文件！
+# 包含 data 和 sound 的汇编文件
 file(GLOB DATA_ASM CONFIGURE_DEPENDS "${ROOT}/data/*.s" "${ROOT}/sound/*.s")
 file(GLOB SONG_ASM CONFIGURE_DEPENDS "${ROOT}/sound/songs/*.s" "${ROOT}/sound/songs/midi/*.s")
 set(GENERATED_ASM)
 set(SPECIAL_IDS "${CMAKE_BINARY_DIR}/generated/special_ids.inc")
 
-# 修正3：在 awk 中严格使用 $$2，防止 CMake 把它吃掉，从而彻底解决 missing expression 报错！
+# 修正2：彻底修复 awk，使用 $2 恢复正常语义，并消除 Expansion 中可能存在的逗号
 add_custom_command(
     OUTPUT "${SPECIAL_IDS}"
     COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_BINARY_DIR}/generated"
-    COMMAND /bin/sh -c "awk 'BEGIN { id=0 } /^[[:space:]]*def_special[[:space:]]+/ { gsub(/,/, \"\", $$2); printf \".set SPECIAL_%s, %d\\n\", $$2, id++ }' '${ROOT}/data/specials.inc' > '${SPECIAL_IDS}'"
+    COMMAND /bin/sh -c "awk 'BEGIN { id=0 } /^[[:space:]]*def_special[[:space:]]+/ { gsub(/,/, \"\", $2); printf \".set SPECIAL_%s, %d\\n\", $2, id++ }' '${ROOT}/data/specials.inc' > '${SPECIAL_IDS}'"
     DEPENDS "${ROOT}/data/specials.inc"
     VERBATIM)
 
@@ -65,8 +65,8 @@ foreach(SOURCE IN LISTS DATA_ASM SONG_ASM)
         add_custom_command(
             OUTPUT "${OUTPUT}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${OUTPUT_DIR}"
-            # 修正4：完美还原原始 Makefile 逻辑，第二层 preproc 使用 -ie '${SOURCE}'，绝不会再报 no file extension！
-            COMMAND /bin/sh -c "cd '${ROOT}' && { printf \".include \\\"${SPECIAL_IDS}\\\"\\n\"; '${ROOT}/tools/preproc/preproc' -s '${SOURCE}' '${ROOT}/charmap.txt' | /usr/bin/cpp -I'${ROOT}/include' -I'${ROOT}/sound' -I'${ROOT}/src/platform' -DMODERN=1 -DPORTABLE -DUBFIX | '${ROOT}/tools/preproc/preproc' -ie '${SOURCE}' '${ROOT}/charmap.txt'; } > '${OUTPUT}.s' && '${ARM_NONE_EABI_AS}' -march=armv7-a -I'${ROOT}' -I'${ROOT}/sound' -o '${OUTPUT}' '${OUTPUT}.s'"
+            # 修正3：绝地修复！第二层 preproc 虽然有 -i (包含在 -ie 中) 表示读取 stdin，但必须传入 '${SOURCE}' 作为文件名给它提取 .s 后缀，绝不能用 '-'！
+            COMMAND /bin/sh -c "cd '${ROOT}' && { printf \".include \\\"${SPECIAL_IDS}\\\"\\n\"; '${ROOT}/tools/preproc/preproc' -s '${SOURCE}' '${ROOT}/charmap.txt' | /usr/bin/cpp -I'${ROOT}/include' -I'${ROOT}/sound' -I'${ROOT}/src/platform' -DMODERN=1 -DPORTABLE -DUBFIX | '${ROOT}/tools/preproc/preproc' -ie -g '${ASSETS_DIR}' '${SOURCE}' '${ROOT}/charmap.txt'; } > '${OUTPUT}.s' && '${ARM_NONE_EABI_AS}' -march=armv7-a -I'${ROOT}' -I'${ROOT}/sound' -o '${OUTPUT}' '${OUTPUT}.s'"
             DEPENDS "${SOURCE}" "${ROOT}/tools/preproc/preproc" "${ROOT}/charmap.txt" "${SPECIAL_IDS}"
             VERBATIM)
     endif()
