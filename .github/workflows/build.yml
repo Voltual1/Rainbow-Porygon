@@ -72,7 +72,6 @@ jobs:
 
           make tools
           echo "=== 开始编译 ROM ==="
-          # 注意：这里保留了 KEEP_TEMPS=1 确保中间产物不被删
           make -j$(nproc) all \
             CC="ccache arm-none-eabi-gcc" \
             KEEP_TEMPS=1
@@ -80,12 +79,13 @@ jobs:
           echo "=== 编译后 Ccache 状态 ==="
           ccache -s
 
-      # 关键步骤：打包整个工作目录
+      # 修复步骤：先打包输出到 /tmp/，避开当前文件夹的写入检测
       - name: Package entire workspace
         run: |
-          echo "Packaging workspace for inspection..."
-          # 排除掉巨大的缓存目录 .ccache 和 .git，只保留源码和 build 产物
-          tar -czf workspace_debug_dump.tar.gz --exclude='.ccache' --exclude='.git' .
+          echo "Packaging workspace to /tmp..."
+          tar -czf /tmp/workspace_debug_dump.tar.gz --exclude='.ccache' --exclude='.git' .
+          echo "Moving package back to workspace..."
+          mv /tmp/workspace_debug_dump.tar.gz .
 
       - name: Get version info
         id: version
