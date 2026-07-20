@@ -1,111 +1,101 @@
-name: CI
+name: Android CI
 
 on:
-  workflow_dispatch: # 方便手动触发
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
 
-env:
-  GAME_REVISION: 0
-  GAME_LANGUAGE: ENGLISH
-  COMPARE: 0
-  UNUSED_ERROR: 1
-  DEPRECATED_ERROR: 1
-  CCACHE_DIR: ${{ github.workspace }}/.ccache
+permissions:
+  contents: write
 
 jobs:
   build:
-    if: github.actor != 'allcontributors[bot]'
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive # 必须递归初始化 SDL2 等子模块
 
-      - name: Install dependencies
+      # 1. 安装 GBA 编译器与依赖工具
+      - name: Install GBA Toolchain dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             binutils-arm-none-eabi gcc-arm-none-eabi libnewlib-arm-none-eabi \
             libpng-dev python3 ccache
 
-      - name: Cache build tools
-        uses: actions/cache@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
-          path: |
-            tools/bin2c/bin2c
-            tools/gbafix/gbafix
-            tools/gbagfx/gbagfx
-            tools/jsonproc/jsonproc
-            tools/mapjson/mapjson
-            tools/mid2agb/mid2agb
-            tools/preproc/preproc
-            tools/ramscrgen/ramscrgen
-            tools/rsfont/rsfont
-            tools/scaninc/scaninc
-            tools/trainerproc/trainerproc
-            tools/compresSmol/compresSmol
-            tools/compresSmol/compresSmolTilemap
-            tools/wav2agb/wav2agb
-          key: tools-${{ runner.os }}-${{ hashFiles('tools/*/Makefile', 'tools/**/*.c', 'tools/**/*.cpp', 'tools/**/*.h') }}
+          java-version: "17"
+          distribution: "temurin"
 
-      - name: Cache ccache
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.CCACHE_DIR }}
-          key: ccache-emerald-${{ runner.os }}-main
-          restore-keys: |
-            ccache-emerald-${{ runner.os }}-
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
-      - name: ROM (Emerald)
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      # 2. 核心修复步骤：完整运行一次 GBA 编译，并将生成的 assets 复制回源码目录，以兼容 Android 的 preproc 寻址
+      - name: Build GBA ROM & Sync Assets to Source Tree
+        run: |
+          make -j$(nproc) tools
+          make -j$(nproc)
+          # 将 build/assets/ 目录下的所有编译后资产（.gbapal, .4bpp 等）同步回源码树
+          cp -r build/assets/* .
+
+      - name: Decode Keystore
+        if: github.event_name != 'pull_request'
         env:
-          GAME_VERSION: EMERALD
+          ENCODED_STRING: ${{ secrets.SIGNING_KEY }}
         run: |
-          mkdir -p ${{ env.CCACHE_DIR }}
-          export CCACHE_DIR=${{ env.CCACHE_DIR }}
-          export CCACHE_MAXSIZE=500M
-          export CCACHE_SLOPPINESS="time_macros,include_file_mtime,include_file_ctime,pch_defines,locale,modules,files"
-          export CCACHE_COMPILERCHECK=none
-          export CCACHE_BASEDIR=${{ github.workspace }}
+          echo $ENCODED_STRING | base64 -d > android/release.keystore
 
-          ccache -M 500M
-          echo "=== 编译前 Ccache 状态 ==="
-          ccache -s
-
-          make tools
-          echo "=== 开始编译 ROM ==="
-          make -j$(nproc) all \
-            CC="ccache arm-none-eabi-gcc" \
-            KEEP_TEMPS=1
-
-          echo "=== 编译后 Ccache 状态 ==="
-          ccache -s
-
-      # 修复步骤：先打包输出到 /tmp/，避开当前文件夹的写入检测
-      - name: Package entire workspace
+      - name: Build Android APK
         run: |
-          echo "Packaging workspace to /tmp..."
-          tar -czf /tmp/workspace_debug_dump.tar.gz --exclude='.ccache' --exclude='.git' .
-          echo "Moving package back to workspace..."
-          mv /tmp/workspace_debug_dump.tar.gz .
+          chmod +x android/SDL2/android-project/gradlew
+          android/SDL2/android-project/gradlew -p android :app:assembleRelease
+        env:
+          KEYSTORE_PATH: ../../release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
       - name: Get version info
         id: version
         shell: bash
         run: |
-          echo "BUILD_TAG=debug-dump-$(date +%Y%m%d_%H%M%S)" >> $GITHUB_OUTPUT
+          echo "BUILD_VERSION=android-build-$(date +%Y%m%d_%H%M%S)-${GITHUB_SHA:0:8}" >> $GITHUB_OUTPUT
+          echo "TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")" >> $GITHUB_OUTPUT
 
-      # 上传至 Release 草稿
-      - name: Create Debug Release Draft
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pokeemerald-android-release
+          path: android/app/build/outputs/apk/release/*.apk
+
+      - name: Create Draft Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.BUILD_TAG }}
-          name: "Debug Dump: Workspace After GBA Build"
+          tag_name: ${{ steps.version.outputs.BUILD_VERSION }}
+          name: "Android Auto Build ${{ steps.version.outputs.BUILD_VERSION }}"
           body: |
-            ### 自动化调试包
-            此包包含了完整的 `build/` 目录以及所有被 `gbagfx` 生成的资源。
-            请解压后重点检查：
-            1. `build/assets/` 下是否有 `.gbapal` 文件？
-            2. `graphics/` 源码目录下是否出现了 `.gbapal` 文件？
+            ### Android 构建成功
+            - 提交: `${{ github.sha }}`
+            - 构建时间: `${{ steps.version.outputs.TIMESTAMP }}`
+            - 资产已被同步至源码目录，通过了 preproc 预处理器检验。
           draft: true
-          files: workspace_debug_dump.tar.gz
+          files: |
+            android/app/build/outputs/apk/release/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clean up Keystore
+        if: always()
+        run: rm -f android/release.keystore
