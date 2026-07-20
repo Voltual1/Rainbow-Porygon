@@ -19,9 +19,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: recursive # 必须递归初始化 SDL2 等子模块
+          submodules: recursive
 
-      # 1. 安装 GBA 编译器与依赖工具
+      # 1. 安装 GBA 编译链（用于生成 .gbapal 和 .c 源码）
       - name: Install GBA Toolchain dependencies
         run: |
           sudo apt-get update
@@ -41,13 +41,20 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      # 2. 核心修复步骤：完整运行一次 GBA 编译，并将生成的 assets 复制回源码目录，以兼容 Android 的 preproc 寻址
-      - name: Build GBA ROM & Sync Assets to Source Tree
+      # 2. 预编译 GBA：生成所有 NDK 编译所需的中间资源和头文件
+      - name: Build GBA ROM & Sync Generated Files
         run: |
           make -j$(nproc) tools
-          make -j$(nproc)
-          # 将 build/assets/ 目录下的所有编译后资产（.gbapal, .4bpp 等）同步回源码树
-          cp -r build/assets/* .
+          # KEEP_TEMPS=1 确保生成的 .i 文件和中间源码不被删除
+          make -j$(nproc) all KEEP_TEMPS=1
+          
+          echo "Merging generated assets and code back to source tree..."
+          # 关键操作：将 build 下两个核心输出目录的内容镜像复制回根目录
+          # 这会把 build/assets/graphics/xxx.gbapal 放到 ./graphics/xxx.gbapal
+          # 这会把 build/emerald/src/map_groups.h 放到 ./src/map_groups.h
+          cp -a build/assets/. .
+          cp -a build/emerald/. .
+          echo "Merge complete."
 
       - name: Decode Keystore
         if: github.event_name != 'pull_request'
@@ -59,6 +66,7 @@ jobs:
       - name: Build Android APK
         run: |
           chmod +x android/SDL2/android-project/gradlew
+          # 执行 Android 构建，此时 preproc 将能正确找到根目录下被同步回来的 .gbapal 文件
           android/SDL2/android-project/gradlew -p android :app:assembleRelease
         env:
           KEYSTORE_PATH: ../../release.keystore
@@ -88,8 +96,7 @@ jobs:
           body: |
             ### Android 构建成功
             - 提交: `${{ github.sha }}`
-            - 构建时间: `${{ steps.version.outputs.TIMESTAMP }}`
-            - 资产已被同步至源码目录，通过了 preproc 预处理器检验。
+            - 构建说明: 已同步 GBA 编译产物（assets & generated code）至根目录，解决了 NDK 路径冲突。
           draft: true
           files: |
             android/app/build/outputs/apk/release/*.apk

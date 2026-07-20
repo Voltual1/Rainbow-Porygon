@@ -1,7 +1,7 @@
 name: CI
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # 方便手动触发
 
 env:
   GAME_REVISION: 0
@@ -9,24 +9,24 @@ env:
   COMPARE: 0
   UNUSED_ERROR: 1
   DEPRECATED_ERROR: 1
-  # 告诉 ccache 把缓存放在哪里，方便 Actions 收集
   CCACHE_DIR: ${{ github.workspace }}/.ccache
 
 jobs:
   build:
     if: github.actor != 'allcontributors[bot]'
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 1. 安装依赖时顺便加上 ccache
-      - name: Install binutils
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends binutils-arm-none-eabi gcc-arm-none-eabi libnewlib-arm-none-eabi libpng-dev python3 ccache
+          sudo apt-get install -y --no-install-recommends \
+            binutils-arm-none-eabi gcc-arm-none-eabi libnewlib-arm-none-eabi \
+            libpng-dev python3 ccache
 
-      # 2. 现有的工具缓存（保持不变）
       - name: Cache build tools
         uses: actions/cache@v4
         with:
@@ -47,45 +47,65 @@ jobs:
             tools/wav2agb/wav2agb
           key: tools-${{ runner.os }}-${{ hashFiles('tools/*/Makefile', 'tools/**/*.c', 'tools/**/*.cpp', 'tools/**/*.h') }}
 
-      # 3. 新增：源码编译缓存 (ccache)
       - name: Cache ccache
         uses: actions/cache@v4
         with:
           path: ${{ env.CCACHE_DIR }}
-          # 键名包含 commit 系统的 hash，保证每次都能更新缓存
-          key: ccache-${{ runner.os }}-${{ github.sha }}
-          # 如果没有精确命中，就继承上一次的缓存
+          key: ccache-emerald-${{ runner.os }}-main
           restore-keys: |
-            ccache-${{ runner.os }}-
+            ccache-emerald-${{ runner.os }}-
 
       - name: ROM (Emerald)
         env:
           GAME_VERSION: EMERALD
         run: |
-          # 确保缓存目录存在
           mkdir -p ${{ env.CCACHE_DIR }}
-          
-          # 【核心修复 1】：允许 ccache 包装非 gcc 独立程序 (cc1)
+          export CCACHE_DIR=${{ env.CCACHE_DIR }}
+          export CCACHE_MAXSIZE=500M
+          export CCACHE_SLOPPINESS="time_macros,include_file_mtime,include_file_ctime,pch_defines,locale,modules,files"
           export CCACHE_COMPILERCHECK=none
-          
-          # 【核心修复 2】：非常关键！告诉 ccache 忽略由于 KEEP_TEMPS 引入的宏和临时文件绝对路径差异
-          export CCACHE_SLOPPINESS=time_macros,include_file_mtime,include_file_ctime
-          
-          # 限制缓存大小并查看初始状态
+          export CCACHE_BASEDIR=${{ github.workspace }}
+
           ccache -M 500M
           echo "=== 编译前 Ccache 状态 ==="
           ccache -s
-          
-          # 【核心修复 3】：获取真实的 cc1 路径
-          REAL_CC1=$(arm-none-eabi-gcc --print-prog-name=cc1)
-          
-          # 【核心修复 4】：传入 KEEP_TEMPS=1，强迫 Makefile 落地临时文件，让 Ccache 可以抓取哈希
-          make -j$(nproc) -O all CC1="ccache $REAL_CC1" KEEP_TEMPS=1
-          
-          # 打印编译后状态
+
+          make tools
+          echo "=== 开始编译 ROM ==="
+          # 注意：这里保留了 KEEP_TEMPS=1 确保中间产物不被删
+          make -j$(nproc) all \
+            CC="ccache arm-none-eabi-gcc" \
+            KEEP_TEMPS=1
+
           echo "=== 编译后 Ccache 状态 ==="
           ccache -s
 
-      # 5. 最终状态同步
-      - name: All builds passed
-        run: echo "Emerald build passed."
+      # 关键步骤：打包整个工作目录
+      - name: Package entire workspace
+        run: |
+          echo "Packaging workspace for inspection..."
+          # 排除掉巨大的缓存目录 .ccache 和 .git，只保留源码和 build 产物
+          tar -czf workspace_debug_dump.tar.gz --exclude='.ccache' --exclude='.git' .
+
+      - name: Get version info
+        id: version
+        shell: bash
+        run: |
+          echo "BUILD_TAG=debug-dump-$(date +%Y%m%d_%H%M%S)" >> $GITHUB_OUTPUT
+
+      # 上传至 Release 草稿
+      - name: Create Debug Release Draft
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.BUILD_TAG }}
+          name: "Debug Dump: Workspace After GBA Build"
+          body: |
+            ### 自动化调试包
+            此包包含了完整的 `build/` 目录以及所有被 `gbagfx` 生成的资源。
+            请解压后重点检查：
+            1. `build/assets/` 下是否有 `.gbapal` 文件？
+            2. `graphics/` 源码目录下是否出现了 `.gbapal` 文件？
+          draft: true
+          files: workspace_debug_dump.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

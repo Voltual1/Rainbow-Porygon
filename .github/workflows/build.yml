@@ -1,11 +1,10 @@
 name: CI
 
 on:
-  workflow_dispatch:
+#  push:
+#   branches: [ master ]
 
-# 显式增加写入权限以解决 403 错误
-permissions:
-  contents: write
+  workflow_dispatch:
 
 env:
   GAME_REVISION: 0
@@ -64,6 +63,7 @@ jobs:
           GAME_VERSION: EMERALD
         run: |
           mkdir -p ${{ env.CCACHE_DIR }}
+
           export CCACHE_DIR=${{ env.CCACHE_DIR }}
           export CCACHE_MAXSIZE=500M
           export CCACHE_SLOPPINESS="time_macros,include_file_mtime,include_file_ctime,pch_defines,locale,modules,files"
@@ -82,32 +82,3 @@ jobs:
 
           echo "=== 编译后 Ccache 状态 ==="
           ccache -s
-
-      - name: Package entire workspace
-        run: |
-          echo "Packaging workspace to /tmp..."
-          tar -czf /tmp/workspace_debug_dump.tar.gz --exclude='.ccache' --exclude='.git' .
-          echo "Moving package back to workspace..."
-          mv /tmp/workspace_debug_dump.tar.gz .
-
-      - name: Get version info
-        id: version
-        shell: bash
-        run: |
-          echo "BUILD_TAG=debug-dump-$(date +%Y%m%d_%H%M%S)" >> $GITHUB_OUTPUT
-
-      - name: Create Debug Release Draft
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.version.outputs.BUILD_TAG }}
-          name: "Debug Dump: Workspace After GBA Build"
-          body: |
-            ### 自动化调试包
-            此包包含了完整的 `build/` 目录以及所有被 `gbagfx` 生成的资源。
-            请解压后重点检查：
-            1. `build/assets/graphics/` 或 `build/emerald/graphics/` 下是否有 `.gbapal` 文件？
-            2. 源码根目录下的 `graphics/` 目录中是否生成了对应的编译后资源？
-          draft: true
-          files: workspace_debug_dump.tar.gz
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
