@@ -1,10 +1,7 @@
 name: CI
 
 on:
-  push:
-   branches: [ master ]
-
-  workflow_dispatch:
+  workflow_dispatch: # 方便手动触发
 
 env:
   GAME_REVISION: 0
@@ -63,7 +60,6 @@ jobs:
           GAME_VERSION: EMERALD
         run: |
           mkdir -p ${{ env.CCACHE_DIR }}
-
           export CCACHE_DIR=${{ env.CCACHE_DIR }}
           export CCACHE_MAXSIZE=500M
           export CCACHE_SLOPPINESS="time_macros,include_file_mtime,include_file_ctime,pch_defines,locale,modules,files"
@@ -76,9 +72,40 @@ jobs:
 
           make tools
           echo "=== 开始编译 ROM ==="
+          # 注意：这里保留了 KEEP_TEMPS=1 确保中间产物不被删
           make -j$(nproc) all \
             CC="ccache arm-none-eabi-gcc" \
             KEEP_TEMPS=1
 
           echo "=== 编译后 Ccache 状态 ==="
           ccache -s
+
+      # 关键步骤：打包整个工作目录
+      - name: Package entire workspace
+        run: |
+          echo "Packaging workspace for inspection..."
+          # 排除掉巨大的缓存目录 .ccache 和 .git，只保留源码和 build 产物
+          tar -czf workspace_debug_dump.tar.gz --exclude='.ccache' --exclude='.git' .
+
+      - name: Get version info
+        id: version
+        shell: bash
+        run: |
+          echo "BUILD_TAG=debug-dump-$(date +%Y%m%d_%H%M%S)" >> $GITHUB_OUTPUT
+
+      # 上传至 Release 草稿
+      - name: Create Debug Release Draft
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.BUILD_TAG }}
+          name: "Debug Dump: Workspace After GBA Build"
+          body: |
+            ### 自动化调试包
+            此包包含了完整的 `build/` 目录以及所有被 `gbagfx` 生成的资源。
+            请解压后重点检查：
+            1. `build/assets/` 下是否有 `.gbapal` 文件？
+            2. `graphics/` 源码目录下是否出现了 `.gbapal` 文件？
+          draft: true
+          files: workspace_debug_dump.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
