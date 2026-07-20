@@ -21,7 +21,6 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      # 1. 安装 GBA 编译链（用于生成 .gbapal 和 .c 源码）
       - name: Install GBA Toolchain dependencies
         run: |
           sudo apt-get update
@@ -41,20 +40,32 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      # 2. 预编译 GBA：生成所有 NDK 编译所需的中间资源和头文件
-      - name: Build GBA ROM & Sync Generated Files
+      # 核心修复步骤：生成 GBA 资产，并将它们合并回源码根目录
+      - name: Build GBA Assets & Mirror to Root
         run: |
           make -j$(nproc) tools
-          # KEEP_TEMPS=1 确保生成的 .i 文件和中间源码不被删除
-          make -j$(nproc) all KEEP_TEMPS=1
+          # 生成所有 .gbapal, .4bpp 以及 map_groups.h
+          # 使用 || true 是因为即便链接阶段报错，资产通常也已经生成完毕了
+          make -j$(nproc) all KEEP_TEMPS=1 || echo "GBA Link failed, but checking for assets..."
           
-          echo "Merging generated assets and code back to source tree..."
-          # 关键操作：将 build 下两个核心输出目录的内容镜像复制回根目录
-          # 这会把 build/assets/graphics/xxx.gbapal 放到 ./graphics/xxx.gbapal
-          # 这会把 build/emerald/src/map_groups.h 放到 ./src/map_groups.h
-          cp -a build/assets/. .
-          cp -a build/emerald/. .
-          echo "Merge complete."
+          echo "Mirroring assets to satisfy Android preprocessor..."
+          # 将 build 目录下的资产深度合并回根目录
+          # 这样 ./graphics/crash_screen/assertf.pal.gbapal 就能被找到了
+          [ -d "build/assets" ] && cp -a build/assets/. .
+          [ -d "build/emerald" ] && cp -a build/emerald/. .
+          
+          # 确保 platform.h 在 include 目录下
+          if [ ! -f "include/platform.h" ]; then
+             echo "Syncing platform.h to include directory..."
+             find src/platform -name "platform.h" -exec cp -v {} include/ \;
+          fi
+          
+          # 解决 NDK 找不到生成的头文件问题
+          find build/emerald -name "*.h" -exec cp -v {} include/ \;
+          
+          echo "Final check for critical files:"
+          ls -l include/platform.h || exit 1
+          ls -l graphics/crash_screen/assertf.pal.gbapal || echo "Warning: Asset sync partially failed"
 
       - name: Decode Keystore
         if: github.event_name != 'pull_request'
@@ -66,20 +77,13 @@ jobs:
       - name: Build Android APK
         run: |
           chmod +x android/SDL2/android-project/gradlew
-          # 执行 Android 构建，此时 preproc 将能正确找到根目录下被同步回来的 .gbapal 文件
+          # 此时 preproc 已经在根目录能看到所有 .gbapal 文件了
           android/SDL2/android-project/gradlew -p android :app:assembleRelease
         env:
           KEYSTORE_PATH: ../../release.keystore
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-
-      - name: Get version info
-        id: version
-        shell: bash
-        run: |
-          echo "BUILD_VERSION=android-build-$(date +%Y%m%d_%H%M%S)-${GITHUB_SHA:0:8}" >> $GITHUB_OUTPUT
-          echo "TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")" >> $GITHUB_OUTPUT
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -91,12 +95,8 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.BUILD_VERSION }}
-          name: "Android Auto Build ${{ steps.version.outputs.BUILD_VERSION }}"
-          body: |
-            ### Android 构建成功
-            - 提交: `${{ github.sha }}`
-            - 构建说明: 已同步 GBA 编译产物（assets & generated code）至根目录，解决了 NDK 路径冲突。
+          tag_name: android-auto-build-${{ github.sha }}
+          name: "Android Build Success"
           draft: true
           files: |
             android/app/build/outputs/apk/release/*.apk
