@@ -3,7 +3,7 @@ project(pokeemerald_android C ASM)
 
 set(ROOT "${CMAKE_CURRENT_LIST_DIR}/../../../../..")
 
-# 自动定位 GBA 交叉编译工具
+# 自动寻找工具链
 find_program(ARM_NONE_EABI_AS arm-none-eabi-as REQUIRED)
 find_program(ARM_NONE_EABI_LD arm-none-eabi-ld REQUIRED)
 find_program(ARM_NONE_EABI_OBJCOPY arm-none-eabi-objcopy REQUIRED)
@@ -13,7 +13,7 @@ set(SDL_SHARED ON CACHE BOOL "" FORCE)
 set(SDL_TEST OFF CACHE BOOL "" FORCE)
 add_subdirectory("${ROOT}/android/SDL2" "${CMAKE_BINARY_DIR}/SDL2")
 
-# 设置 Expansion 资产路径
+# 设置预编译资产目录
 set(ASSETS_DIR "${ROOT}/build/assets")
 
 file(GLOB_RECURSE GAME_C CONFIGURE_DEPENDS
@@ -29,20 +29,20 @@ foreach(SOURCE IN LISTS GAME_C)
     add_custom_command(
         OUTPUT "${OUTPUT}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${OUTPUT_DIR}"
-        # 修复 1：预处理 C 文件时加入 iquote 指向 platform 目录，并修复 preproc 参数
-        COMMAND /bin/sh -c "cd '${ROOT}' && '${CMAKE_C_COMPILER}' --target=${CMAKE_C_COMPILER_TARGET} --sysroot='${CMAKE_SYSROOT}' -E -std=gnu99 -iquote'${ROOT}/include' -iquote'${ROOT}/gflib' -iquote'${ROOT}/src/platform' -I'${ROOT}/android/SDL2/include' -DNONMATCHING -DPORTABLE -DPLATFORM_SDL2 -DRENDERER_EASY_DRAW -DMODERN=1 -DUBFIX '${SOURCE}' -o '${OUTPUT}.i' && '${ROOT}/tools/preproc/preproc' -i -g '${ASSETS_DIR}' '${OUTPUT}.i' '${ROOT}/charmap.txt' > '${OUTPUT}'"
+        # 修正 1：移除 C 文件预处理中错误的 -i 参数，它会破坏文件读取
+        COMMAND /bin/sh -c "cd '${ROOT}' && '${CMAKE_C_COMPILER}' --target=${CMAKE_C_COMPILER_TARGET} --sysroot='${CMAKE_SYSROOT}' -E -std=gnu99 -iquote'${ROOT}/include' -iquote'${ROOT}/gflib' -iquote'${ROOT}/src/platform' -I'${ROOT}/android/SDL2/include' -DNONMATCHING -DPORTABLE -DPLATFORM_SDL2 -DRENDERER_EASY_DRAW -DMODERN=1 -DUBFIX '${SOURCE}' -o '${OUTPUT}.i' && '${ROOT}/tools/preproc/preproc' -g '${ASSETS_DIR}' '${OUTPUT}.i' '${ROOT}/charmap.txt' > '${OUTPUT}'"
         DEPENDS "${SOURCE}" "${ROOT}/tools/preproc/preproc" "${ROOT}/charmap.txt"
         VERBATIM)
     list(APPEND GENERATED_C "${OUTPUT}")
 endforeach()
 
-# 修复 2：包含 sound/ 根目录下的汇编文件（解决 MPlayDef.s 等缺失问题）
-file(GLOB DATA_ASM CONFIGURE_DEPENDS "${ROOT}/data/*.s" "${ROOT}/sound/*.s")
+# 修正 2：改回只抓取 data/*.s，sound 会通过汇编中的 .include 自动被引用
+file(GLOB DATA_ASM CONFIGURE_DEPENDS "${ROOT}/data/*.s")
 file(GLOB SONG_ASM CONFIGURE_DEPENDS "${ROOT}/sound/songs/*.s" "${ROOT}/sound/songs/midi/*.s")
 set(GENERATED_ASM)
 set(SPECIAL_IDS "${CMAKE_BINARY_DIR}/generated/special_ids.inc")
 
-# 修复 3：增强 awk 鲁棒性，自动剔除 Expansion 格式中的逗号并初始化 id
+# 修正 3：增强 awk 逻辑，自动剔除 Expansion 格式中的逗号并初始化 id
 add_custom_command(
     OUTPUT "${SPECIAL_IDS}"
     COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_BINARY_DIR}/generated"
@@ -65,9 +65,8 @@ foreach(SOURCE IN LISTS DATA_ASM SONG_ASM)
         add_custom_command(
             OUTPUT "${OUTPUT}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${OUTPUT_DIR}"
-            # 修复 4：核心修复！将 preproc 的输入改为 '-' (stdin)，使 cpp 处理后的 voice_groups.inc 能够生效
-            # 同时加入 -g 指向 build/assets 解决图片寻址
-            COMMAND /bin/sh -c "cd '${ROOT}' && { printf \".include \\\"${SPECIAL_IDS}\\\"\\n\"; '${ROOT}/tools/preproc/preproc' '${SOURCE}' '${ROOT}/charmap.txt' | /usr/bin/cpp -I'${ROOT}/include' -I'${ROOT}/sound' -I'${ROOT}/src/platform' -DMODERN=1 -DPORTABLE -DUBFIX | '${ROOT}/tools/preproc/preproc' -i -g '${ASSETS_DIR}' - '${ROOT}/charmap.txt'; } > '${OUTPUT}.s' && '${ARM_NONE_EABI_AS}' -march=armv7-a -I'${ROOT}' -I'${ROOT}/sound' -o '${OUTPUT}' '${OUTPUT}.s'"
+            # 修正 4：彻底修复管道！第一个 preproc 读 SOURCE 文件，cpp 拥有 sound/ 搜索权，第二个 preproc 用 -ie 读入 stdin。
+            COMMAND /bin/sh -c "cd '${ROOT}' && { printf \".include \\\"${SPECIAL_IDS}\\\"\\n\"; '${ROOT}/tools/preproc/preproc' -g '${ASSETS_DIR}' '${SOURCE}' '${ROOT}/charmap.txt' | /usr/bin/cpp -I'${ROOT}/include' -I'${ROOT}/sound' -I'${ROOT}/src/platform' -DMODERN=1 -DPORTABLE -DUBFIX | '${ROOT}/tools/preproc/preproc' -ie -g '${ASSETS_DIR}' '${SOURCE}' '${ROOT}/charmap.txt'; } > '${OUTPUT}.s' && '${ARM_NONE_EABI_AS}' -march=armv7-a -I'${ROOT}' -I'${ROOT}/sound' -o '${OUTPUT}' '${OUTPUT}.s'"
             DEPENDS "${SOURCE}" "${ROOT}/tools/preproc/preproc" "${ROOT}/charmap.txt" "${SPECIAL_IDS}"
             VERBATIM)
     endif()
@@ -93,7 +92,10 @@ target_include_directories(main PRIVATE
 target_compile_definitions(main PRIVATE
     NONMATCHING PORTABLE PLATFORM_SDL2 RENDERER_EASY_DRAW MODERN=1 UBFIX)
 target_compile_options(main PRIVATE
-    -O3 -fno-builtin -Wno-implicit-function-declaration -Wno-trigraphs
+    -O3
+    -fno-builtin
+    -Wno-implicit-function-declaration
+    -Wno-trigraphs
     "SHELL:-iquote '${ROOT}/include'"
     "SHELL:-iquote '${ROOT}/src/platform'"
     "SHELL:-iquote '${ROOT}/gflib'")
