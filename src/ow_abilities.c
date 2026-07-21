@@ -13,7 +13,8 @@ static UNUSED bool32 IsFalse(enum Species species);
 static UNUSED bool32 IsTrue(enum Species species);
 static UNUSED bool32 IsTrueIfUndiscoveredEggGroup(enum Species species);
 
-static const bool32 (*const sSynchronizeModes[])(enum Species) = 
+// 修复：将 static const bool32 (*) 修改为 static bool32 (*const [])，解决返回值 const 校验冲突
+static bool32 (*const sSynchronizeModes[])(enum Species) = 
 {
 #if OW_SYNCHRONIZE_NATURE == GEN_3
     [WILDMON_ORIGIN] = HasHalfChance,
@@ -48,7 +49,8 @@ static const bool32 (*const sSynchronizeModes[])(enum Species) =
 #endif
 };
 
-static const bool32 (*const sCuteCharmModes[])(enum Species) = 
+// 修复：同上，修正函数指针数组类型修饰符
+static bool32 (*const sCuteCharmModes[])(enum Species) = 
 {
     [WILDMON_ORIGIN] = HasTwoThirdsChance,
     [STATIC_WILDMON_ORIGIN] = HasTwoThirdsChance,
