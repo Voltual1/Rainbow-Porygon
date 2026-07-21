@@ -557,12 +557,33 @@ u16 Sqrt(u32 num)
 }
 
 #if PORTABLE
-// 补全 GBA ROM Header 标识
+#include "libgcnmultiboot.h"
+
+// 1. GBA Header & Reset Stubs
 const u8 RomHeaderGameCode[4] = "BPEE";
 const u8 RomHeaderSoftwareVersion = 0;
-
-// 补全 GBA Flash / BIOS 硬件 Stub
 u8 ProgramFlashSector_DUMMY(u16 sectorNum, u8 *src) { return 0; }
 void IntrMain(void) {}
 void *gInitialMainCB2 = NULL;
+void RegisterRamReset(u32 flags) {}
+void ReInitializeEWRAM(void) {}
+
+// 2. GameCube MultiBoot Stubs (GC 联动 Stub)
+void GameCubeMultiBoot_Main(struct GcmbStruct *pStruct) {}
+void GameCubeMultiBoot_ExecuteProgram(struct GcmbStruct *pStruct) {}
+void GameCubeMultiBoot_Init(struct GcmbStruct *pStruct) {}
+void GameCubeMultiBoot_HandleSerialInterrupt(struct GcmbStruct *pStruct) {}
+void GameCubeMultiBoot_Quit(void) {}
+
+// 3. m4a Audio Table Stubs (GBA 音频解析存根)
+void ply_fine(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
+void ply_goto(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
+void ply_patt(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
+void ply_pend(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
+void ply_rept(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
+void ply_prio(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
+void ply_tempo(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
+void ply_keysh(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
+void ply_voice(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
+void ply_vol(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
 #endif
