@@ -8,17 +8,17 @@
 #define STUB_FUNC_QUIET(func) func {}
 #define STUB_FUNC_QUIET_BLOCK(func, block) func { block }
 
-// 多平台与网络/存根
-STUB_FUNC_QUIET_BLOCK(bool8 HandleLinkConnection(), return 0;)
-STUB_FUNC_QUIET(void Task_InitUnionRoom())
-STUB_FUNC(int MultiBoot(struct MultiBootParam *mp))
+// 1. 多平台与链接管理 (补全返回值)
+STUB_FUNC_QUIET_BLOCK(bool8 HandleLinkConnection(void), return 0;)
+STUB_FUNC_QUIET(void Task_InitUnionRoom(void))
+STUB_FUNC_BLOCK(int MultiBoot(struct MultiBootParam *mp), return 1;)
 STUB_FUNC(void RegisterRamReset(u32 resetFlags))
 STUB_FUNC(void IntrMain(void))
 STUB_FUNC(void GameCubeMultiBoot_Hash(void))
-STUB_FUNC_QUIET(void GameCubeMultiBoot_Main(void))
-STUB_FUNC(void GameCubeMultiBoot_ExecuteProgram(void))
-STUB_FUNC(void GameCubeMultiBoot_Init(void))
-STUB_FUNC(void GameCubeMultiBoot_HandleSerialInterrupt(void))
+STUB_FUNC_QUIET(void GameCubeMultiBoot_Main(struct GcmbStruct *pStruct))
+STUB_FUNC(void GameCubeMultiBoot_ExecuteProgram(struct GcmbStruct *pStruct))
+STUB_FUNC(void GameCubeMultiBoot_Init(struct GcmbStruct *pStruct))
+STUB_FUNC(void GameCubeMultiBoot_HandleSerialInterrupt(struct GcmbStruct *pStruct))
 STUB_FUNC(void GameCubeMultiBoot_Quit(void))
 STUB_FUNC(void rfu_initializeAPI(void))
 STUB_FUNC(void InitRFUAPI(void))
@@ -26,23 +26,23 @@ STUB_FUNC(void InitRFUAPI(void))
 STUB_FUNC_BLOCK(u32 VerifyFlashSectorNBytes(u16 sectorNum, u8 *src, u32 n), return 0;)
 STUB_FUNC_BLOCK(u32 VerifyFlashSector(u16 sectorNum, u8 *src), return 0;)
 
-// MultiBoot
+// 2. MultiBoot 存根 (补全返回值)
 STUB_FUNC(void MultiBootInit(struct MultiBootParam *mp))
-STUB_FUNC(int MultiBootMain(struct MultiBootParam *mp))
+STUB_FUNC_BLOCK(int MultiBootMain(struct MultiBootParam *mp), return 1;)
 STUB_FUNC(void MultiBootStartProbe(struct MultiBootParam *mp))
 STUB_FUNC(void MultiBootStartMaster(struct MultiBootParam *mp, const u8 *srcp, int length, u8 palette_color, s8 palette_speed))
-STUB_FUNC(int MultiBootCheckComplete(struct MultiBootParam *mp))
+STUB_FUNC_BLOCK(int MultiBootCheckComplete(struct MultiBootParam *mp), return 1;)
 
-STUB_FUNC(u32 umul3232H32(u32 a, u32 b))
+// 3. m4a 音频函数 (修正函数签名)
+STUB_FUNC_BLOCK(u32 umul3232H32(u32 a, u32 b), return (u32)(((u64)a * b) >> 32);)
 STUB_FUNC(void SoundMain(void))
-STUB_FUNC(void SoundMainRAM(void))
 STUB_FUNC(void SoundMainBTM(void))
 STUB_FUNC(void RealClearChain(void *x))
-STUB_FUNC(void MPlayJumpTableCopy(void))
-STUB_FUNC(void MPlayMain(void))
+STUB_FUNC(void MPlayJumpTableCopy(MPlayFunc *mplayJumpTable))
+STUB_FUNC(void MPlayMain(struct MusicPlayerInfo *mplayInfo))
 STUB_FUNC(void TrackStop(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t))
 STUB_FUNC(void ChnVolSetAsm(void))
-STUB_FUNC(void ply_note(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t))
+STUB_FUNC(void ply_note(u32 note_cmd, struct MusicPlayerInfo *m, struct MusicPlayerTrack *t))
 STUB_FUNC(void ply_fine(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t))
 STUB_FUNC(void ply_goto(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t))
 STUB_FUNC(void ply_patt(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t))
@@ -64,13 +64,17 @@ STUB_FUNC(void ply_tune(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t))
 STUB_FUNC(void ply_port(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t))
 STUB_FUNC(void ply_endtie(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t))
 
-// 解封数学与解压相关存根
+// 4. 解决类型冲突：头文件里是 char[]，我们不能定义成普通变量
+char SoundMainRAM[1];
+char gMaxLines[1];
+char gNumMusicPlayers[1];
+
+// 5. 其余 BIOS/数学存根
 STUB_FUNC_BLOCK(s32 Div(s32 num, s32 denom), return denom != 0 ? num / denom : 0;)
 STUB_FUNC(void BitUnPack(const void *src, void *dst, const void *data))
 STUB_FUNC(void FastUnsafeCopy32(const void *src, void *dst, u32 size))
 STUB_FUNC(void LZ77UnCompWRAMOptimized(const u32 *src, void *dst))
 
-u32 gMaxLines = 0;
-u8 gNumMusicPlayers = 0;
+// 6. 特殊汇编标签符号
 u8 LZ77UnCompWRAMOptimized_end[1];
 u8 __iwram_end[1];
