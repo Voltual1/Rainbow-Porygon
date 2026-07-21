@@ -244,7 +244,10 @@ std::string AsmFile::ReadPath()
 
         if (c == 0)
         {
-            if (m_pos >= in include string");
+            if (m_pos >= m_size)
+                RaiseError("unexpected EOF in include string");
+            else
+                RaiseError("unexpected null character in include string");
         }
 
         if (!IsAsciiPrintable(c))
