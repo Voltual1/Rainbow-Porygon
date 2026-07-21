@@ -600,6 +600,6 @@ void ply_endtie(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
 
 // 4. 其余缺失的底层音频函数
 void TrackStop(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
-void RealClearChain(void) {}
+void RealClearChain(void *x) {}
 void SoundMainBTM(void) {}
 #endif
