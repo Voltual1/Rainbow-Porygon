@@ -437,6 +437,13 @@ static int MultiBootHandShake(struct MultiBootParam *mp)
 }
 
 NAKED
+#if PORTABLE
+static void MultiBootWaitCycles(u32 cycles)
+{
+    // PORTABLE 移植模式下直接忽略硬件时钟周期等待
+}
+#else
+NAKED
 static void MultiBootWaitCycles(u32 cycles)
 {
     asm_unified("\
@@ -454,6 +461,7 @@ MultiBootWaitCyclesLoop:\n\
     bgt  MultiBootWaitCyclesLoop\n\
     bx   lr\n");
 }
+#endif
 
 static void MultiBootWaitSendDone(void)
 {
