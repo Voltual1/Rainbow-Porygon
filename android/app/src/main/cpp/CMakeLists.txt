@@ -41,7 +41,7 @@ set(GENERATED_ASM)
 set(SPECIAL_IDS "${CMAKE_BINARY_DIR}/generated/special_ids.inc")
 set(ENUM_DEFINES "${CMAKE_BINARY_DIR}/generated/enum_defines.h")
 
-# 1. 自动生成 special_ids.inc 的逻辑
+# 1. 自动生成 special_ids.inc
 file(WRITE "${CMAKE_BINARY_DIR}/gen_specials.py" [[
 import sys, re
 with open(sys.argv[2], 'w') as out:
@@ -61,10 +61,9 @@ add_custom_command(
     DEPENDS "${ROOT}/data/specials.inc"
     VERBATIM)
 
-# 2. 自动生成 enum_defines.h 的逻辑 (将 Python 脚本写入 build 目录)
+# 2. 自动生成 enum_defines.h
 file(WRITE "${CMAKE_BINARY_DIR}/gen_enum_defines.py" [[
 import re, os, sys
-
 def parse_enum_file(filepath):
     try:
         with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
@@ -113,7 +112,6 @@ with open(output_file, 'w', encoding='utf-8') as f:
     f.write("\n#endif\n")
 ]])
 
-# 将生成 enum_defines.h 定义为构建步骤
 add_custom_command(
     OUTPUT "${ENUM_DEFINES}"
     COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_BINARY_DIR}/generated"
@@ -121,7 +119,7 @@ add_custom_command(
     DEPENDS "${CMAKE_BINARY_DIR}/gen_enum_defines.py"
     VERBATIM)
 
-# 3. 编译汇编文件 (显式依赖 enum_defines.h)
+# 3. 编译汇编文件 (引入 -P 和 -D__ASSEMBLER__ 以及 -D__GBA__)
 foreach(SOURCE IN LISTS DATA_ASM SONG_ASM)
     file(RELATIVE_PATH RELATIVE_SOURCE "${ROOT}" "${SOURCE}")
     set(OUTPUT "${CMAKE_BINARY_DIR}/generated/${RELATIVE_SOURCE}.o")
@@ -137,7 +135,11 @@ foreach(SOURCE IN LISTS DATA_ASM SONG_ASM)
         add_custom_command(
             OUTPUT "${OUTPUT}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${OUTPUT_DIR}"
-            COMMAND /bin/sh -c "cd '${ROOT}' && { printf \".include \\\"${SPECIAL_IDS}\\\"\\n\"; PORTABLE=1 '${ROOT}/tools/preproc/preproc' -s '${SOURCE}' '${ROOT}/charmap.txt' | /usr/bin/cpp -I'${ROOT}' -I'${ROOT}/include' -I'${ROOT}/include/constants' -I'${ROOT}/sound' -I'${ROOT}/src/platform' -DMODERN=1 -DPORTABLE=1 -DUBFIX -DTESTING=0 -DEMERALD=1 -include '${ENUM_DEFINES}' | PORTABLE=1 '${ROOT}/tools/preproc/preproc' -ie -g '${ASSETS_DIR}' '${SOURCE}' '${ROOT}/charmap.txt'; } > '${OUTPUT}.s' && '${ARM_NONE_EABI_AS}' -march=armv7-a -I'${ROOT}' -I'${ROOT}/sound' -o '${OUTPUT}' '${OUTPUT}.s'"
+            # 升级版 cpp 调用：
+            # -P: 禁止行标记，防止干扰 preproc
+            # -D__ASSEMBLER__: 让头文件屏蔽 C 专用语法
+            # -include ${ENUM_DEFINES}: 强制展开无法被 guard 屏蔽的 enum 符号
+            COMMAND /bin/sh -c "cd '${ROOT}' && { printf \".include \\\"${SPECIAL_IDS}\\\"\\n\"; PORTABLE=1 '${ROOT}/tools/preproc/preproc' -s '${SOURCE}' '${ROOT}/charmap.txt' | /usr/bin/cpp -P -I'${ROOT}' -I'${ROOT}/include' -I'${ROOT}/include/constants' -I'${ROOT}/sound' -I'${ROOT}/src/platform' -DMODERN=1 -DPORTABLE=1 -DUBFIX -DTESTING=0 -DEMERALD=1 -D__ASSEMBLER__ -D__GBA__ -include '${ENUM_DEFINES}' | PORTABLE=1 '${ROOT}/tools/preproc/preproc' -ie -g '${ASSETS_DIR}' '${SOURCE}' '${ROOT}/charmap.txt'; } > '${OUTPUT}.s' && '${ARM_NONE_EABI_AS}' -march=armv7-a -I'${ROOT}' -I'${ROOT}/sound' -o '${OUTPUT}' '${OUTPUT}.s'"
             DEPENDS "${SOURCE}" "${ROOT}/tools/preproc/preproc" "${ROOT}/charmap.txt" "${SPECIAL_IDS}" "${ENUM_DEFINES}"
             VERBATIM)
     endif()
