@@ -2063,11 +2063,11 @@ static void rfu_STC_UNI_receive(u8 bm_slot_id, const struct RfuLocalStruct *llsf
     struct RfuSlotStatusUNI *slotStatusUNI = gRfuSlotStatusUNI[bm_slot_id];
     struct UNIRecv *UNI_recv = &slotStatusUNI->recv;
 
-    UNI_recv->parentChild = 0; // Wait, maybe and unused slot data structure error?
+    UNI_recv->errorCode = 0;
     if (gRfuSlotStatusUNI[bm_slot_id]->recvBufferSize < llsf_NI->frame)
     {
-        slotStatusUNI->recv.parentChild = 0; // Fixed warning
-        // Set error code or state
+        slotStatusUNI->recv.state = SLOT_STATE_RECV_IGNORE;
+        UNI_recv->errorCode = ERR_RECV_BUFF_OVER;
     }
     else
     {
@@ -2075,20 +2075,25 @@ static void rfu_STC_UNI_receive(u8 bm_slot_id, const struct RfuLocalStruct *llsf
         {
             if (UNI_recv->newDataFlag)
             {
+                UNI_recv->errorCode = ERR_RECV_UNK;
                 goto force_tail_merge;
             }
         }
         else
         {
-            // Do normal receive
+            if (UNI_recv->newDataFlag)
+                UNI_recv->errorCode = ERR_RECV_DATA_OVERWRITED;
         }
+        UNI_recv->state = SLOT_STATE_RECEIVING;
         size = UNI_recv->dataSize = llsf_NI->frame;
         dest = gRfuSlotStatusUNI[bm_slot_id]->recvBuffer;
         gRfuFixed->fastCopyPtr(&src, &dest, size);
         UNI_recv->newDataFlag = 1;
+        UNI_recv->state = 0;
     }
 force_tail_merge:
-    return;
+    if (UNI_recv->errorCode)
+        gRfuStatic->recvErrorFlag |= 16 << bm_slot_id;
 }
 
 static void rfu_STC_NI_receive_Sender(u8 NI_slot, u8 bm_flag, const struct RfuLocalStruct *llsf_NI, const u8 *data_p)
