@@ -9,14 +9,11 @@
 #define STUB_FUNC_QUIET(func) func {}
 #define STUB_FUNC_QUIET_BLOCK(func, block) func { block }
 
-// 1. 链接与连接管理
-STUB_FUNC_QUIET_BLOCK(bool8 HandleLinkConnection(void), return 0;)
-STUB_FUNC_QUIET(void Task_InitUnionRoom(void))
-STUB_FUNC_BLOCK(int MultiBoot(struct MultiBootParam *mp), return 1;)
+// 1. 底层系统存根 (Expansion 未实现的硬件调用)
 STUB_FUNC(void RegisterRamReset(u32 resetFlags))
 STUB_FUNC(void IntrMain(void))
 
-// 2. GameCube 联动存根 (已包含头文件，解决 GcmbStruct 报错)
+// 2. GameCube 联动存根
 STUB_FUNC(void GameCubeMultiBoot_Hash(void))
 STUB_FUNC_QUIET(void GameCubeMultiBoot_Main(struct GcmbStruct *pStruct))
 STUB_FUNC(void GameCubeMultiBoot_ExecuteProgram(struct GcmbStruct *pStruct))
@@ -24,20 +21,7 @@ STUB_FUNC(void GameCubeMultiBoot_Init(struct GcmbStruct *pStruct))
 STUB_FUNC(void GameCubeMultiBoot_HandleSerialInterrupt(struct GcmbStruct *pStruct))
 STUB_FUNC(void GameCubeMultiBoot_Quit(void))
 
-// 3. RFU 与 Flash 存根
-STUB_FUNC(void rfu_initializeAPI(void))
-STUB_FUNC(void InitRFUAPI(void))
-STUB_FUNC_BLOCK(u32 VerifyFlashSectorNBytes(u16 sectorNum, u8 *src, u32 n), return 0;)
-STUB_FUNC_BLOCK(u32 VerifyFlashSector(u16 sectorNum, u8 *src), return 0;)
-
-// 4. MultiBoot 流程
-STUB_FUNC(void MultiBootInit(struct MultiBootParam *mp))
-STUB_FUNC_BLOCK(int MultiBootMain(struct MultiBootParam *mp), return 1;)
-STUB_FUNC(void MultiBootStartProbe(struct MultiBootParam *mp))
-STUB_FUNC(void MultiBootStartMaster(struct MultiBootParam *mp, const u8 *srcp, int length, u8 palette_color, s8 palette_speed))
-STUB_FUNC_BLOCK(int MultiBootCheckComplete(struct MultiBootParam *mp), return 1;)
-
-// 5. m4a 音频函数 (修正签名与返回值)
+// 3. m4a 音频解析引擎存根 (这些通常在 GBA 汇编中，移植版必须打桩)
 STUB_FUNC_BLOCK(u32 umul3232H32(u32 a, u32 b), return (u32)(((u64)a * b) >> 32);)
 STUB_FUNC(void SoundMain(void))
 STUB_FUNC(void SoundMainBTM(void))
@@ -68,17 +52,17 @@ STUB_FUNC(void ply_tune(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t))
 STUB_FUNC(void ply_port(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t))
 STUB_FUNC(void ply_endtie(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t))
 
-// 6. 解决类型冲突 (char[] 匹配汇编标签)
+// 4. 音频汇编标签 (char[] 匹配汇编符号)
 char SoundMainRAM[1];
 char gMaxLines[1];
 char gNumMusicPlayers[1];
 
-// 7. 数学与解压
+// 5. GBA BIOS 数学/解压存根
 STUB_FUNC_BLOCK(s32 Div(s32 num, s32 denom), return denom != 0 ? num / denom : 0;)
 STUB_FUNC(void BitUnPack(const void *src, void *dst, const void *data))
 STUB_FUNC(void FastUnsafeCopy32(const void *src, void *dst, u32 size))
 STUB_FUNC(void LZ77UnCompWRAMOptimized(const u32 *src, void *dst))
 
-// 8. 汇编填充符号
+// 6. 内存边界标签符号
 u8 LZ77UnCompWRAMOptimized_end[1];
 u8 __iwram_end[1];
