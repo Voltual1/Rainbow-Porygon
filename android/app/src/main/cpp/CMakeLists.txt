@@ -55,10 +55,11 @@ with open(sys.argv[2], 'w') as out:
 ]])
 
 add_custom_command(
-    OUTPUT "${SPECIAL_IDS}"
-    COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_BINARY_DIR}/generated"
-    COMMAND python3 "${CMAKE_BINARY_DIR}/gen_specials.py" "${ROOT}/data/specials.inc" "${SPECIAL_IDS}"
-    DEPENDS "${ROOT}/data/specials.inc"
+    OUTPUT "${OUTPUT}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${OUTPUT_DIR}"
+    # 注意：去掉了 cpp 后的 -P 参数，让 preproc 能通过行标记找到文件名
+    COMMAND /bin/sh -c "cd '${ROOT}' && { printf \".include \\\"${SPECIAL_IDS}\\\"\\n\"; PORTABLE=1 '${ROOT}/tools/preproc/preproc' -s '${SOURCE}' '${ROOT}/charmap.txt' | /usr/bin/cpp -I'${ROOT}' -I'${ROOT}/include' -I'${ROOT}/include/constants' -I'${ROOT}/sound' -I'${ROOT}/src/platform' -DMODERN=1 -DPORTABLE=1 -DUBFIX -DTESTING=0 -DEMERALD=1 -D__ASSEMBLER__ -D__GBA__ -include '${ENUM_DEFINES}' | PORTABLE=1 '${ROOT}/tools/preproc/preproc' -ie -g '${ASSETS_DIR}' '${SOURCE}' '${ROOT}/charmap.txt'; } > '${OUTPUT}.s' && '${ARM_NONE_EABI_AS}' -march=armv7-a -I'${ROOT}' -I'${ROOT}/sound' -o '${OUTPUT}' '${OUTPUT}.s'"
+    DEPENDS "${SOURCE}" "${ROOT}/tools/preproc/preproc" "${ROOT}/charmap.txt" "${SPECIAL_IDS}" "${ENUM_DEFINES}"
     VERBATIM)
 
 # 2. 自动生成 enum_defines.h
