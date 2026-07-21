@@ -678,9 +678,10 @@ bool AsmFile::ParseEnum()
             symbolCount++;
         }
         else if (symbolCount == 0)
-        {
-            RaiseError("%s:%ld: empty enum is invalid", headerFilename.c_str(), currentHeaderLine);
-        }
+{
+    // RaiseError("%s:%ld: empty enum is invalid", headerFilename.c_str(), currentHeaderLine);
+    return true; 
+}
 
         if (m_buffer[m_pos] == '#')
         {
