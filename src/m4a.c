@@ -1822,10 +1822,3 @@ void SetPokemonCryPriority(u8 val)
 }
 
 void m4aSoundVSync(void) {}
-
-#if PORTABLE
-void ply_fine(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *track) {}
-void ply_goto(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *track) {}
-void ply_patt(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *track) {}
-void ply_pend(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *track) {}
-#endif
