@@ -42,11 +42,14 @@ static void SFC32_Seed(struct Sfc32State *state, u32 seed, u8 stream)
 /*This ASM implementation uses some shortcuts and is generally faster on the GBA.
 * It's not necessarily faster if inlined, or on other platforms.
 * In addition, it's extremely non-portable. */
+#if PORTABLE
 u32 Random32(void)
 {
-#if PORTABLE
     return _SFC32_Next_Stream(&gRngValue, STREAM1);
+}
 #else
+u32 NAKED Random32(void)
+{
     asm(".thumb\n\
     push {r4, r5, r6}\n\
     mov r6, #11\n\
@@ -71,8 +74,8 @@ u32 Random32(void)
     bx lr\n\
     .ltorg"
     );
-#endif
 }
+#endif
 
 u32 Random2_32(void)
 {

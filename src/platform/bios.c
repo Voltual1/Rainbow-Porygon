@@ -558,6 +558,7 @@ u16 Sqrt(u32 num)
 
 #if PORTABLE
 #include "libgcnmultiboot.h"
+#include "gba/m4a_internal.h"
 
 // 1. GBA Header & Reset Stubs
 const u8 RomHeaderGameCode[4] = "BPEE";
@@ -568,14 +569,14 @@ void *gInitialMainCB2 = NULL;
 void RegisterRamReset(u32 flags) {}
 void ReInitializeEWRAM(void) {}
 
-// 2. GameCube MultiBoot Stubs (GC 联动 Stub)
+// 2. GameCube MultiBoot Stubs
 void GameCubeMultiBoot_Main(struct GcmbStruct *pStruct) {}
 void GameCubeMultiBoot_ExecuteProgram(struct GcmbStruct *pStruct) {}
 void GameCubeMultiBoot_Init(struct GcmbStruct *pStruct) {}
 void GameCubeMultiBoot_HandleSerialInterrupt(struct GcmbStruct *pStruct) {}
 void GameCubeMultiBoot_Quit(void) {}
 
-// 3. m4a Audio Table Stubs (GBA 音频解析存根)
+// 3. m4a Audio Table Stubs (补全所有 ply_ 开头的符号)
 void ply_fine(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
 void ply_goto(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
 void ply_patt(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
@@ -586,4 +587,19 @@ void ply_tempo(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
 void ply_keysh(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
 void ply_voice(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
 void ply_vol(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
+void ply_pan(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
+void ply_bend(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
+void ply_bendr(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
+void ply_lfos(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
+void ply_lfodl(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
+void ply_mod(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
+void ply_modt(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
+void ply_tune(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
+void ply_port(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
+void ply_endtie(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
+
+// 4. 其余缺失的底层音频函数
+void TrackStop(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
+void RealClearChain(void *m) {}
+void SoundMainBTM(void *m) {}
 #endif
