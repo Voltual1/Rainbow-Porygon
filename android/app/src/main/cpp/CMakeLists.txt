@@ -60,7 +60,7 @@ add_custom_command(
     DEPENDS "${ROOT}/data/specials.inc"
     VERBATIM)
 
-# 2. 自动生成 enum_defines.h (将所有 C enum 解析成 #define，消灭 R_ARM_ABS16 错误)
+# 2. 自动生成 enum_defines.h (升级版正则表达式，支持更多 Expansion 复杂的 Enum 写法)
 file(WRITE "${CMAKE_BINARY_DIR}/gen_enum_defines.py" [[
 import re, os, sys
 
@@ -71,23 +71,25 @@ def parse_enum_file(filepath):
     except Exception:
         return []
     
+    # 移除注释和预处理指令
     content = re.sub(r'//.*', '', content)
     content = re.sub(r'/\*.*?\*/', '', content, flags=re.DOTALL)
-    content = re.sub(r'#.*', '', content)
     
+    # 匹配 Enum 块：支持 enum XXX { ... } 或 typedef enum { ... } XXX;
     enum_blocks = re.findall(r'\benum\b\s*(?:[a-zA-Z_][a-zA-Z0-9_]*)?\s*\{(.*?)\}', content, re.DOTALL)
     
     defines = []
     for block in enum_blocks:
-        block = re.sub(r'\s+', ' ', block)
         entries = block.split(',')
+        current_val = 0
         base_expr = None
         offset = 0
-        current_val = 0
         for entry in entries:
+            # 移除所有空白符
             entry = entry.strip()
-            if not entry:
-                continue
+            if not entry: continue
+            
+            # 处理赋值
             if '=' in entry:
                 parts = entry.split('=')
                 name = parts[0].strip()
@@ -98,6 +100,8 @@ def parse_enum_file(filepath):
                     defines.append((name, f"({base_expr})"))
             else:
                 name = entry.strip()
+                # 处理带有宏的 entry
+                name = re.sub(r'\s+.*', '', name) 
                 if re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', name):
                     if base_expr is not None:
                         offset += 1
@@ -114,24 +118,15 @@ def main():
     for root, dirs, files in os.walk(include_dir):
         for file in files:
             if file.endswith('.h'):
-                filepath = os.path.join(root, file)
-                all_defines.extend(parse_enum_file(filepath))
+                all_defines.extend(parse_enum_file(os.path.join(root, file)))
     
     seen = set()
-    unique_defines = []
-    for name, val in all_defines:
-        if name not in seen:
-            seen.add(name)
-            unique_defines.append((name, val))
-    
-    os.makedirs(os.path.dirname(output_file), exist_ok=True)
     with open(output_file, 'w', encoding='utf-8') as f:
-        f.write("#ifndef GENERATED_ENUM_DEFINES_H\n")
-        f.write("#define GENERATED_ENUM_DEFINES_H\n\n")
-        for name, val in unique_defines:
-            f.write(f"#ifndef {name}\n")
-            f.write(f"#define {name} {val}\n")
-            f.write(f"#endif\n")
+        f.write("#ifndef GENERATED_ENUM_DEFINES_H\n#define GENERATED_ENUM_DEFINES_H\n\n")
+        for name, val in all_defines:
+            if name not in seen:
+                f.write(f"#define {name} {val}\n")
+                seen.add(name)
         f.write("\n#endif\n")
 
 if __name__ == '__main__':
