@@ -1217,7 +1217,7 @@ static void SpriteCB_EndGetOnScreen(struct Sprite *sprite)
 static void SpriteCB_GetOnScreen(struct Sprite *sprite)
 {
     if (sprite->x != sprite->data[1]
-        || sprite->y != sprite->data[2])
+| sprite->y != sprite->data[2])
     {
         if (sprite->x < sprite->data[1])
             sprite->x += 15;
