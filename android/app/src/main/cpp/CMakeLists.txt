@@ -20,6 +20,8 @@ file(GLOB_RECURSE GAME_C CONFIGURE_DEPENDS
     "${ROOT}/src/*.c"
     "${ROOT}/gflib/*.c")
 list(FILTER GAME_C EXCLUDE REGEX "\\.inc\\.c$")
+# 关键修复 1：去除 C 源文件列表中的重复项，防止重复添加 add_custom_command
+list(REMOVE_DUPLICATES GAME_C)
 
 set(GENERATED_C)
 foreach(SOURCE IN LISTS GAME_C)
@@ -39,88 +41,28 @@ file(GLOB DATA_ASM CONFIGURE_DEPENDS "${ROOT}/data/*.s" "${ROOT}/sound/*.s")
 file(GLOB SONG_ASM CONFIGURE_DEPENDS "${ROOT}/sound/songs/*.s" "${ROOT}/sound/songs/midi/*.s")
 set(GENERATED_ASM)
 set(SPECIAL_IDS "${CMAKE_BINARY_DIR}/generated/special_ids.inc")
-set(ENUM_DEFINES "${CMAKE_BINARY_DIR}/generated/enum_defines.h")
 
-# 1. 自动生成 special_ids.inc
-file(WRITE "${CMAKE_BINARY_DIR}/gen_specials.py" [[
+# 生成 special_ids.inc
+file(WRITE "${CMAKE_BINARY_DIR}/gen_specials.py" "
 import sys, re
 with open(sys.argv[2], 'w') as out:
     idx = 0
     with open(sys.argv[1], 'r') as f:
         for line in f:
-            m = re.match(r'^\s*def_special\s+([A-Za-z0-9_]+)', line)
+            m = re.match(r'^\\s*def_special\\s+([A-Za-z0-9_]+)', line)
             if m:
-                out.write('.set SPECIAL_{}, {}\n'.format(m.group(1), idx))
+                out.write('.set SPECIAL_{}, {}\\n'.format(m.group(1), idx))
                 idx += 1
-]])
+")
 
 add_custom_command(
-    OUTPUT "${OUTPUT}"
-    COMMAND "${CMAKE_COMMAND}" -E make_directory "${OUTPUT_DIR}"
-    # 注意：去掉了 cpp 后的 -P 参数，让 preproc 能通过行标记找到文件名
-    COMMAND /bin/sh -c "cd '${ROOT}' && { printf \".include \\\"${SPECIAL_IDS}\\\"\\n\"; PORTABLE=1 '${ROOT}/tools/preproc/preproc' -s '${SOURCE}' '${ROOT}/charmap.txt' | /usr/bin/cpp -I'${ROOT}' -I'${ROOT}/include' -I'${ROOT}/include/constants' -I'${ROOT}/sound' -I'${ROOT}/src/platform' -DMODERN=1 -DPORTABLE=1 -DUBFIX -DTESTING=0 -DEMERALD=1 -D__ASSEMBLER__ -D__GBA__ -include '${ENUM_DEFINES}' | PORTABLE=1 '${ROOT}/tools/preproc/preproc' -ie -g '${ASSETS_DIR}' '${SOURCE}' '${ROOT}/charmap.txt'; } > '${OUTPUT}.s' && '${ARM_NONE_EABI_AS}' -march=armv7-a -I'${ROOT}' -I'${ROOT}/sound' -o '${OUTPUT}' '${OUTPUT}.s'"
-    DEPENDS "${SOURCE}" "${ROOT}/tools/preproc/preproc" "${ROOT}/charmap.txt" "${SPECIAL_IDS}" "${ENUM_DEFINES}"
-    VERBATIM)
-
-# 2. 自动生成 enum_defines.h
-file(WRITE "${CMAKE_BINARY_DIR}/gen_enum_defines.py" [[
-import re, os, sys
-def parse_enum_file(filepath):
-    try:
-        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
-            content = f.read()
-    except Exception: return []
-    content = re.sub(r'//.*', '', content)
-    content = re.sub(r'/\*.*?\*/', '', content, flags=re.DOTALL)
-    enum_blocks = re.findall(r'\benum\b\s*(?:[a-zA-Z_][a-zA-Z0-9_]*)?\s*\{(.*?)\}', content, re.DOTALL)
-    defines = []
-    for block in enum_blocks:
-        entries = block.split(',')
-        current_val, base_expr, offset = 0, None, 0
-        for entry in entries:
-            entry = entry.strip()
-            if not entry: continue
-            if '=' in entry:
-                parts = entry.split('=')
-                name = parts[0].strip()
-                val_str = parts[1].strip()
-                if re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', name):
-                    base_expr, offset = val_str, 0
-                    defines.append((name, f"({base_expr})"))
-            else:
-                name = re.sub(r'\s+.*', '', entry.strip())
-                if re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', name):
-                    if base_expr is not None:
-                        offset += 1
-                        defines.append((name, f"({base_expr}) + {offset}"))
-                    else:
-                        defines.append((name, f"{current_val}"))
-                        current_val += 1
-    return defines
-
-include_dir, output_file = sys.argv[1], sys.argv[2]
-all_defines, seen = [], set()
-for root, _, files in os.walk(include_dir):
-    for file in files:
-        if file.endswith('.h'):
-            all_defines.extend(parse_enum_file(os.path.join(root, file)))
-with open(output_file, 'w', encoding='utf-8') as f:
-    f.write("#ifndef GENERATED_ENUM_DEFINES_H\n#define GENERATED_ENUM_DEFINES_H\n\n")
-    for name, val in all_defines:
-        if name not in seen:
-            f.write(f"#define {name} {val}\n")
-            seen.add(name)
-    f.write("\n#endif\n")
-]])
-
-add_custom_command(
-    OUTPUT "${ENUM_DEFINES}"
+    OUTPUT "${SPECIAL_IDS}"
     COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_BINARY_DIR}/generated"
-    COMMAND python3 "${CMAKE_BINARY_DIR}/gen_enum_defines.py" "${ROOT}/include" "${ENUM_DEFINES}"
-    DEPENDS "${CMAKE_BINARY_DIR}/gen_enum_defines.py"
+    COMMAND python3 "${CMAKE_BINARY_DIR}/gen_specials.py" "${ROOT}/data/specials.inc" "${SPECIAL_IDS}"
+    DEPENDS "${ROOT}/data/specials.inc"
     VERBATIM)
 
-# 3. 编译汇编文件 (引入 -P 和 -D__ASSEMBLER__ 以及 -D__GBA__)
+# 汇编预处理与编译管道
 foreach(SOURCE IN LISTS DATA_ASM SONG_ASM)
     file(RELATIVE_PATH RELATIVE_SOURCE "${ROOT}" "${SOURCE}")
     set(OUTPUT "${CMAKE_BINARY_DIR}/generated/${RELATIVE_SOURCE}.o")
@@ -136,12 +78,9 @@ foreach(SOURCE IN LISTS DATA_ASM SONG_ASM)
         add_custom_command(
             OUTPUT "${OUTPUT}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${OUTPUT_DIR}"
-            # 升级版 cpp 调用：
-            # -P: 禁止行标记，防止干扰 preproc
-            # -D__ASSEMBLER__: 让头文件屏蔽 C 专用语法
-            # -include ${ENUM_DEFINES}: 强制展开无法被 guard 屏蔽的 enum 符号
-            COMMAND /bin/sh -c "cd '${ROOT}' && { printf \".include \\\"${SPECIAL_IDS}\\\"\\n\"; PORTABLE=1 '${ROOT}/tools/preproc/preproc' -s '${SOURCE}' '${ROOT}/charmap.txt' | /usr/bin/cpp -P -I'${ROOT}' -I'${ROOT}/include' -I'${ROOT}/include/constants' -I'${ROOT}/sound' -I'${ROOT}/src/platform' -DMODERN=1 -DPORTABLE=1 -DUBFIX -DTESTING=0 -DEMERALD=1 -D__ASSEMBLER__ -D__GBA__ -include '${ENUM_DEFINES}' | PORTABLE=1 '${ROOT}/tools/preproc/preproc' -ie -g '${ASSETS_DIR}' '${SOURCE}' '${ROOT}/charmap.txt'; } > '${OUTPUT}.s' && '${ARM_NONE_EABI_AS}' -march=armv7-a -I'${ROOT}' -I'${ROOT}/sound' -o '${OUTPUT}' '${OUTPUT}.s'"
-            DEPENDS "${SOURCE}" "${ROOT}/tools/preproc/preproc" "${ROOT}/charmap.txt" "${SPECIAL_IDS}" "${ENUM_DEFINES}"
+            # 关键修复 2：采用 Expansion 原生预处理管道，通过 -ie 开启 preproc 的 enum 解析功能
+            COMMAND /bin/sh -c "cd '${ROOT}' && { printf \".include \\\"${SPECIAL_IDS}\\\"\\n\"; PORTABLE=1 '${ROOT}/tools/preproc/preproc' -s '${SOURCE}' '${ROOT}/charmap.txt' | /usr/bin/cpp -I'${ROOT}' -I'${ROOT}/include' -I'${ROOT}/include/constants' -I'${ROOT}/sound' -I'${ROOT}/src/platform' -DMODERN=1 -DPORTABLE=1 -DUBFIX -DTESTING=0 -DEMERALD=1 | PORTABLE=1 '${ROOT}/tools/preproc/preproc' -ie -g '${ASSETS_DIR}' '${SOURCE}' '${ROOT}/charmap.txt'; } > '${OUTPUT}.s' && '${ARM_NONE_EABI_AS}' -march=armv7-a -I'${ROOT}' -I'${ROOT}/sound' -o '${OUTPUT}' '${OUTPUT}.s'"
+            DEPENDS "${SOURCE}" "${ROOT}/tools/preproc/preproc" "${ROOT}/charmap.txt" "${SPECIAL_IDS}"
             VERBATIM)
     endif()
     list(APPEND GENERATED_ASM "${OUTPUT}")
@@ -168,7 +107,12 @@ target_compile_definitions(main PRIVATE
     NONMATCHING PORTABLE PLATFORM_SDL2 RENDERER_EASY_DRAW MODERN=1 UBFIX TESTING=0 EMERALD=1)
 
 target_compile_options(main PRIVATE
-    -O3 -fno-builtin -Wno-implicit-function-declaration -Wno-trigraphs -Wno-gnu-alignof-expression -Wno-null-dereference
+    -O3
+    -fno-builtin
+    -Wno-implicit-function-declaration
+    -Wno-trigraphs
+    -Wno-gnu-alignof-expression
+    -Wno-null-dereference
     "SHELL:-iquote '${ROOT}/include'"
     "SHELL:-iquote '${ROOT}/src/platform'"
     "SHELL:-iquote '${ROOT}/gflib'")
