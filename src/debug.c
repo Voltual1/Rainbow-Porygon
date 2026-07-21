@@ -864,11 +864,11 @@ static const struct DebugMenuOption *Debug_GetCurrentCallbackMenu(void)
 
 static bool32 IsSubMenuAction(const void *action)
 {
-    return action == DebugAction_OpenSubMenu
-| action == DebugAction_OpenSubMenuFlagsVars
-| action == DebugAction_OpenSubMenuFakeRTC
-| action == DebugAction_OpenSubMenuCreateFollowerNPC
-| action == DebugAction_OpenSubMenuTrainers;
+    return (action == DebugAction_OpenSubMenu)
+        || (action == DebugAction_OpenSubMenuFlagsVars)
+        || (action == DebugAction_OpenSubMenuFakeRTC)
+        || (action == DebugAction_OpenSubMenuCreateFollowerNPC)
+        || (action == DebugAction_OpenSubMenuTrainers);
 }
 
 static u32 Debug_GenerateListBasicMenu(const struct DebugMenuOption *items)
