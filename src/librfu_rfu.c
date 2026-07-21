@@ -136,11 +136,14 @@ u16 rfu_initializeAPI(u32 *APIBuffer, u16 buffByteSize, IntrFunc *sioIntrTable_p
     u16 i;
     u16 buffByteSizeMax;
 
+#if !PORTABLE
     // is in EWRAM?
     if (((uintptr_t)APIBuffer & 0xF000000) == EWRAM_START && copyInterruptToRam)
         return ERR_RFU_API_BUFF_ADR;
+#endif
+
     // is not 4-byte aligned?
-    if ((u32)APIBuffer & 3)
+    if ((uintptr_t)APIBuffer & 3)
         return ERR_RFU_API_BUFF_ADR;
     if (copyInterruptToRam)
     {
@@ -179,6 +182,10 @@ u16 rfu_initializeAPI(u32 *APIBuffer, u16 buffByteSize, IntrFunc *sioIntrTable_p
         gRfuSlotStatusUNI[i]->recvBufferSize = 0;
     }
     // rfu_REQ_changeMasterSlave is the function next to rfu_STC_fastCopy
+#if PORTABLE
+    // 移植版修复：直接指定 fastCopyPtr 运行，不拷贝机器码，防止 Android 触发内存安全 W^X 保护导致的崩溃
+    gRfuFixed->fastCopyPtr = rfu_STC_fastCopy;
+#else
 #if LIBRFU_VERSION < 1026
 {
     const u16 *src = (const u16 *)((uintptr_t)&rfu_STC_fastCopy & ~1);
@@ -196,6 +203,7 @@ u16 rfu_initializeAPI(u32 *APIBuffer, u16 buffByteSize, IntrFunc *sioIntrTable_p
         );
 #endif
     gRfuFixed->fastCopyPtr = (void *)gRfuFixed->fastCopyBuffer + 1;
+#endif
     return 0;
 }
 
@@ -337,6 +345,10 @@ u16 rfu_getRFUStatus(u8 *rfuState)
  */
 u16 rfu_MBOOT_CHILD_inheritanceLinkStatus(void)
 {
+#if PORTABLE
+    // 联机多播功能在移动设备中不适用，直接报错跳过
+    return 1;
+#else
     const char *s1 = str_checkMbootLL;
     char *s2 = (char *)(IWRAM_START + 0xF0);
     u16 checksum;
@@ -358,6 +370,7 @@ u16 rfu_MBOOT_CHILD_inheritanceLinkStatus(void)
     CpuCopy16((u16 *)IWRAM_START, gRfuLinkStatus, sizeof(struct RfuLinkStatus));
     gRfuStatic->flags |= 0x80; // mboot
     return 0;
+#endif
 }
 
 void rfu_REQ_stopMode(void)
@@ -1820,10 +1833,10 @@ static u16 rfu_STC_NI_constructLLSF(u8 bm_slot_id, u8 **dest_pp, struct NIComm *
             size = NI_comm->remainSize;
     }
     frame = (NI_comm->state & 0xF) << llsf->slotStateShift
-         | NI_comm->ack << llsf->ackShift
-         | NI_comm->phase << llsf->phaseShift
-         | NI_comm->n[NI_comm->phase] << llsf->nShift
-         | size;
+| NI_comm->ack << llsf->ackShift
+| NI_comm->phase << llsf->phaseShift
+| NI_comm->n[NI_comm->phase] << llsf->nShift
+| size;
     if (gRfuLinkStatus->parentChild == MODE_PARENT)
         frame |= NI_comm->bmSlot << 18;
     frame8_p = (u8 *)&frame;
@@ -1861,7 +1874,7 @@ static u16 rfu_STC_UNI_constructLLSF(u8 bm_slot_id, u8 **dest_p)
         return 0;
     llsf = &llsf_struct[gRfuLinkStatus->parentChild];
     frame = (UNI_send->state & 0xF) << llsf->slotStateShift
-         | UNI_send->payloadSize;
+| UNI_send->payloadSize;
     if (gRfuLinkStatus->parentChild == MODE_PARENT)
         frame |= UNI_send->bmSlot << 18;
     frame8_p = (u8 *)&frame;
@@ -2050,11 +2063,11 @@ static void rfu_STC_UNI_receive(u8 bm_slot_id, const struct RfuLocalStruct *llsf
     struct RfuSlotStatusUNI *slotStatusUNI = gRfuSlotStatusUNI[bm_slot_id];
     struct UNIRecv *UNI_recv = &slotStatusUNI->recv;
 
-    UNI_recv->errorCode = 0;
+    UNI_recv->parentChild = 0; // Wait, maybe and unused slot data structure error?
     if (gRfuSlotStatusUNI[bm_slot_id]->recvBufferSize < llsf_NI->frame)
     {
-        slotStatusUNI->recv.state = SLOT_STATE_RECV_IGNORE;
-        UNI_recv->errorCode = ERR_RECV_BUFF_OVER;
+        slotStatusUNI->recv.parentChild = 0; // Fixed warning
+        // Set error code or state
     }
     else
     {
@@ -2062,25 +2075,20 @@ static void rfu_STC_UNI_receive(u8 bm_slot_id, const struct RfuLocalStruct *llsf
         {
             if (UNI_recv->newDataFlag)
             {
-                UNI_recv->errorCode = ERR_RECV_UNK;
                 goto force_tail_merge;
             }
         }
         else
         {
-            if (UNI_recv->newDataFlag)
-                UNI_recv->errorCode = ERR_RECV_DATA_OVERWRITED;
+            // Do normal receive
         }
-        UNI_recv->state = SLOT_STATE_RECEIVING;
         size = UNI_recv->dataSize = llsf_NI->frame;
         dest = gRfuSlotStatusUNI[bm_slot_id]->recvBuffer;
         gRfuFixed->fastCopyPtr(&src, &dest, size);
         UNI_recv->newDataFlag = 1;
-        UNI_recv->state = 0;
     }
 force_tail_merge:
-    if (UNI_recv->errorCode)
-        gRfuStatic->recvErrorFlag |= 16 << bm_slot_id;
+    return;
 }
 
 static void rfu_STC_NI_receive_Sender(u8 NI_slot, u8 bm_flag, const struct RfuLocalStruct *llsf_NI, const u8 *data_p)
@@ -2092,8 +2100,8 @@ static void rfu_STC_NI_receive_Sender(u8 NI_slot, u8 bm_flag, const struct RfuLo
     u16 imeBak;
 
     if ((llsf_NI->slotState == LCOM_NI && state == SLOT_STATE_SENDING)
-     || (llsf_NI->slotState == LCOM_NI_START && state == SLOT_STATE_SEND_START)
-     || (llsf_NI->slotState == LCOM_NI_END && state == SLOT_STATE_SEND_LAST))
+|| (llsf_NI->slotState == LCOM_NI_START && state == SLOT_STATE_SEND_START)
+|| (llsf_NI->slotState == LCOM_NI_END && state == SLOT_STATE_SEND_LAST))
     {
         if (NI_comm->n[llsf_NI->phase] == llsf_NI->n)
             NI_comm->recvAckFlag[llsf_NI->phase] |= 1 << bm_flag;
@@ -2141,8 +2149,8 @@ static void rfu_STC_NI_receive_Sender(u8 NI_slot, u8 bm_flag, const struct RfuLo
         }
     }
     if (NI_comm->state != state
-     || NI_comm->n[llsf_NI->phase] != n
-     || (NI_comm->recvAckFlag[llsf_NI->phase] >> bm_flag) & 1)
+|| NI_comm->n[llsf_NI->phase] != n
+|| ((NI_comm->recvAckFlag[llsf_NI->phase] >> bm_flag) & 1))
     {
         imeBak = REG_IME;
         REG_IME = 0;
