@@ -551,14 +551,6 @@ u8 Platform_GetBorderBackground(void)
 {
     if (sHasBorderBackgroundConfig)
         return sBorderBackground;
-    if (gSaveBlock2Ptr != NULL)
-    {
-        u8 legacySelection = gSaveBlock2Ptr->optionsBorderBackground;
-        if (legacySelection == 1)
-            return sBorderBackgroundCount;
-        if (legacySelection >= 2)
-            return legacySelection - 1;
-    }
     return 0;
 }
 
