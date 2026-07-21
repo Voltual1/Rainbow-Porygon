@@ -44,7 +44,6 @@ jobs:
         run: |
           make -j$(nproc) tools
           make -j$(nproc) all KEEP_TEMPS=1 || echo "Assets generated, ignoring link error"
-          cp -v src/platform/platform.h include/ || true
 
       - name: Decode Keystore
         if: github.event_name != 'pull_request'
