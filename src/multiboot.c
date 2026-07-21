@@ -477,3 +477,10 @@ static void MultiBootWaitSendDone(void)
 
     MultiBootWaitCycles(600);
 }
+
+#if PORTABLE
+int MultiBoot(struct MultiBootParam *mp)
+{
+    return 1; // 移植模式直接返回失败状态，跳过硬件多播
+}
+#endif

@@ -555,3 +555,14 @@ u16 Sqrt(u32 num)
     }
     return bound;
 }
+
+#if PORTABLE
+// 补全 GBA ROM Header 标识
+const u8 RomHeaderGameCode[4] = "BPEE";
+const u8 RomHeaderSoftwareVersion = 0;
+
+// 补全 GBA Flash / BIOS 硬件 Stub
+u8 ProgramFlashSector_DUMMY(u16 sectorNum, u8 *src) { return 0; }
+void IntrMain(void) {}
+void *gInitialMainCB2 = NULL;
+#endif

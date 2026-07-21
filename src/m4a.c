@@ -1820,3 +1820,12 @@ void SetPokemonCryPriority(u8 val)
 {
     gPokemonCrySong.priority = val;
 }
+
+void m4aSoundVSync(void) {}
+
+#if PORTABLE
+void ply_fine(void) {}
+void ply_goto(void) {}
+void ply_patt(void) {}
+void ply_pend(void) {}
+#endif

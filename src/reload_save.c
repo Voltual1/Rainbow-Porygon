@@ -13,6 +13,10 @@
 // Used to gracefully exit after a link connection error
 void ReloadSave(void)
 {
+#if !PORTABLE
+    RegisterRamReset(RESET_EWRAM);
+    ReInitializeEWRAM();
+#endif
     u16 imeBackup = REG_IME;
     REG_IME = 0;
     RegisterRamReset(RESET_EWRAM);
