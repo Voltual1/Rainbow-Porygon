@@ -571,8 +571,8 @@ bool AsmFile::ParseEnum()
         if (identifier == "__attribute__")
         {
             if (m_pos + 1 >= m_size
-             || m_buffer[m_pos] != '('
-             || m_buffer[m_pos + 1] != '(')
+                || m_buffer[m_pos] != '('
+                || m_buffer[m_pos + 1] != '(')
             {
                 m_pos = fallbackPosition - 4;
                 return false;
@@ -668,7 +668,11 @@ bool AsmFile::ParseEnum()
             // HACK(#7394): Make the definitions global so that C 'asm'
             // statements are able to reference them (if they happen to
             // be available in an assembled object file).
-            std::printf(".global %s; ", currentIdentName.c_str());
+            // PORTABLE 模式下禁止输出 .global 声明，防止产生位置相关的 R_ARM_ABS16 错误。
+            if (std::getenv("PORTABLE") == nullptr)
+            {
+                std::printf(".global %s; ", currentIdentName.c_str());
+            }
             std::printf(".equiv %s, (%s) + %ld\n", currentIdentName.c_str(), enumBase.c_str(), enumCounter);
             enumCounter++;
             symbolCount++;
