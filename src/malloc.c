@@ -266,5 +266,9 @@ const char *MemBlockLocation(const struct MemBlock *block)
     if (!block->allocated)
         return NULL;
 
+#if PORTABLE
+    return (const char *)(((uintptr_t)block->locationHi << 14) | block->locationLo);
+#else
     return (const char *)(ROM_START | (block->locationHi << 14) | block->locationLo);
+#endif
 }
