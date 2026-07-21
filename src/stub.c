@@ -9,7 +9,11 @@
 #define STUB_FUNC_QUIET(func) func {}
 #define STUB_FUNC_QUIET_BLOCK(func, block) func { block }
 
-// --- 1. 底层硬件与初始化存根 ---
+// 解决 GBA 头文件中可能以宏定义的干扰
+#undef RegisterRamReset
+
+// --- 1. 底层系统与初始化存根 ---
+STUB_FUNC(void RegisterRamReset(u32 resetFlags))
 STUB_FUNC(void IntrMain(void))
 void *gInitialMainCB2 = NULL;
 const u8 RomHeaderGameCode[4] = "BPEE";
@@ -44,6 +48,7 @@ STUB_FUNC(void ply_pend(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t))
 STUB_FUNC(void ply_rept(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t))
 STUB_FUNC(void ply_prio(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t))
 STUB_FUNC(void ply_tempo(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t))
+#undef ply_keysh
 STUB_FUNC(void ply_keysh(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t))
 STUB_FUNC(void ply_voice(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t))
 STUB_FUNC(void ply_vol(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t))
