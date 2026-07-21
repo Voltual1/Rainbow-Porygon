@@ -39,8 +39,9 @@ file(GLOB DATA_ASM CONFIGURE_DEPENDS "${ROOT}/data/*.s" "${ROOT}/sound/*.s")
 file(GLOB SONG_ASM CONFIGURE_DEPENDS "${ROOT}/sound/songs/*.s" "${ROOT}/sound/songs/midi/*.s")
 set(GENERATED_ASM)
 set(SPECIAL_IDS "${CMAKE_BINARY_DIR}/generated/special_ids.inc")
+set(ENUM_DEFINES "${CMAKE_BINARY_DIR}/generated/enum_defines.h")
 
-# 1. 自动生成 special_ids.inc
+# 1. 自动生成 special_ids.inc 的逻辑
 file(WRITE "${CMAKE_BINARY_DIR}/gen_specials.py" [[
 import sys, re
 with open(sys.argv[2], 'w') as out:
@@ -60,7 +61,7 @@ add_custom_command(
     DEPENDS "${ROOT}/data/specials.inc"
     VERBATIM)
 
-# 2. 自动生成 enum_defines.h (升级版正则表达式，支持更多 Expansion 复杂的 Enum 写法)
+# 2. 自动生成 enum_defines.h 的逻辑 (将 Python 脚本写入 build 目录)
 file(WRITE "${CMAKE_BINARY_DIR}/gen_enum_defines.py" [[
 import re, os, sys
 
@@ -68,40 +69,26 @@ def parse_enum_file(filepath):
     try:
         with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
             content = f.read()
-    except Exception:
-        return []
-    
-    # 移除注释和预处理指令
+    except Exception: return []
     content = re.sub(r'//.*', '', content)
     content = re.sub(r'/\*.*?\*/', '', content, flags=re.DOTALL)
-    
-    # 匹配 Enum 块：支持 enum XXX { ... } 或 typedef enum { ... } XXX;
     enum_blocks = re.findall(r'\benum\b\s*(?:[a-zA-Z_][a-zA-Z0-9_]*)?\s*\{(.*?)\}', content, re.DOTALL)
-    
     defines = []
     for block in enum_blocks:
         entries = block.split(',')
-        current_val = 0
-        base_expr = None
-        offset = 0
+        current_val, base_expr, offset = 0, None, 0
         for entry in entries:
-            # 移除所有空白符
             entry = entry.strip()
             if not entry: continue
-            
-            # 处理赋值
             if '=' in entry:
                 parts = entry.split('=')
                 name = parts[0].strip()
                 val_str = parts[1].strip()
                 if re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', name):
-                    base_expr = val_str
-                    offset = 0
+                    base_expr, offset = val_str, 0
                     defines.append((name, f"({base_expr})"))
             else:
-                name = entry.strip()
-                # 处理带有宏的 entry
-                name = re.sub(r'\s+.*', '', name) 
+                name = re.sub(r'\s+.*', '', entry.strip())
                 if re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', name):
                     if base_expr is not None:
                         offset += 1
@@ -111,34 +98,30 @@ def parse_enum_file(filepath):
                         current_val += 1
     return defines
 
-def main():
-    include_dir = sys.argv[1]
-    output_file = sys.argv[2]
-    all_defines = []
-    for root, dirs, files in os.walk(include_dir):
-        for file in files:
-            if file.endswith('.h'):
-                all_defines.extend(parse_enum_file(os.path.join(root, file)))
-    
-    seen = set()
-    with open(output_file, 'w', encoding='utf-8') as f:
-        f.write("#ifndef GENERATED_ENUM_DEFINES_H\n#define GENERATED_ENUM_DEFINES_H\n\n")
-        for name, val in all_defines:
-            if name not in seen:
-                f.write(f"#define {name} {val}\n")
-                seen.add(name)
-        f.write("\n#endif\n")
-
-if __name__ == '__main__':
-    main()
+include_dir, output_file = sys.argv[1], sys.argv[2]
+all_defines, seen = [], set()
+for root, _, files in os.walk(include_dir):
+    for file in files:
+        if file.endswith('.h'):
+            all_defines.extend(parse_enum_file(os.path.join(root, file)))
+with open(output_file, 'w', encoding='utf-8') as f:
+    f.write("#ifndef GENERATED_ENUM_DEFINES_H\n#define GENERATED_ENUM_DEFINES_H\n\n")
+    for name, val in all_defines:
+        if name not in seen:
+            f.write(f"#define {name} {val}\n")
+            seen.add(name)
+    f.write("\n#endif\n")
 ]])
 
-execute_process(
-    COMMAND python3 "${CMAKE_BINARY_DIR}/gen_enum_defines.py" "${ROOT}/include" "${CMAKE_BINARY_DIR}/generated/enum_defines.h"
-    RESULT_VARIABLE GEN_ENUMS_RESULT
-)
+# 将生成 enum_defines.h 定义为构建步骤
+add_custom_command(
+    OUTPUT "${ENUM_DEFINES}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_BINARY_DIR}/generated"
+    COMMAND python3 "${CMAKE_BINARY_DIR}/gen_enum_defines.py" "${ROOT}/include" "${ENUM_DEFINES}"
+    DEPENDS "${CMAKE_BINARY_DIR}/gen_enum_defines.py"
+    VERBATIM)
 
-# 3. 编译汇编文件
+# 3. 编译汇编文件 (显式依赖 enum_defines.h)
 foreach(SOURCE IN LISTS DATA_ASM SONG_ASM)
     file(RELATIVE_PATH RELATIVE_SOURCE "${ROOT}" "${SOURCE}")
     set(OUTPUT "${CMAKE_BINARY_DIR}/generated/${RELATIVE_SOURCE}.o")
@@ -154,9 +137,8 @@ foreach(SOURCE IN LISTS DATA_ASM SONG_ASM)
         add_custom_command(
             OUTPUT "${OUTPUT}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${OUTPUT_DIR}"
-            # 关键：增加了 -include '${CMAKE_BINARY_DIR}/generated/enum_defines.h' 选项，让预处理器完全消除 enum 符号名
-            COMMAND /bin/sh -c "cd '${ROOT}' && { printf \".include \\\"${SPECIAL_IDS}\\\"\\n\"; PORTABLE=1 '${ROOT}/tools/preproc/preproc' -s '${SOURCE}' '${ROOT}/charmap.txt' | /usr/bin/cpp -I'${ROOT}' -I'${ROOT}/include' -I'${ROOT}/include/constants' -I'${ROOT}/sound' -I'${ROOT}/src/platform' -DMODERN=1 -DPORTABLE=1 -DUBFIX -DTESTING=0 -DEMERALD=1 -include '${CMAKE_BINARY_DIR}/generated/enum_defines.h' | PORTABLE=1 '${ROOT}/tools/preproc/preproc' -ie -g '${ASSETS_DIR}' '${SOURCE}' '${ROOT}/charmap.txt'; } > '${OUTPUT}.s' && '${ARM_NONE_EABI_AS}' -march=armv7-a -I'${ROOT}' -I'${ROOT}/sound' -o '${OUTPUT}' '${OUTPUT}.s'"
-            DEPENDS "${SOURCE}" "${ROOT}/tools/preproc/preproc" "${ROOT}/charmap.txt" "${SPECIAL_IDS}" "${CMAKE_BINARY_DIR}/generated/enum_defines.h"
+            COMMAND /bin/sh -c "cd '${ROOT}' && { printf \".include \\\"${SPECIAL_IDS}\\\"\\n\"; PORTABLE=1 '${ROOT}/tools/preproc/preproc' -s '${SOURCE}' '${ROOT}/charmap.txt' | /usr/bin/cpp -I'${ROOT}' -I'${ROOT}/include' -I'${ROOT}/include/constants' -I'${ROOT}/sound' -I'${ROOT}/src/platform' -DMODERN=1 -DPORTABLE=1 -DUBFIX -DTESTING=0 -DEMERALD=1 -include '${ENUM_DEFINES}' | PORTABLE=1 '${ROOT}/tools/preproc/preproc' -ie -g '${ASSETS_DIR}' '${SOURCE}' '${ROOT}/charmap.txt'; } > '${OUTPUT}.s' && '${ARM_NONE_EABI_AS}' -march=armv7-a -I'${ROOT}' -I'${ROOT}/sound' -o '${OUTPUT}' '${OUTPUT}.s'"
+            DEPENDS "${SOURCE}" "${ROOT}/tools/preproc/preproc" "${ROOT}/charmap.txt" "${SPECIAL_IDS}" "${ENUM_DEFINES}"
             VERBATIM)
     endif()
     list(APPEND GENERATED_ASM "${OUTPUT}")
@@ -180,22 +162,10 @@ target_include_directories(main PRIVATE
     "${ROOT}/android/SDL2/include")
 
 target_compile_definitions(main PRIVATE
-    NONMATCHING
-    PORTABLE
-    PLATFORM_SDL2
-    RENDERER_EASY_DRAW
-    MODERN=1
-    UBFIX
-    TESTING=0
-    EMERALD=1)
+    NONMATCHING PORTABLE PLATFORM_SDL2 RENDERER_EASY_DRAW MODERN=1 UBFIX TESTING=0 EMERALD=1)
 
 target_compile_options(main PRIVATE
-    -O3
-    -fno-builtin
-    -Wno-implicit-function-declaration
-    -Wno-trigraphs
-    -Wno-gnu-alignof-expression
-    -Wno-null-dereference
+    -O3 -fno-builtin -Wno-implicit-function-declaration -Wno-trigraphs -Wno-gnu-alignof-expression -Wno-null-dereference
     "SHELL:-iquote '${ROOT}/include'"
     "SHELL:-iquote '${ROOT}/src/platform'"
     "SHELL:-iquote '${ROOT}/gflib'")
