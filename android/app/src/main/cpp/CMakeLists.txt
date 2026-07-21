@@ -75,8 +75,8 @@ foreach(SOURCE IN LISTS DATA_ASM SONG_ASM)
         add_custom_command(
             OUTPUT "${OUTPUT}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${OUTPUT_DIR}"
-            # 补全 -I'${ROOT}/include/constants' 和 -I'${ROOT}'，让 B_MSG_MON_EATING 等所有常量完全展开！
-            COMMAND /bin/sh -c "cd '${ROOT}' && { printf \".include \\\"${SPECIAL_IDS}\\\"\\n\"; '${ROOT}/tools/preproc/preproc' -s '${SOURCE}' '${ROOT}/charmap.txt' | /usr/bin/cpp -I'${ROOT}' -I'${ROOT}/include' -I'${ROOT}/include/constants' -I'${ROOT}/sound' -I'${ROOT}/src/platform' -DMODERN=1 -DPORTABLE -DUBFIX -DTESTING=0 -DEMERALD=1 | '${ROOT}/tools/preproc/preproc' -ie -g '${ASSETS_DIR}' '${SOURCE}' '${ROOT}/charmap.txt'; } > '${OUTPUT}.s' && '${ARM_NONE_EABI_AS}' -march=armv7-a -I'${ROOT}' -I'${ROOT}/sound' -o '${OUTPUT}' '${OUTPUT}.s'"
+            # 关键点：在 preproc 调用前导出环境变量 PORTABLE=1，避免输出 .global 导致 relocation 失败
+            COMMAND /bin/sh -c "cd '${ROOT}' && { printf \".include \\\"${SPECIAL_IDS}\\\"\\n\"; PORTABLE=1 '${ROOT}/tools/preproc/preproc' -s '${SOURCE}' '${ROOT}/charmap.txt' | /usr/bin/cpp -I'${ROOT}' -I'${ROOT}/include' -I'${ROOT}/include/constants' -I'${ROOT}/sound' -I'${ROOT}/src/platform' -DMODERN=1 -DPORTABLE -DUBFIX -DTESTING=0 -DEMERALD=1 | PORTABLE=1 '${ROOT}/tools/preproc/preproc' -ie -g '${ASSETS_DIR}' '${SOURCE}' '${ROOT}/charmap.txt'; } > '${OUTPUT}.s' && '${ARM_NONE_EABI_AS}' -march=armv7-a -I'${ROOT}' -I'${ROOT}/sound' -o '${OUTPUT}' '${OUTPUT}.s'"
             DEPENDS "${SOURCE}" "${ROOT}/tools/preproc/preproc" "${ROOT}/charmap.txt" "${SPECIAL_IDS}"
             VERBATIM)
     endif()
