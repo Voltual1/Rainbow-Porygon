@@ -55,10 +55,13 @@ AsmFile::AsmFile(AsmFile&& other) : m_filename(std::move(other.m_filename))
 
 AsmFile::~AsmFile()
 {
-    if (m_size > 0 && m_buffer != nullptr) delete[] m_buffer;
+    if (m_size > 0) delete[] m_buffer;
 }
 
 // Removes comments to simplify further processing.
+// It stops upon encountering a null character,
+// which may or may not be the end of file marker.
+// If it's not, the error will be caught later.
 void AsmFile::RemoveComments()
 {
     long pos = 0;
@@ -120,6 +123,8 @@ void AsmFile::RemoveComments()
     }
 }
 
+// Checks if we're at a particular directive and if so, consumes it.
+// Returns whether the directive was found.
 bool AsmFile::CheckForDirective(std::string name)
 {
     long i;
@@ -137,6 +142,8 @@ bool AsmFile::CheckForDirective(std::string name)
     return true;
 }
 
+// Checks if we're at a known directive and if so, consumes it.
+// Returns which directive was found.
 Directive AsmFile::GetDirective()
 {
     SkipWhitespace();
@@ -155,6 +162,8 @@ Directive AsmFile::GetDirective()
         return Directive::Unknown;
 }
 
+// Checks if we're at label and if so, returns its symbol and scope.
+// Returns 'label::none' if not.
 Label AsmFile::GetLabel()
 {
     long start = m_pos;
@@ -194,6 +203,7 @@ std::string AsmFile::PeekSection()
 
     SkipWhitespace();
 
+    // TODO: Support 'pushsection', 'popsection', '.previous'.
     if (CheckForDirective(".bss"))
     {
         section = ".bss";
@@ -220,12 +230,14 @@ std::string AsmFile::PeekSection()
     return section;
 }
 
+// Skips tabs and spaces.
 void AsmFile::SkipWhitespace()
 {
     while (m_buffer[m_pos] == '\t' || m_buffer[m_pos] == ' ')
         m_pos++;
 }
 
+// Reads include path.
 std::string AsmFile::ReadPath()
 {
     SkipWhitespace();
@@ -253,6 +265,7 @@ std::string AsmFile::ReadPath()
         if (!IsAsciiPrintable(c))
             RaiseError("unexpected character '\\x%02X' in include string", c);
 
+        // Don't bother allowing any escape sequences.
         if (c == '\\')
         {
             c = m_buffer[m_pos];
@@ -265,13 +278,14 @@ std::string AsmFile::ReadPath()
             RaiseError("path is too long");
     }
 
-    m_pos++;
+    m_pos++; // Go past the right quote.
 
     ExpectEmptyRestOfLine();
 
     return std::string(&m_buffer[startPos], length);
 }
 
+// Reads a charmap string.
 int AsmFile::ReadString(unsigned char* s)
 {
     SkipWhitespace();
@@ -316,31 +330,81 @@ int AsmFile::ReadBraille(unsigned char* s)
 {
     static std::map<char, unsigned char> encoding =
     {
-        { 'A', BRAILLE_CHAR_A }, { 'B', BRAILLE_CHAR_B }, { 'C', BRAILLE_CHAR_C },
-        { 'D', BRAILLE_CHAR_D }, { 'E', BRAILLE_CHAR_E }, { 'F', BRAILLE_CHAR_F },
-        { 'G', BRAILLE_CHAR_G }, { 'H', BRAILLE_CHAR_H }, { 'I', BRAILLE_CHAR_I },
-        { 'J', BRAILLE_CHAR_J }, { 'K', BRAILLE_CHAR_K }, { 'L', BRAILLE_CHAR_L },
-        { 'M', BRAILLE_CHAR_M }, { 'N', BRAILLE_CHAR_N }, { 'O', BRAILLE_CHAR_O },
-        { 'P', BRAILLE_CHAR_P }, { 'Q', BRAILLE_CHAR_Q }, { 'R', BRAILLE_CHAR_R },
-        { 'S', BRAILLE_CHAR_S }, { 'T', BRAILLE_CHAR_T }, { 'U', BRAILLE_CHAR_U },
-        { 'V', BRAILLE_CHAR_V }, { 'W', BRAILLE_CHAR_W }, { 'X', BRAILLE_CHAR_X },
-        { 'Y', BRAILLE_CHAR_Y }, { 'Z', BRAILLE_CHAR_Z }, { 'a', BRAILLE_CHAR_A },
-        { 'b', BRAILLE_CHAR_B }, { 'c', BRAILLE_CHAR_C }, { 'd', BRAILLE_CHAR_D },
-        { 'e', BRAILLE_CHAR_E }, { 'f', BRAILLE_CHAR_F }, { 'g', BRAILLE_CHAR_G },
-        { 'h', BRAILLE_CHAR_H }, { 'i', BRAILLE_CHAR_I }, { 'j', BRAILLE_CHAR_J },
-        { 'k', BRAILLE_CHAR_K }, { 'l', BRAILLE_CHAR_L }, { 'm', BRAILLE_CHAR_M },
-        { 'n', BRAILLE_CHAR_N }, { 'o', BRAILLE_CHAR_O }, { 'p', BRAILLE_CHAR_P },
-        { 'q', BRAILLE_CHAR_Q }, { 'r', BRAILLE_CHAR_R }, { 's', BRAILLE_CHAR_S },
-        { 't', BRAILLE_CHAR_T }, { 'u', BRAILLE_CHAR_U }, { 'v', BRAILLE_CHAR_V },
-        { 'w', BRAILLE_CHAR_W }, { 'x', BRAILLE_CHAR_X }, { 'y', BRAILLE_CHAR_Y },
-        { 'z', BRAILLE_CHAR_Z }, { '0', BRAILLE_CHAR_0 }, { '1', BRAILLE_CHAR_1 },
-        { '2', BRAILLE_CHAR_2 }, { '3', BRAILLE_CHAR_3 }, { '4', BRAILLE_CHAR_4 },
-        { '5', BRAILLE_CHAR_5 }, { '6', BRAILLE_CHAR_6 }, { '7', BRAILLE_CHAR_7 },
-        { '8', BRAILLE_CHAR_8 }, { '9', BRAILLE_CHAR_9 }, { ' ', BRAILLE_CHAR_SPACE },
-        { ',', BRAILLE_CHAR_COMMA }, { '.', BRAILLE_CHAR_PERIOD }, { '?', BRAILLE_CHAR_QUESTION_MARK },
-        { '!', BRAILLE_CHAR_EXCL_MARK }, { ':', BRAILLE_CHAR_COLON }, { ';', BRAILLE_CHAR_SEMICOLON },
-        { '-', BRAILLE_CHAR_HYPHEN }, { '/', BRAILLE_CHAR_SLASH }, { '(', BRAILLE_CHAR_PAREN },
-        { ')', BRAILLE_CHAR_PAREN }, { '\'', BRAILLE_CHAR_APOSTROPHE }, { '#', BRAILLE_CHAR_NUMBER },
+        { 'A', BRAILLE_CHAR_A },
+        { 'B', BRAILLE_CHAR_B },
+        { 'C', BRAILLE_CHAR_C },
+        { 'D', BRAILLE_CHAR_D },
+        { 'E', BRAILLE_CHAR_E },
+        { 'F', BRAILLE_CHAR_F },
+        { 'G', BRAILLE_CHAR_G },
+        { 'H', BRAILLE_CHAR_H },
+        { 'I', BRAILLE_CHAR_I },
+        { 'J', BRAILLE_CHAR_J },
+        { 'K', BRAILLE_CHAR_K },
+        { 'L', BRAILLE_CHAR_L },
+        { 'M', BRAILLE_CHAR_M },
+        { 'N', BRAILLE_CHAR_N },
+        { 'O', BRAILLE_CHAR_O },
+        { 'P', BRAILLE_CHAR_P },
+        { 'Q', BRAILLE_CHAR_Q },
+        { 'R', BRAILLE_CHAR_R },
+        { 'S', BRAILLE_CHAR_S },
+        { 'T', BRAILLE_CHAR_T },
+        { 'U', BRAILLE_CHAR_U },
+        { 'V', BRAILLE_CHAR_V },
+        { 'W', BRAILLE_CHAR_W },
+        { 'X', BRAILLE_CHAR_X },
+        { 'Y', BRAILLE_CHAR_Y },
+        { 'Z', BRAILLE_CHAR_Z },
+        { 'a', BRAILLE_CHAR_A },
+        { 'b', BRAILLE_CHAR_B },
+        { 'c', BRAILLE_CHAR_C },
+        { 'd', BRAILLE_CHAR_D },
+        { 'e', BRAILLE_CHAR_E },
+        { 'f', BRAILLE_CHAR_F },
+        { 'g', BRAILLE_CHAR_G },
+        { 'h', BRAILLE_CHAR_H },
+        { 'i', BRAILLE_CHAR_I },
+        { 'j', BRAILLE_CHAR_J },
+        { 'k', BRAILLE_CHAR_K },
+        { 'l', BRAILLE_CHAR_L },
+        { 'm', BRAILLE_CHAR_M },
+        { 'n', BRAILLE_CHAR_N },
+        { 'o', BRAILLE_CHAR_O },
+        { 'p', BRAILLE_CHAR_P },
+        { 'q', BRAILLE_CHAR_Q },
+        { 'r', BRAILLE_CHAR_R },
+        { 's', BRAILLE_CHAR_S },
+        { 't', BRAILLE_CHAR_T },
+        { 'u', BRAILLE_CHAR_U },
+        { 'v', BRAILLE_CHAR_V },
+        { 'w', BRAILLE_CHAR_W },
+        { 'x', BRAILLE_CHAR_X },
+        { 'y', BRAILLE_CHAR_Y },
+        { 'z', BRAILLE_CHAR_Z },
+        { '0', BRAILLE_CHAR_0 },
+        { '1', BRAILLE_CHAR_1 },
+        { '2', BRAILLE_CHAR_2 },
+        { '3', BRAILLE_CHAR_3 },
+        { '4', BRAILLE_CHAR_4 },
+        { '5', BRAILLE_CHAR_5 },
+        { '6', BRAILLE_CHAR_6 },
+        { '7', BRAILLE_CHAR_7 },
+        { '8', BRAILLE_CHAR_8 },
+        { '9', BRAILLE_CHAR_9 },
+        { ' ', BRAILLE_CHAR_SPACE },
+        { ',', BRAILLE_CHAR_COMMA },
+        { '.', BRAILLE_CHAR_PERIOD },
+        { '?', BRAILLE_CHAR_QUESTION_MARK },
+        { '!', BRAILLE_CHAR_EXCL_MARK },
+        { ':', BRAILLE_CHAR_COLON },
+        { ';', BRAILLE_CHAR_SEMICOLON },
+        { '-', BRAILLE_CHAR_HYPHEN },
+        { '/', BRAILLE_CHAR_SLASH },
+        { '(', BRAILLE_CHAR_PAREN },
+        { ')', BRAILLE_CHAR_PAREN },
+        { '\'', BRAILLE_CHAR_APOSTROPHE },
+        { '#', BRAILLE_CHAR_NUMBER },
         { '$', EOS },
     };
 
@@ -376,12 +440,15 @@ int AsmFile::ReadBraille(unsigned char* s)
 
             if (!inNumber && c >= '0' && c <= '9' )
             {
+                // Output number indicator at start of a number
                 inNumber = true;
                 VerifyStringLength(length);
                 s[length++] = BRAILLE_CHAR_NUMBER;
             }
             else if (inNumber && encoding[c] == BRAILLE_CHAR_SPACE)
             {
+                // Number ends at a space.
+                // Non-number characters encountered before a space will simply be output as is.
                 inNumber = false;
             }
 
@@ -391,13 +458,15 @@ int AsmFile::ReadBraille(unsigned char* s)
         }
     }
 
-    m_pos++;
+    m_pos++; // Go past the right quote.
 
     ExpectEmptyRestOfLine();
 
     return length;
 }
 
+// If we're at a comma, consumes it.
+// Returns whether a comma was found.
 bool AsmFile::ConsumeComma()
 {
     if (m_buffer[m_pos] == ',')
@@ -409,6 +478,7 @@ bool AsmFile::ConsumeComma()
     return false;
 }
 
+// Converts digit character to numerical value.
 static int ConvertDigit(char c, int radix)
 {
     int digit;
@@ -425,6 +495,7 @@ static int ConvertDigit(char c, int radix)
     return (digit < radix) ? digit : -1;
 }
 
+// Reads an integer. If the integer is greater than maxValue, it returns -1.
 int AsmFile::ReadPadLength()
 {
     if (!IsAsciiDigit(m_buffer[m_pos]))
@@ -454,6 +525,7 @@ int AsmFile::ReadPadLength()
     return n;
 }
 
+// Outputs the current line and moves to the next one.
 void AsmFile::OutputLine()
 {
     while (m_buffer[m_pos] != '\n' && m_buffer[m_pos] != 0)
@@ -482,13 +554,14 @@ void AsmFile::OutputLine()
     }
 }
 
+// parses an assumed C `enum`. Returns false if `enum { ...` is not matched
 bool AsmFile::ParseEnum()
 {
     if (!m_doEnum)
         return false;
 
     long fallbackPosition = m_pos;
-    std::string headerFilename = "unknown";
+    std::string headerFilename = "";
     long currentHeaderLine = 0;
     std::string enumName;
     while (true)
@@ -498,8 +571,8 @@ bool AsmFile::ParseEnum()
         if (identifier == "__attribute__")
         {
             if (m_pos + 1 >= m_size
-                || m_buffer[m_pos] != '('
-                || m_buffer[m_pos + 1] != '(')
+| m_buffer[m_pos] != '('
+| m_buffer[m_pos + 1] != '(')
             {
                 m_pos = fallbackPosition - 4;
                 return false;
@@ -541,7 +614,7 @@ bool AsmFile::ParseEnum()
     long enumCounter = 0;
     long symbolCount = 0;
 
-    if (m_buffer[m_pos] == ':')
+    if (m_buffer[m_pos] == ':') // : <type>
     {
         m_pos++;
         std::string underlyingType;
@@ -552,7 +625,7 @@ bool AsmFile::ParseEnum()
         currentHeaderLine += SkipWhitespaceAndEol();
     }
 
-    if (m_buffer[m_pos] != '{')
+    if (m_buffer[m_pos] != '{') // assume assembly macro, otherwise assume enum and report errors accordingly
     {
         m_pos = fallbackPosition - 4;
         return false;
@@ -592,18 +665,18 @@ bool AsmFile::ParseEnum()
                 }
                 enumCounter = 0;
             }
-            // 关键修正：在 PORTABLE 模式下绝不能生成 .global 声明以杜绝 ABS16 重定位错误
-            if (std::getenv("PORTABLE") == nullptr)
-            {
-                std::printf(".global %s; ", currentIdentName.c_str());
-            }
+            // HACK(#7394): Make the definitions global so that C 'asm'
+            // statements are able to reference them (if they happen to
+            // be available in an assembled object file).
+            // PORTABLE FIX: Also emit .hidden to prevent R_ARM_ABS16 relocations in dynamic libraries
+            std::printf(".global %s; .hidden %s; ", currentIdentName.c_str(), currentIdentName.c_str());
             std::printf(".equiv %s, (%s) + %ld\n", currentIdentName.c_str(), enumBase.c_str(), enumCounter);
             enumCounter++;
             symbolCount++;
         }
         else if (symbolCount == 0)
         {
-            return true;
+            RaiseError("%s:%ld: empty enum is invalid", headerFilename.c_str(), currentHeaderLine);
         }
 
         if (m_buffer[m_pos] == '#')
@@ -628,6 +701,7 @@ bool AsmFile::ParseEnum()
     return true;
 }
 
+// Asserts that the rest of the line is empty and moves to the next one.
 void AsmFile::ExpectEmptyRestOfLine()
 {
     SkipWhitespace();
@@ -657,16 +731,19 @@ void AsmFile::ExpectEmptyRestOfLine()
     }
 }
 
+// Checks if we're at the end of the file.
 bool AsmFile::IsAtEnd()
 {
     return (m_pos >= m_size);
 }
 
+// Output the current location to set gas's logical file and line numbers.
 void AsmFile::OutputLocation()
 {
     std::printf("# %ld \"%s\"\n", m_lineNum, m_filename.c_str());
 }
 
+// Reports a diagnostic message.
 void AsmFile::ReportDiagnostic(const char* type, const char* format, std::va_list args)
 {
     const int bufferSize = 1024;
@@ -684,17 +761,20 @@ do                                        \
     va_end(args);                         \
 } while (0)
 
+// Reports an error diagnostic and terminates the program.
 void AsmFile::RaiseError(const char* format, ...)
 {
     DO_REPORT("error");
     std::exit(1);
 }
 
+// Reports a warning diagnostic.
 void AsmFile::RaiseWarning(const char* format, ...)
 {
     DO_REPORT("warning");
 }
 
+// Skips Whitespace including newlines and returns the amount of newlines skipped
 int AsmFile::SkipWhitespaceAndEol()
 {
     int newlines = 0;
@@ -713,7 +793,7 @@ int AsmFile::ParseLineSkipInEnum(void)
     while (m_buffer[m_pos] == ' ' || m_buffer[m_pos] == '\t')
         m_pos++;
 
-    if (!IsAsciiDigit(m_buffer[m_pos]))
+     if (!IsAsciiDigit(m_buffer[m_pos]))
         RaiseError("malformatted line indicator found inside `enum`, expected line number");
 
     unsigned n = 0;
@@ -751,11 +831,12 @@ int AsmFile::ParseLineSkipInEnum(void)
     return n - 1;
 }
 
+// returns the last line indicator and its corresponding file name without modifying the token index
 int AsmFile::FindLastLineNumber(std::string& filename)
 {
     long pos = m_pos;
     long linebreaks = 0;
-    while (pos >= 0 && m_buffer[pos] != '#')
+    while (m_buffer[pos] != '#' && pos >= 0)
     {
         if (m_buffer[pos] == '\n')
             linebreaks++;
@@ -763,20 +844,14 @@ int AsmFile::FindLastLineNumber(std::string& filename)
     }
 
     if (pos < 0)
-    {
-        filename = "unknown";
-        return 0;
-    }
+        RaiseError("line indicator for header file not found before `enum`");
 
     pos++;
     while (m_buffer[pos] == ' ' || m_buffer[pos] == '\t')
         pos++;
 
     if (!IsAsciiDigit(m_buffer[pos]))
-    {
-        filename = "unknown";
-        return 0;
-    }
+        RaiseError("malformatted line indicator found before `enum`, expected line number");
 
     unsigned n = 0;
     int digit = 0;
@@ -787,15 +862,30 @@ int AsmFile::FindLastLineNumber(std::string& filename)
         pos++;
 
     if (m_buffer[pos++] != '"')
-    {
-        filename = "unknown";
-        return n + linebreaks - 1;
-    }
+        RaiseError("malformatted line indicator found before `enum`, expected filename");
 
-    filename.clear();
     while (m_buffer[pos] != '"')
     {
-        filename += m_buffer[pos++];
+        unsigned char c = m_buffer[pos++];
+
+        if (c == 0)
+        {
+            if (pos >= m_size)
+                RaiseError("unexpected EOF in line indicator");
+            else
+                RaiseError("unexpected null character in line indicator");
+        }
+
+        if (!IsAsciiPrintable(c))
+            RaiseError("unexpected character '\\x%02X' in line indicator", c);
+
+        if (c == '\\')
+        {
+            c = m_buffer[pos];
+            RaiseError("unexpected escape '\\%c' in line indicator", c);
+        }
+
+        filename += c;
     }
 
     return n + linebreaks - 1;
