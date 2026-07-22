@@ -345,22 +345,34 @@ static void UNUSED MusicPlayerJumpTableCopy(void)
 
 void ClearChain(void *x)
 {
-#if __STDC_VERSION__ < 202311L
-    void (*func)(void *) = *(&gMPlayJumpTable[34]);
+#ifdef PORTABLE
+    // 在 Android 平台直接使用清除逻辑，不再查表
+    u32 *ptr = (u32 *)x;
+    s32 i;
+    for (i = 0; i < 16; i++) *ptr++ = 0;
 #else
-    void (*func)(...) = *(&gMPlayJumpTable[34]);
-#endif
+    #if __STDC_VERSION__ < 202311L
+        void (*func)(void *) = *(&gMPlayJumpTable[34]);
+    #else
+        void (*func)(...) = *(&gMPlayJumpTable[34]);
+    #endif
     func(x);
+#endif
 }
 
 void Clear64byte(void *x)
 {
-#if __STDC_VERSION__ < 202311L
-    void (*func)(void *) = *(&gMPlayJumpTable[35]);
+#ifdef PORTABLE
+    // 64字节清除，等同于 GBA BIOS 的逻辑
+    memset(x, 0, 64);
 #else
-    void (*func)(...) = *(&gMPlayJumpTable[35]);
-#endif
+    #if __STDC_VERSION__ < 202311L
+        void (*func)(void *) = *(&gMPlayJumpTable[35]);
+    #else
+        void (*func)(...) = *(&gMPlayJumpTable[35]);
+    #endif
     func(x);
+#endif
 }
 
 void SoundInit(struct SoundInfo *soundInfo)
@@ -376,13 +388,13 @@ void SoundInit(struct SoundInfo *soundInfo)
     REG_DMA1CNT_H = DMA_32BIT;
     REG_DMA2CNT_H = DMA_32BIT;
     REG_SOUNDCNT_X = SOUND_MASTER_ENABLE
-                   | SOUND_4_ON
-                   | SOUND_3_ON
-                   | SOUND_2_ON
-                   | SOUND_1_ON;
+                     | SOUND_4_ON
+                     | SOUND_3_ON
+                     | SOUND_2_ON
+                     | SOUND_1_ON;
     REG_SOUNDCNT_H = SOUND_B_FIFO_RESET | SOUND_B_TIMER_0 | SOUND_B_LEFT_OUTPUT
-                   | SOUND_A_FIFO_RESET | SOUND_A_TIMER_0 | SOUND_A_RIGHT_OUTPUT
-                   | SOUND_ALL_MIX_FULL;
+                     | SOUND_A_FIFO_RESET | SOUND_A_TIMER_0 | SOUND_A_RIGHT_OUTPUT
+                     | SOUND_ALL_MIX_FULL;
     REG_SOUNDBIAS_H = (REG_SOUNDBIAS_H & 0x3F) | 0x40;
 
     REG_DMA1SAD = (s32)soundInfo->pcmBuffer;
@@ -401,7 +413,12 @@ void SoundInit(struct SoundInfo *soundInfo)
     soundInfo->MidiKeyToCgbFreq = (MidiKeyToCgbFreqFunc)DummyFunc;
     soundInfo->ExtVolPit = (ExtVolPitFunc)DummyFunc;
 
+#ifndef PORTABLE
     MPlayJumpTableCopy(gMPlayJumpTable);
+#else
+    // Android 下不需要拷贝，部分关键项在 MPlayExtender 中手动填充
+    // 且 Clear64byte 等函数已经改为了直接调用
+#endif
 
     soundInfo->MPlayJumpTable = gMPlayJumpTable;
 
