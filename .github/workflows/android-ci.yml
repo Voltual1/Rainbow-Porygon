@@ -49,6 +49,7 @@ jobs:
             tools/
             build/
             libagbsyscall/
+            .map_version
             data/layouts/layouts.inc
             data/layouts/layouts_table.inc
             data/maps/connections.inc
@@ -79,12 +80,14 @@ jobs:
             src/data/trainers_frlg.h
             src/data/tutor_moves.h
             src/data/wild_encounters.h
-          key: gba-assets-${{ runner.os }}-${{ hashFiles('Makefile', 'config.mk', 'make_tools.mk', 'sound/**/*', 'data/**/*', 'tools/**/*.c', 'tools/**/*.cpp') }}-${{ github.sha }}
+            test/battle/partner_control.h
+            test/battle/trainer_control.h
+          key: gba-assets-${{ runner.os }}-${{ hashFiles('Makefile', 'config.mk', 'make_tools.mk', 'sound/**/*', 'data/**/*', 'tools/**/*.c', 'tools/**/*.cpp') }}
           restore-keys: |
-            gba-assets-${{ runner.os }}-${{ hashFiles('Makefile', 'config.mk', 'make_tools.mk', 'sound/**/*', 'data/**/*', 'tools/**/*.c', 'tools/**/*.cpp') }}-
             gba-assets-${{ runner.os }}-
 
       - name: Build GBA Assets
+        if: steps.cache-gba-assets.outputs.cache-hit != 'true'
         env:
           CCACHE_DIR: ${{ github.workspace }}/.ccache
         run: |
