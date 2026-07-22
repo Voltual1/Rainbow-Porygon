@@ -1,6 +1,10 @@
 #include "gba/gba.h"
 #include "gba/flash_internal.h"
 
+#ifdef PORTABLE
+u8 gFlashBaseBuffer[FLASH_ROM_SIZE_1M]; // 128KB GBA Flash buffer allocated on host memory
+#endif
+
 static u8 sTimerNum;
 static u16 sTimerCount;
 static vu16 *sTimerReg;

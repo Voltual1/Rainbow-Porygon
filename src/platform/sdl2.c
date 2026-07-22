@@ -103,7 +103,7 @@ int main(int argc, char **argv)
 #endif
     if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO
 #ifdef __ANDROID__
-                | SDL_INIT_GAMECONTROLLER
+ SDL_INIT_GAMECONTROLLER
 #endif
                 ) < 0)
     {
@@ -405,7 +405,7 @@ static void ReadSaveFile(const char *path)
 
     if (sSaveFile == NULL)
     {
-        memset(FLASH_BASE, 0xFF, sizeof(FLASH_BASE));
+        memset(FLASH_BASE, 0xFF, sizeof(gFlashBaseBuffer));
         SDL_Log("Unable to open save file: %s", path);
         return;
     }
@@ -416,12 +416,12 @@ static void ReadSaveFile(const char *path)
 
     // Only read as many bytes as fit inside the buffer
     // or as many bytes as are in the file
-    int bytesToRead = (fileSize < sizeof(FLASH_BASE)) ? fileSize : sizeof(FLASH_BASE);
+    int bytesToRead = (fileSize < sizeof(gFlashBaseBuffer)) ? fileSize : sizeof(gFlashBaseBuffer);
 
     int bytesRead = fread(FLASH_BASE, 1, bytesToRead, sSaveFile);
 
     // Fill the buffer if the savefile was just created or smaller than the buffer itself
-    for (int i = bytesRead; i < sizeof(FLASH_BASE); i++)
+    for (int i = bytesRead; i < sizeof(gFlashBaseBuffer); i++)
     {
         FLASH_BASE[i] = 0xFF;
     }
@@ -497,7 +497,7 @@ static void StoreSaveFile()
     if (sSaveFile != NULL)
     {
         fseek(sSaveFile, 0, SEEK_SET);
-        fwrite(FLASH_BASE, 1, sizeof(FLASH_BASE), sSaveFile);
+        fwrite(FLASH_BASE, 1, sizeof(gFlashBaseBuffer), sSaveFile);
     }
 }
 
