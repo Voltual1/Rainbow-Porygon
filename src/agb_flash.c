@@ -143,12 +143,7 @@ void ReadFlash_Core(vu8 *src, u8 *dest, u32 size)
 void ReadFlash(u16 sectorNum, u32 offset, u8 *dest, u32 size)
 {
     u8 *src;
-    u16 i;
-    vu16 readFlash_Core_Buffer[0x40];
-    vu16 *funcSrc;
-    vu16 *funcDest;
-    void (*readFlash_Core)(vu8 *, u8 *, u32);
-
+    
     REG_WAITCNT = (REG_WAITCNT & ~WAITCNT_SRAM_MASK) | WAITCNT_SRAM_8;
 
     if (gFlash->romSize == FLASH_ROM_SIZE_1M)
@@ -156,6 +151,17 @@ void ReadFlash(u16 sectorNum, u32 offset, u8 *dest, u32 size)
         SwitchFlashBank(sectorNum / SECTORS_PER_BANK);
         sectorNum %= SECTORS_PER_BANK;
     }
+
+#ifdef PORTABLE
+    // Android 平台直接读取，禁止将代码拷贝到栈上执行
+    src = FLASH_BASE + (sectorNum << gFlash->sector.shift) + offset;
+    ReadFlash_Core((vu8 *)src, dest, size);
+#else
+    u16 i;
+    vu16 readFlash_Core_Buffer[0x40];
+    vu16 *funcSrc;
+    vu16 *funcDest;
+    void (*readFlash_Core)(vu8 *, u8 *, u32);
 
     funcSrc = (vu16 *)ReadFlash_Core;
     funcSrc = (vu16 *)((s32)funcSrc ^ 1);
@@ -170,10 +176,9 @@ void ReadFlash(u16 sectorNum, u32 offset, u8 *dest, u32 size)
     }
 
     readFlash_Core = (void (*)(vu8 *, u8 *, u32))((s32)readFlash_Core_Buffer + 1);
-
     src = FLASH_BASE + (sectorNum << gFlash->sector.shift) + offset;
-
     readFlash_Core(src, dest, size);
+#endif
 }
 
 u32 VerifyFlashSector_Core(u8 *src, u8 *tgt, u32 size)
@@ -189,13 +194,8 @@ u32 VerifyFlashSector_Core(u8 *src, u8 *tgt, u32 size)
 
 u32 VerifyFlashSector(u16 sectorNum, u8 *src)
 {
-    u16 i;
-    vu16 verifyFlashSector_Core_Buffer[0x80];
-    vu16 *funcSrc;
-    vu16 *funcDest;
     u8 *tgt;
     u16 size;
-    u32 (*verifyFlashSector_Core)(u8 *, u8 *, u32);
 
     REG_WAITCNT = (REG_WAITCNT & ~WAITCNT_SRAM_MASK) | WAITCNT_SRAM_8;
 
@@ -204,6 +204,18 @@ u32 VerifyFlashSector(u16 sectorNum, u8 *src)
         SwitchFlashBank(sectorNum / SECTORS_PER_BANK);
         sectorNum %= SECTORS_PER_BANK;
     }
+
+    tgt = FLASH_BASE + (sectorNum << gFlash->sector.shift);
+    size = gFlash->sector.size;
+
+#ifdef PORTABLE
+    return VerifyFlashSector_Core(src, tgt, size);
+#else
+    u16 i;
+    vu16 verifyFlashSector_Core_Buffer[0x80];
+    vu16 *funcSrc;
+    vu16 *funcDest;
+    u32 (*verifyFlashSector_Core)(u8 *, u8 *, u32);
 
     funcSrc = (vu16 *)VerifyFlashSector_Core;
     funcSrc = (vu16 *)((s32)funcSrc ^ 1);
@@ -218,11 +230,8 @@ u32 VerifyFlashSector(u16 sectorNum, u8 *src)
     }
 
     verifyFlashSector_Core = (u32 (*)(u8 *, u8 *, u32))((s32)verifyFlashSector_Core_Buffer + 1);
-
-    tgt = FLASH_BASE + (sectorNum << gFlash->sector.shift);
-    size = gFlash->sector.size;
-
     return verifyFlashSector_Core(src, tgt, size);
+#endif
 }
 
 u32 VerifyFlashSectorNBytes(u16 sectorNum, u8 *src, u32 n)
