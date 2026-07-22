@@ -103,7 +103,7 @@ int main(int argc, char **argv)
 #endif
     if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO
 #ifdef __ANDROID__
- SDL_INIT_GAMECONTROLLER
+                | SDL_INIT_GAMECONTROLLER
 #endif
                 ) < 0)
     {
