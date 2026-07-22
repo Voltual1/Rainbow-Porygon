@@ -37,65 +37,69 @@ foreach(SOURCE IN LISTS GAME_C)
     list(APPEND GENERATED_C "${OUTPUT}")
 endforeach()
 
-file(GLOB DATA_ASM CONFIGURE_DEPENDS "${ROOT}/data/*.s" "${ROOT}/sound/*.s")
-file(GLOB SONG_ASM CONFIGURE_DEPENDS "${ROOT}/sound/songs/*.s" "${ROOT}/sound/songs/midi/*.s")
-set(GENERATED_ASM)
-set(SPECIAL_IDS "${CMAKE_BINARY_DIR}/generated/special_ids.inc")
+# ==================== 暂时注释掉 ASM 与 GAME_DATA 处理 ====================
+# file(GLOB DATA_ASM CONFIGURE_DEPENDS "${ROOT}/data/*.s" "${ROOT}/sound/*.s")
+# file(GLOB SONG_ASM CONFIGURE_DEPENDS "${ROOT}/sound/songs/*.s" "${ROOT}/sound/songs/midi/*.s")
+# set(GENERATED_ASM)
+# set(SPECIAL_IDS "${CMAKE_BINARY_DIR}/generated/special_ids.inc")
 
 # 生成 special_ids.inc
-file(WRITE "${CMAKE_BINARY_DIR}/gen_specials.py" "
-import sys, re
-with open(sys.argv[2], 'w') as out:
-    idx = 0
-    with open(sys.argv[1], 'r') as f:
-        for line in f:
-            m = re.match(r'^\\s*def_special\\s+([A-Za-z0-9_]+)', line)
-            if m:
-                out.write('.set SPECIAL_{}, {}\\n'.format(m.group(1), idx))
-                idx += 1
-")
+# file(WRITE "${CMAKE_BINARY_DIR}/gen_specials.py" "
+# import sys, re
+# with open(sys.argv[2], 'w') as out:
+#     idx = 0
+#     with open(sys.argv[1], 'r') as f:
+#         for line in f:
+#             m = re.match(r'^\\s*def_special\\s+([A-Za-z0-9_]+)', line)
+#             if m:
+#                 out.write('.set SPECIAL_{}, {}\\n'.format(m.group(1), idx))
+#                 idx += 1
+# ")
 
-add_custom_command(
-    OUTPUT "${SPECIAL_IDS}"
-    COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_BINARY_DIR}/generated"
-    COMMAND python3 "${CMAKE_BINARY_DIR}/gen_specials.py" "${ROOT}/data/specials.inc" "${SPECIAL_IDS}"
-    DEPENDS "${ROOT}/data/specials.inc"
-    VERBATIM)
+# add_custom_command(
+#     OUTPUT "${SPECIAL_IDS}"
+#     COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_BINARY_DIR}/generated"
+#     COMMAND python3 "${CMAKE_BINARY_DIR}/gen_specials.py" "${ROOT}/data/specials.inc" "${SPECIAL_IDS}"
+#     DEPENDS "${ROOT}/data/specials.inc"
+#     VERBATIM)
 
 # 汇编预处理与编译管道
-foreach(SOURCE IN LISTS DATA_ASM SONG_ASM)
-    file(RELATIVE_PATH RELATIVE_SOURCE "${ROOT}" "${SOURCE}")
-    set(OUTPUT "${CMAKE_BINARY_DIR}/generated/${RELATIVE_SOURCE}.o")
-    get_filename_component(OUTPUT_DIR "${OUTPUT}" DIRECTORY)
-    if(SOURCE MATCHES "/sound/songs/")
-        add_custom_command(
-            OUTPUT "${OUTPUT}"
-            COMMAND "${CMAKE_COMMAND}" -E make_directory "${OUTPUT_DIR}"
-            COMMAND /bin/sh -c "sed -e 's/\\.4byte/\\.word/g;s/\\.2byte/\\.short/g' '${SOURCE}' > '${OUTPUT}.s' && '${ARM_NONE_EABI_AS}' -march=armv7-a -I'${ROOT}/sound' -o '${OUTPUT}' '${OUTPUT}.s'"
-            DEPENDS "${SOURCE}"
-            VERBATIM)
-    else()
-        add_custom_command(
-            OUTPUT "${OUTPUT}"
-            COMMAND "${CMAKE_COMMAND}" -E make_directory "${OUTPUT_DIR}"
-            # 关键修复 2：采用 Expansion 原生预处理管道，通过 -ie 开启 preproc 的 enum 解析功能
-            COMMAND /bin/sh -c "cd '${ROOT}' && { printf \".include \\\"${SPECIAL_IDS}\\\"\\n\"; PORTABLE=1 '${ROOT}/tools/preproc/preproc' -s '${SOURCE}' '${ROOT}/charmap.txt' | /usr/bin/cpp -I'${ROOT}' -I'${ROOT}/include' -I'${ROOT}/include/constants' -I'${ROOT}/sound' -I'${ROOT}/src/platform' -DMODERN=1 -DPORTABLE=1 -DUBFIX -DTESTING=0 -DEMERALD=1 | PORTABLE=1 '${ROOT}/tools/preproc/preproc' -ie -g '${ASSETS_DIR}' '${SOURCE}' '${ROOT}/charmap.txt'; } > '${OUTPUT}.s' && '${ARM_NONE_EABI_AS}' -march=armv7-a -I'${ROOT}' -I'${ROOT}/sound' -o '${OUTPUT}' '${OUTPUT}.s'"
-            DEPENDS "${SOURCE}" "${ROOT}/tools/preproc/preproc" "${ROOT}/charmap.txt" "${SPECIAL_IDS}"
-            VERBATIM)
-    endif()
-    list(APPEND GENERATED_ASM "${OUTPUT}")
-endforeach()
+# foreach(SOURCE IN LISTS DATA_ASM SONG_ASM)
+#     file(RELATIVE_PATH RELATIVE_SOURCE "${ROOT}" "${SOURCE}")
+#     set(OUTPUT "${CMAKE_BINARY_DIR}/generated/${RELATIVE_SOURCE}.o")
+#     get_filename_component(OUTPUT_DIR "${OUTPUT}" DIRECTORY)
+#     if(SOURCE MATCHES "/sound/songs/")
+#         add_custom_command(
+#             OUTPUT "${OUTPUT}"
+#             COMMAND "${CMAKE_COMMAND}" -E make_directory "${OUTPUT_DIR}"
+#             COMMAND /bin/sh -c "sed -e 's/\\.4byte/\\.word/g;s/\\.2byte/\\.short/g' '${SOURCE}' > '${OUTPUT}.s' && '${ARM_NONE_EABI_AS}' -march=armv7-a -I'${ROOT}/sound' -o '${OUTPUT}' '${OUTPUT}.s'"
+#             DEPENDS "${SOURCE}"
+#             VERBATIM)
+#     else()
+#         add_custom_command(
+#             OUTPUT "${OUTPUT}"
+#             COMMAND "${CMAKE_COMMAND}" -E make_directory "${OUTPUT_DIR}"
+#             # 关键修复 2：采用 Expansion 原生预处理管道，通过 -ie 开启 preproc 的 enum 解析功能
+#             COMMAND /bin/sh -c "cd '${ROOT}' && { printf \".include \\\"${SPECIAL_IDS}\\\"\\n\"; PORTABLE=1 '${ROOT}/tools/preproc/preproc' -s '${SOURCE}' '${ROOT}/charmap.txt' | /usr/bin/cpp -I'${ROOT}' -I'${ROOT}/include' -I'${ROOT}/include/constants' -I'${ROOT}/sound' -I'${ROOT}/src/platform' -DMODERN=1 -DPORTABLE=1 -DUBFIX -DTESTING=0 -DEMERALD=1 | PORTABLE=1 '${ROOT}/tools/preproc/preproc' -ie -g '${ASSETS_DIR}' '${SOURCE}' '${ROOT}/charmap.txt'; } > '${OUTPUT}.s' && '${ARM_NONE_EABI_AS}' -march=armv7-a -I'${ROOT}' -I'${ROOT}/sound' -o '${OUTPUT}' '${OUTPUT}.s'"
+#             DEPENDS "${SOURCE}" "${ROOT}/tools/preproc/preproc" "${ROOT}/charmap.txt" "${SPECIAL_IDS}"
+#             VERBATIM)
+#     endif()
+#     list(APPEND GENERATED_ASM "${OUTPUT}")
+# endforeach()
 
-set(GAME_DATA_OBJECT "${CMAKE_BINARY_DIR}/generated/game_data.o")
-add_custom_command(
-    OUTPUT "${GAME_DATA_OBJECT}"
-    COMMAND "${ARM_NONE_EABI_LD}" -r -o "${GAME_DATA_OBJECT}.tmp" ${GENERATED_ASM}
-    COMMAND "${ARM_NONE_EABI_OBJCOPY}" --rename-section .rodata=.data,alloc,load,data,contents "${GAME_DATA_OBJECT}.tmp" "${GAME_DATA_OBJECT}"
-    DEPENDS ${GENERATED_ASM}
-    VERBATIM)
-set_source_files_properties("${GAME_DATA_OBJECT}" PROPERTIES GENERATED TRUE EXTERNAL_OBJECT TRUE)
+# set(GAME_DATA_OBJECT "${CMAKE_BINARY_DIR}/generated/game_data.o")
+# add_custom_command(
+#     OUTPUT "${GAME_DATA_OBJECT}"
+#     COMMAND "${ARM_NONE_EABI_LD}" -r -o "${GAME_DATA_OBJECT}.tmp" ${GENERATED_ASM}
+#     COMMAND "${ARM_NONE_EABI_OBJCOPY}" --rename-section .rodata=.data,alloc,load,data,contents "${GAME_DATA_OBJECT}.tmp" "${GAME_DATA_OBJECT}"
+#     DEPENDS ${GENERATED_ASM}
+#     VERBATIM)
+# set_source_files_properties("${GAME_DATA_OBJECT}" PROPERTIES GENERATED TRUE EXTERNAL_OBJECT TRUE)
+# =========================================================================
 
-add_library(main SHARED ${GENERATED_C} "${GAME_DATA_OBJECT}")
+# 仅保留 C 语言编译出的源文件
+add_library(main SHARED ${GENERATED_C})
+
 target_include_directories(main PRIVATE
     "${ROOT}"
     "${ROOT}/include"
