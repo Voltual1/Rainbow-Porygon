@@ -1,6 +1,6 @@
 #include "global.h"
+#include <string.h>
 #include "gba/m4a_internal.h"
-#include "global.h"
 
 #ifdef PORTABLE
     #include "cgb_audio.h"
@@ -346,7 +346,6 @@ static void UNUSED MusicPlayerJumpTableCopy(void)
 void ClearChain(void *x)
 {
 #ifdef PORTABLE
-    // 在 Android 平台直接使用清除逻辑，不再查表
     u32 *ptr = (u32 *)x;
     s32 i;
     for (i = 0; i < 16; i++) *ptr++ = 0;
@@ -363,7 +362,6 @@ void ClearChain(void *x)
 void Clear64byte(void *x)
 {
 #ifdef PORTABLE
-    // 64字节清除，等同于 GBA BIOS 的逻辑
     memset(x, 0, 64);
 #else
     #if __STDC_VERSION__ < 202311L
@@ -415,9 +413,6 @@ void SoundInit(struct SoundInfo *soundInfo)
 
 #ifndef PORTABLE
     MPlayJumpTableCopy(gMPlayJumpTable);
-#else
-    // Android 下不需要拷贝，部分关键项在 MPlayExtender 中手动填充
-    // 且 Clear64byte 等函数已经改为了直接调用
 #endif
 
     soundInfo->MPlayJumpTable = gMPlayJumpTable;
