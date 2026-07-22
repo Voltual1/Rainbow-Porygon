@@ -592,9 +592,11 @@ bool AsmFile::ParseEnum()
                 }
                 enumCounter = 0;
             }
-            
-            // 终极修复：必须无条件输出 .global 导出以解决 R_ARM_ABS16 重定位问题
-            std::printf(".global %s; ", currentIdentName.c_str());
+            // 关键修正：在 PORTABLE 模式下绝不能生成 .global 声明以杜绝 ABS16 重定位错误
+            if (std::getenv("PORTABLE") == nullptr)
+            {
+                std::printf(".global %s; ", currentIdentName.c_str());
+            }
             std::printf(".equiv %s, (%s) + %ld\n", currentIdentName.c_str(), enumBase.c_str(), enumCounter);
             enumCounter++;
             symbolCount++;
