@@ -8,6 +8,7 @@
 #include "constants/moves.h"
 #include "constants/pokemon.h"
 #include "constants/items.h"
+#include "constants/battle_string_ids.h"  
 	.include "asm/macros.inc"
 	.include "asm/macros/battle_anim_script.inc"
 	.include "constants/constants.inc"
