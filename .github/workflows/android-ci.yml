@@ -47,8 +47,9 @@ jobs:
           path: |
             tools/
             build/
-            src/wild_encounters.h
+            include/map_groups.h
             include/constants/script_commands.h
+            src/wild_encounters.h
             src/pokemon/teachable_learnsets.h
             src/tutor_moves.h
           key: gba-assets-${{ runner.os }}-${{ hashFiles('Makefile', 'config.mk', 'make_tools.mk', 'sound/**/*', 'data/**/*', 'tools/**/*.c', 'tools/**/*.cpp') }}
