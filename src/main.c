@@ -98,8 +98,8 @@ void AgbMain(void)
     *(vu16 *)BG_PLTT = RGB_WHITE; // Set the backdrop to white on startup
     InitGpuRegManager();
     REG_WAITCNT = WAITCNT_PREFETCH_ENABLE
-                | WAITCNT_WS0_S_1 | WAITCNT_WS0_N_3
-                | WAITCNT_WS1_S_1 | WAITCNT_WS1_N_3;
+ | WAITCNT_WS0_S_1 | WAITCNT_WS0_N_3
+ | WAITCNT_WS1_S_1 | WAITCNT_WS1_N_3;
     InitKeys();
     InitIntrHandlers();
     m4aSoundInit();
@@ -108,7 +108,9 @@ void AgbMain(void)
     InitRFU();
 #endif
     RtcInit();
+#ifndef PORTABLE
     CheckForFlashMemory();
+#endif
     InitMainCallbacks();
     InitMapMusic();
 #ifdef BUGFIX
@@ -145,6 +147,7 @@ void AgbMainLoop(void)
     {
         ReadKeys();
 
+#ifndef PORTABLE
         if (gSoftResetDisabled == FALSE
          && JOY_HELD_RAW(A_BUTTON)
          && JOY_HELD_RAW(B_START_SELECT) == B_START_SELECT)
@@ -153,6 +156,7 @@ void AgbMainLoop(void)
             rfu_waitREQComplete();
             DoSoftReset();
         }
+#endif
 
         if (Overworld_SendKeysToLinkIsRunning() == TRUE)
         {
@@ -503,6 +507,7 @@ int _getpid(void) { return 1; }
 int _isatty(int file) { return 1; }
 int _kill(int pid, int sig) { return -1; }
 int _lseek(int file, int ptr, int dir) { return 0; }
+int _read(int file, char *ptr, int len) { return 0; }
 int _read(int file, char *ptr, int len) { return 0; }
 int _write(int file, char *ptr, int len) { return 0; }
 #endif
