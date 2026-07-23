@@ -525,7 +525,7 @@ static void DecodeLOtANS(const u32 *data, const u32 *pFreqs, u8 *resultVec, u32 
     u32 remainingCount = count % 2;
 
 #ifdef PORTABLE
-    SwitchToArmCallLOtANS(data, sWorkingYkTable, resultVec, &resultVec[count - remainingCount], DecodeLOtANSLoop);
+    SwitchToArmCallLOtANS(data, sWorkingYkTable, resultVec, &resultVec[count - remainingCount], (void (*)(const u32 *, u32 *, void *, void *))DecodeLOtANSLoop);
 #else
     u32 funcBuffer[FUNC_BUFFER_SIZE(DecodeLOtANSLoop, SwitchToArmCallLOtANS)];
 
@@ -605,7 +605,7 @@ static void DecodeSymtANS(const u32 *data, const u32 *pFreqs, u16 *resultVec, u3
     BuildDecompressionTable(pFreqs, sWorkingYkTable);
 
 #ifdef PORTABLE
-    SwitchToArmCallDecodeSymtANS(data, sWorkingYkTable, resultVec, &resultVec[count], (void *)DecodeLOtANSLoop);
+    SwitchToArmCallDecodeSymtANS(data, sWorkingYkTable, resultVec, &resultVec[count], (void (*)(const u32 *, u32 *, u16 *, u16 *))DecodeLOtANSLoop);
 #else
     u32 funcBuffer[FUNC_BUFFER_SIZE(DecodeLOtANSLoop, SwitchToArmCallLOtANS)];
     // CopyFuncToIwram(funcBuffer, DecodeSymtANSLoop, SwitchToArmCallDecodeSymtANS);
@@ -948,7 +948,7 @@ ARM_FUNC __attribute__((no_reorder)) static void SwitchToArmCallDecodeInstructio
 static void DecodeInstructionsIwram(u32 headerLoSize, const u8 *loVec, const u16 *symVec, void *dest)
 {
 #ifdef PORTABLE
-    SwitchToArmCallDecodeInstructions(headerLoSize, loVec, symVec, dest, DecodeInstructions);
+    SwitchToArmCallDecodeInstructions(headerLoSize, loVec, symVec, dest, (void (*)(u32, const u8 *, const u16 *, void *))DecodeInstructions);
 #else
     u32 funcBuffer[FUNC_BUFFER_SIZE(DecodeInstructions, SwitchToArmCallDecodeInstructions)];
 
@@ -1419,7 +1419,7 @@ ARM_FUNC static void SwitchToArmCallFastLZ77(const u32 *src, void *dest, void (*
 void FastLZ77UnCompWram(const u32 *src, void *dest)
 {
 #ifdef PORTABLE
-    SwitchToArmCallFastLZ77(src, dest, (void *)LZ77UnCompWRAMOptimized);
+    SwitchToArmCallFastLZ77(src, dest, (void (*)(const u32 *, void *))LZ77UnCompWRAMOptimized);
 #else
     u32 funcBuffer[200];
 
