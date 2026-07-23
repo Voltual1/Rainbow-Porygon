@@ -80,7 +80,7 @@ void BitUnPack(const void *src, void *dst, const void *data) {
     u32 srcBitLen = config->srcBitLen;
     u32 dstBitLen = config->dstBitLen;
     u32 offset = config->dataOffset & 0x7FFFFFFF;
-    bool zeroOffset = (config->dataOffset & 0x80000000) != 0;
+    bool8 zeroOffset = (config->dataOffset & 0x80000000) != 0;
     
     // 初始化目标缓冲区为 0
     u32 totalDstBytes = (config->srcLen * 8 / srcBitLen) * dstBitLen / 8;
