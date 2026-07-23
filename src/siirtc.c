@@ -6,6 +6,10 @@
 #include "siirtc.h"
 #include "config/general.h"
 
+#ifdef PORTABLE
+#include <time.h>
+#endif
+
 #define STATUS_INTFE  0x02 // frequency interrupt enable
 #define STATUS_INTME  0x08 // per-minute interrupt enable
 #define STATUS_INTAE  0x20 // alarm interrupt enable
@@ -60,11 +64,22 @@
 #define DIR_ALL_IN  (DIR_0_IN | DIR_1_IN | DIR_2_IN)
 #define DIR_ALL_OUT (DIR_0_OUT | DIR_1_OUT | DIR_2_OUT)
 
+#ifdef PORTABLE
+static vu16 sGpioDataStub;
+static vu16 sGpioDirStub;
+static vu16 sGpioReadEnableStub;
+#define GPIO_PORT_DATA        sGpioDataStub
+#define GPIO_PORT_DIRECTION   sGpioDirStub
+#define GPIO_PORT_READ_ENABLE sGpioReadEnableStub
+#else
 #define GPIO_PORT_DATA        (*(vu16 *)0x80000C4)
 #define GPIO_PORT_DIRECTION   (*(vu16 *)0x80000C6)
 #define GPIO_PORT_READ_ENABLE (*(vu16 *)0x80000C8)
+#endif
 
+#ifndef PORTABLE
 extern vu16 GPIOPortDirection;
+#endif
 
 static bool8 sLocked;
 
@@ -76,6 +91,13 @@ static void EnableGpioPortRead();
 static void DisableGpioPortRead();
 
 KEEP_SECTION USED static const char AgbLibRtcVersion[] = "SIIRTC_V001";
+
+#ifdef PORTABLE
+static u8 BinToBcd(u8 bin)
+{
+    return ((bin / 10) << 4) | (bin % 10);
+}
+#endif
 
 void SiiRtcUnprotect(void)
 {
@@ -91,6 +113,10 @@ void SiiRtcProtect(void)
 
 u8 SiiRtcProbe(void)
 {
+#ifdef PORTABLE
+    // 在 Android 平台直接返回探测成功（1 表示 24小时格式且电力正常）
+    return (0 << 4) | 1;
+#else
     u8 errorCode;
     struct SiiRtcInfo rtc;
 
@@ -103,16 +129,9 @@ u8 SiiRtcProbe(void)
     if (!(rtc.status & SIIRTCINFO_24HOUR) || (rtc.status & SIIRTCINFO_POWER))
 #else
     if ((rtc.status & (SIIRTCINFO_POWER | SIIRTCINFO_24HOUR)) == SIIRTCINFO_POWER
-     || (rtc.status & (SIIRTCINFO_POWER | SIIRTCINFO_24HOUR)) == 0)
+| (rtc.status & (SIIRTCINFO_POWER | SIIRTCINFO_24HOUR)) == 0)
 #endif
     {
-        // The RTC is in 12-hour mode. Reset it and switch to 24-hour mode.
-
-        // Note that the conditions are redundant and equivalent to simply
-        // "(rtc.status & SIIRTCINFO_24HOUR) == 0". It's possible that this
-        // was also intended to handle resetting the clock after power failure
-        // but a mistake was made.
-
         if (!SiiRtcReset())
             return 0;
 
@@ -123,8 +142,6 @@ u8 SiiRtcProbe(void)
 
     if (rtc.second & TEST_MODE)
     {
-        // The RTC is in test mode. Reset it to leave test mode.
-
         if (!SiiRtcReset())
             return (errorCode << 4) & 0xF0;
 
@@ -132,10 +149,14 @@ u8 SiiRtcProbe(void)
     }
 
     return (errorCode << 4) | 1;
+#endif
 }
 
 bool8 SiiRtcReset(void)
 {
+#ifdef PORTABLE
+    return TRUE;
+#else
     bool8 result;
     struct SiiRtcInfo rtc;
 
@@ -161,10 +182,15 @@ bool8 SiiRtcReset(void)
     result = SiiRtcSetStatus(&rtc);
 
     return result;
+#endif
 }
 
 bool8 SiiRtcGetStatus(struct SiiRtcInfo *rtc)
 {
+#ifdef PORTABLE
+    rtc->status = SIIRTCINFO_24HOUR;
+    return TRUE;
+#else
     u8 statusData;
 
     if (sLocked == TRUE)
@@ -184,9 +210,9 @@ bool8 SiiRtcGetStatus(struct SiiRtcInfo *rtc)
     statusData = ReadData();
 
     rtc->status = (statusData & (STATUS_POWER | STATUS_24HOUR))
-                | ((statusData & STATUS_INTAE) >> 3)
-                | ((statusData & STATUS_INTME) >> 2)
-                | ((statusData & STATUS_INTFE) >> 1);
+ ((statusData & STATUS_INTAE) >> 3)
+ ((statusData & STATUS_INTME) >> 2)
+ ((statusData & STATUS_INTFE) >> 1);
 
     GPIO_PORT_DATA = SCK_HI;
     GPIO_PORT_DATA = SCK_HI;
@@ -194,10 +220,14 @@ bool8 SiiRtcGetStatus(struct SiiRtcInfo *rtc)
     sLocked = FALSE;
 
     return TRUE;
+#endif
 }
 
 bool8 SiiRtcSetStatus(struct SiiRtcInfo *rtc)
 {
+#ifdef PORTABLE
+    return TRUE;
+#else
     u8 statusData;
 
     if (sLocked == TRUE)
@@ -209,9 +239,9 @@ bool8 SiiRtcSetStatus(struct SiiRtcInfo *rtc)
     GPIO_PORT_DATA = SCK_HI | CS_HI;
 
     statusData = STATUS_24HOUR
-               | ((rtc->status & SIIRTCINFO_INTAE) << 3)
-               | ((rtc->status & SIIRTCINFO_INTME) << 2)
-               | ((rtc->status & SIIRTCINFO_INTFE) << 1);
+ ((rtc->status & SIIRTCINFO_INTAE) << 3)
+ ((rtc->status & SIIRTCINFO_INTME) << 2)
+ ((rtc->status & SIIRTCINFO_INTFE) << 1);
 
     GPIO_PORT_DIRECTION = DIR_ALL_OUT;
 
@@ -225,10 +255,24 @@ bool8 SiiRtcSetStatus(struct SiiRtcInfo *rtc)
     sLocked = FALSE;
 
     return TRUE;
+#endif
 }
 
 bool8 SiiRtcGetDateTime(struct SiiRtcInfo *rtc)
 {
+#ifdef PORTABLE
+    time_t t = time(NULL);
+    struct tm *lt = localtime(&t);
+
+    rtc->year = BinToBcd(lt->tm_year % 100);
+    rtc->month = BinToBcd(lt->tm_mon + 1);
+    rtc->day = BinToBcd(lt->tm_mday);
+    rtc->dayOfWeek = lt->tm_wday;
+    rtc->hour = BinToBcd(lt->tm_hour);
+    rtc->minute = BinToBcd(lt->tm_min);
+    rtc->second = BinToBcd(lt->tm_sec);
+    return TRUE;
+#else
     u8 i;
 
     if (sLocked == TRUE)
@@ -256,10 +300,14 @@ bool8 SiiRtcGetDateTime(struct SiiRtcInfo *rtc)
     sLocked = FALSE;
 
     return TRUE;
+#endif
 }
 
 bool8 SiiRtcSetDateTime(struct SiiRtcInfo *rtc)
 {
+#ifdef PORTABLE
+    return TRUE;
+#else
     u8 i;
 
     if (sLocked == TRUE)
@@ -283,10 +331,20 @@ bool8 SiiRtcSetDateTime(struct SiiRtcInfo *rtc)
     sLocked = FALSE;
 
     return TRUE;
+#endif
 }
 
 bool8 SiiRtcGetTime(struct SiiRtcInfo *rtc)
 {
+#ifdef PORTABLE
+    time_t t = time(NULL);
+    struct tm *lt = localtime(&t);
+
+    rtc->hour = BinToBcd(lt->tm_hour);
+    rtc->minute = BinToBcd(lt->tm_min);
+    rtc->second = BinToBcd(lt->tm_sec);
+    return TRUE;
+#else
     u8 i;
 
     if (sLocked == TRUE)
@@ -314,10 +372,14 @@ bool8 SiiRtcGetTime(struct SiiRtcInfo *rtc)
     sLocked = FALSE;
 
     return TRUE;
+#endif
 }
 
 bool8 SiiRtcSetTime(struct SiiRtcInfo *rtc)
 {
+#ifdef PORTABLE
+    return TRUE;
+#else
     u8 i;
 
     if (sLocked == TRUE)
@@ -341,10 +403,14 @@ bool8 SiiRtcSetTime(struct SiiRtcInfo *rtc)
     sLocked = FALSE;
 
     return TRUE;
+#endif
 }
 
 static bool8 UNUSED SiiRtcSetAlarm(struct SiiRtcInfo *rtc)
 {
+#ifdef PORTABLE
+    return TRUE;
+#else
     u8 i;
     u8 alarmData[2];
 
@@ -368,7 +434,7 @@ static bool8 UNUSED SiiRtcSetAlarm(struct SiiRtcInfo *rtc)
     GPIO_PORT_DATA = SCK_HI;
     GPIO_PORT_DATA = SCK_HI | CS_HI;
 
-    GPIOPortDirection = DIR_ALL_OUT; // Why is this the only instance that uses a symbol?
+    GPIOPortDirection = DIR_ALL_OUT; 
 
     WriteCommand(CMD_ALARM | WR);
 
@@ -381,10 +447,14 @@ static bool8 UNUSED SiiRtcSetAlarm(struct SiiRtcInfo *rtc)
     sLocked = FALSE;
 
     return TRUE;
+#endif
 }
 
 static int WriteCommand(u8 value)
 {
+#ifdef PORTABLE
+    return 0;
+#else
     u8 i;
     u8 temp;
 
@@ -397,15 +467,17 @@ static int WriteCommand(u8 value)
         GPIO_PORT_DATA = (temp << 1) | SCK_HI | CS_HI;
     }
 
-    // Nothing uses the returned value from this function,
-    // so the undefined behavior is harmless in the vanilla game.
 #ifdef UBFIX
     return 0;
+#endif
 #endif
 }
 
 static int WriteData(u8 value)
 {
+#ifdef PORTABLE
+    return 0;
+#else
     u8 i;
     u8 temp;
 
@@ -418,15 +490,17 @@ static int WriteData(u8 value)
         GPIO_PORT_DATA = (temp << 1) | SCK_HI | CS_HI;
     }
 
-    // Nothing uses the returned value from this function,
-    // so the undefined behavior is harmless in the vanilla game.
 #ifdef UBFIX
     return 0;
+#endif
 #endif
 }
 
 static u8 ReadData()
 {
+#ifdef PORTABLE
+    return 0;
+#else
     u8 i;
     u8 temp;
     u8 value;
@@ -449,6 +523,7 @@ static u8 ReadData()
     }
 
     return value;
+#endif
 }
 
 static void EnableGpioPortRead()
