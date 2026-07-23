@@ -71,10 +71,12 @@ void FastUnsafeCopy32(void *dst, const void *src, u32 size) {
     }
 }
 
-// 辅助 LZ77 解密算法主体
-static void GbaLZ77Decompress(const u32 *src, void *dest) {
+// 纯 C 语言实现的 LZ77UnCompWRAMOptimized (由于 bios.c 未定义)
+void LZ77UnCompWRAMOptimized(const u32 *src, void *dst) {
+    if (src == NULL || dst == NULL) return;
+
     const u8 *src8 = (const u8 *)src;
-    u8 *dst8 = (u8 *)dest;
+    u8 *dst8 = (u8 *)dst;
     
     u32 header = src[0];
     u32 destSize = header >> 8; // 24-bit 解压大小
@@ -109,73 +111,7 @@ static void GbaLZ77Decompress(const u32 *src, void *dest) {
     }
 }
 
-// 修复 Stub: 实现 Wram 与 Vram 版本的 LZ77 Decompress BIOS 函数
-void LZ77UnCompWRAMOptimized(const u32 *src, void *dst) {
-    if (src != NULL && dst != NULL) {
-        GbaLZ77Decompress(src, dst);
-    }
-}
-
-void LZ77UnCompWram(const u32 *src, void *dest) {
-    if (src != NULL && dest != NULL) {
-        GbaLZ77Decompress(src, dest);
-    }
-}
-
-void LZ77UnCompVram(const u32 *src, void *dest) {
-    if (src != NULL && dest != NULL) {
-        GbaLZ77Decompress(src, dest);
-    }
-}
-
-// 辅助 Run-Length 解密算法主体
-static void GbaRLDecompress(const u32 *src, void *dest) {
-    const u8 *src8 = (const u8 *)src;
-    u8 *dst8 = (u8 *)dest;
-    
-    u32 header = src[0];
-    u32 destSize = header >> 8;
-    
-    src8 += 4;
-    u32 bytesWritten = 0;
-    while (bytesWritten < destSize) {
-        u8 flag = *src8++;
-        u32 count = flag & 0x7F;
-        if (flag & 0x80) {
-            // 压缩行程数据块
-            count += 3;
-            u8 val = *src8++;
-            for (u32 i = 0; i < count; i++) {
-                if (bytesWritten >= destSize) break;
-                *dst8++ = val;
-                bytesWritten++;
-            }
-        } else {
-            // 未压缩行程数据块
-            count += 1;
-            for (u32 i = 0; i < count; i++) {
-                if (bytesWritten >= destSize) break;
-                *dst8++ = *src8++;
-                bytesWritten++;
-            }
-        }
-    }
-}
-
-// 修复 Stub: 实现 Wram 与 Vram 版本的 RL Decompress BIOS 函数
-void RLUnCompWram(const u32 *src, void *dest) {
-    if (src != NULL && dest != NULL) {
-        GbaRLDecompress(src, dest);
-    }
-}
-
-void RLUnCompVram(const u32 *src, void *dest) {
-    if (src != NULL && dest != NULL) {
-        GbaRLDecompress(src, dest);
-    }
-}
-
-// 修复 Stub: 实现位合并转换 BitUnPack BIOS 函数
+// 修复 Stub: 实现位合并转换 BitUnPack BIOS 函数 (由于 bios.c 未定义)
 struct BitUnPackConfig {
     u16 srcLen;        // 源数据长度 (字节)
     u8 srcBitLen;      // 源数据每个元素的位数 (1, 2, 4, 8)
@@ -208,7 +144,7 @@ void BitUnPack(const void *src, void *dst, const void *data) {
             u32 bit = (src8[(srcBitPos + i) / 8] >> ((srcBitPos + i) % 8)) & 1;
             rawVal |= (bit << i);
         }
-        srcBitPos += srcBitLen;
+        srcBitPos += srcBitPos < totalBits ? srcBitLen : 0;
         
         if (rawVal != 0 || zeroOffset) {
             rawVal += offset;
