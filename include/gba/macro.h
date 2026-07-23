@@ -1,17 +1,32 @@
 #ifndef GUARD_GBA_MACRO_H
 #define GUARD_GBA_MACRO_H
 
-#define CPU_FILL_UN dest, bit{bit)(   &, \
-)(destBIT_SRC_F)/(bit/8) & 0)); \
-       )igned CPUED,)
-#define, size bit CPU_FILL_UNCHECKED(value, dest, size, bit)
+// --- CPU 填充与拷贝宏 ---
+
+#define CPU_FILL_UNCHECKED(value, dest, size, bit)                                          \
+{                                                                                 \
+    vu##bit tmp = (vu##bit)(value);                                               \
+    CpuSet((void *)&tmp,                                                          \
+           (void *)(dest),                                                        \
+           CPU_SET_##bit##BIT | CPU_SET_SRC_FIXED | ((size)/(bit/8) & 0x1FFFFF)); \
+}
+
+#if MODERN
+#define CPU_FILL(value, dest, size, bit) \
+    do \
+    { \
+        _Static_assert(_Alignof(dest) >= (bit / 8), "destination potentially unaligned"); \
+        CPU_FILL_UNCHECKED(value, dest, size, bit); \
+    } while (0)
+#else
+#define CPU_FILL(value, dest, size, bit) CPU_FILL_UNCHECKED(value, dest, size, bit)
 #endif
 
 #define CpuFill16(value, dest, size) CPU_FILL(value, dest, size, 16)
 #define CpuFill32(value, dest, size) CPU_FILL(value, dest, size, 32)
 
 #define CPU_COPY_UNCHECKED(src, dest, size, bit) \
-    CpuSet((void *)(src), (void *)(dest), CPU_SET_##bit##BIT | ((size)/(bit/8) & 0x1FFFFF))
+    CpuSet((const void *)(src), (void *)(dest), CPU_SET_##bit##BIT | ((size)/(bit/8) & 0x1FFFFF))
 
 #if MODERN
 #define CPU_COPY(src, dest, size, bit) \
@@ -76,14 +91,25 @@
     } \
 }
 
-#define CpuFastCopy(src, dest, size) \
-    CpuFastSet((void *)(src), (void *)(dest), ((size)/(32/8) & 0x1FFFFF))
+#define CpuFastCopy(src, dest, size) CpuFastSet((const void *)(src), (void *)(dest), ((size)/(32/8) & 0x1FFFFF))
+
+// --- DMA 设置宏 ---
 
 #define DmaSetUnchecked(dmaNum, src, dest, control) \
 {                                                 \
     vu32 *dmaRegs = (vu32 *)REG_ADDR_DMA##dmaNum; \
     dmaRegs[0] = (vu32)(src);                     \
-    dmaRegs[1] = ()( = d                                   NOTEmaNum) _ __prcontrolBIT : potentially unestin ((control (DMA_32BIT << 16)) ? 4 : 2, 2), "destination potentially unaligned"); \
+    dmaRegs[1] = (vu32)(dest);                    \
+    dmaRegs[2] = (vu32)(control);                 \
+    dmaRegs[2];                                   \
+}
+
+#if MODERN
+#define DmaSet(dmaNum, src, dest, control) \
+    do \
+    { \
+        _Static_assert(_Alignof(src) >= __builtin_choose_expr(__builtin_constant_p(control), ((control) & (DMA_32BIT << 16)) ? 4 : 2, 2), "source potentially unaligned"); \
+        _Static_assert(_Alignof(dest) >= __builtin_choose_expr(__builtin_constant_p(control), ((control) & (DMA_32BIT << 16)) ? 4 : 2, 2), "destination potentially unaligned"); \
         DmaSetUnchecked(dmaNum, src, dest, control); \
     } while (0)
 #else
@@ -91,19 +117,28 @@
     DmaSetUnchecked(dmaNum, src, dest, control)
 #endif
 
-// 【修复核心】：在原生平台上使用同步 CPU 内存操作代替 DMA 的写入
+// --- 移植版核心修复：DMA 同步拦截 ---
+
 #ifdef PORTABLE
-#define DMA_FILL_UNCHECKED(dmaNum, value, dest, size, bit) CPU_FILL_UNCHECKED(value, dest, size, bit)
+    #define DMA_FILL_UNCHECKED(dmaNum, value, dest, size, bit) CPU_FILL_UNCHECKED(value, dest, size, bit)
+    #define DMA_COPY_UNCHECKED(dmaNum, src, dest, size, bit) CPU_COPY_UNCHECKED(src, dest, size, bit)
 #else
-#define DMA_FILL_UNCHECKED(dmaNum, value, dest, size, bit)                                    \
-{                                                                                             \
-    vu##bit tmp = (vu##bit)(value);                                                           \
-    DmaSet(dmaNum,                                                                            \
-           &tmp,                                                                              \
-           dest,                                                                              \
-           (DMA_ENABLE | DMA_START_NOW | DMA_##bit##BIT | DMA_SRC_FIXED | DMA_DEST_INC) << 16 \
+    #define DMA_FILL_UNCHECKED(dmaNum, value, dest, size, bit)                                    \
+    {                                                                                             \
+        vu##bit tmp = (vu##bit)(value);                                                           \
+        DmaSet(dmaNum,                                                                            \
+               &tmp,                                                                              \
+               dest,                                                                              \
+               (DMA_ENABLE | DMA_START_NOW | DMA_##bit##BIT | DMA_SRC_FIXED | DMA_DEST_INC) << 16 \
  | ((size)/(bit/8)));                                                                 \
-}
+    }
+
+    #define DMA_COPY_UNCHECKED(dmaNum, src, dest, size, bit)                                    \
+        DmaSet(dmaNum,                                                                          \
+               src,                                                                             \
+               dest,                                                                            \
+               (DMA_ENABLE | DMA_START_NOW | DMA_##bit##BIT | DMA_SRC_INC | DMA_DEST_INC) << 16 \
+ | ((size)/(bit/8)))
 #endif
 
 #if MODERN
@@ -119,11 +154,6 @@
 
 #define DmaFill16(dmaNum, value, dest, size) DMA_FILL(dmaNum, value, dest, size, 16)
 #define DmaFill32(dmaNum, value, dest, size) DMA_FILL(dmaNum, value, dest, size, 32)
-
-// Note that the DMA clear macros cause the DMA control value to be calculated
-// at runtime rather than compile time. The size is divided by the DMA transfer
-// unit size (2 or 4 bytes) and then combined with the DMA control flags using a
-// bitwise OR operation.
 
 #define DMA_CLEAR_UNCHECKED(dmaNum, dest, size, bit) \
 {                                           \
@@ -145,18 +175,6 @@
 
 #define DmaClear16(dmaNum, dest, size) DMA_CLEAR(dmaNum, dest, size, 16)
 #define DmaClear32(dmaNum, dest, size) DMA_CLEAR(dmaNum, dest, size, 32)
-
-// 【修复核心】：在原生平台上使用同步 CPU 内存操作代替 DMA 的拷贝
-#ifdef PORTABLE
-#define DMA_COPY_UNCHECKED(dmaNum, src, dest, size, bit) CPU_COPY_UNCHECKED(src, dest, size, bit)
-#else
-#define DMA_COPY_UNCHECKED(dmaNum, src, dest, size, bit)                                    \
-    DmaSet(dmaNum,                                                                          \
-           src,                                                                             \
-           dest,                                                                            \
-           (DMA_ENABLE | DMA_START_NOW | DMA_##bit##BIT | DMA_SRC_INC | DMA_DEST_INC) << 16 \
- | ((size)/(bit/8)))
-#endif
 
 #if MODERN
 #define DMA_COPY(dmaNum, src, dest, size, bit) \
@@ -181,8 +199,8 @@
     while (1)                                             \
     {                                                     \
         DmaCopy##bit(dmaNum, _src, _dest, (block));       \
-        _src += (block);                                  \
-        _dest += (block);                                 \
+        _src = (const u8 *)_src + (block);                \
+        _dest = (u8 *)_dest + (block);                    \
         _size -= (block);                                 \
         if (_size <= (block))                             \
         {                                                 \
@@ -193,7 +211,6 @@
 }
 
 #define DmaCopyLarge16(dmaNum, src, dest, size, block) DmaCopyLarge(dmaNum, src, dest, size, block, 16)
-
 #define DmaCopyLarge32(dmaNum, src, dest, size, block) DmaCopyLarge(dmaNum, src, dest, size, block, 32)
 
 #define DmaFillLarge(dmaNum, value, dest, size, block, bit) \
@@ -203,7 +220,7 @@
     while (1)                                               \
     {                                                       \
         DmaFill##bit(dmaNum, value, _dest, (block));       \
-        _dest += (block);                                   \
+        _dest = (u8 *)_dest + (block);                      \
         _size -= (block);                                   \
         if (_size <= (block))                               \
         {                                                   \
@@ -214,7 +231,6 @@
 }
 
 #define DmaFillLarge16(dmaNum, value, dest, size, block) DmaFillLarge(dmaNum, value, dest, size, block, 16)
-
 #define DmaFillLarge32(dmaNum, value, dest, size, block) DmaFillLarge(dmaNum, value, dest, size, block, 32)
 
 #define DmaClearLarge(dmaNum, dest, size, block, bit) \
@@ -224,7 +240,7 @@
     while (1)                                               \
     {                                                       \
         DmaFill##bit(dmaNum, 0, _dest, (block));       \
-        _dest += (block);                                   \
+        _dest = (u8 *)_dest + (block);                      \
         _size -= (block);                                   \
         if (_size <= (block))                               \
         {                                                   \
@@ -235,7 +251,6 @@
 }
 
 #define DmaClearLarge16(dmaNum, dest, size, block) DmaClearLarge(dmaNum, dest, size, block, 16)
-
 #define DmaClearLarge32(dmaNum, dest, size, block) DmaClearLarge(dmaNum, dest, size, block, 32)
 
 #define DmaCopyDefvars(dmaNum, src, dest, size, bit) \
