@@ -3,6 +3,7 @@
 #include "gba/m4a_internal.h"
 #include "libgcnmultiboot.h"
 #include <stdio.h>
+#include <string.h>
 
 // 彻底清除宏定义的物理函数
 #undef RegisterRamReset
@@ -13,8 +14,7 @@
 void RegisterRamReset(u32 resetFlags) { puts("RegisterRamReset stub"); }
 void IntrMain(void) { puts("IntrMain stub"); }
 
-// 修复崩溃：将指针变量改为实际的函数。
-// 原版的 gInitialMainCB2 是在 ld_script.txt 中定义为 CB2_InitCopyrightScreenAfterBootup 的别名。
+// 将指针变量改为实际的函数。
 extern void CB2_InitCopyrightScreenAfterBootup(void);
 void gInitialMainCB2(void) {
     CB2_InitCopyrightScreenAfterBootup();
@@ -63,9 +63,107 @@ char SoundMainRAM[1];
 char gMaxLines[1];
 char gNumMusicPlayers[1];
 s32 Div(s32 num, s32 denom) { return denom != 0 ? num / denom : 0; }
-void BitUnPack(const void *src, void *dst, const void *data) {}
-void FastUnsafeCopy32(const void *src, void *dst, u32 size) {}
-void LZ77UnCompWRAMOptimized(const u32 *src, void *dst) {}
+struct BitUnPackConfig {
+    u16 srcLen;        // 源数据长度 (字节)
+    u8 srcBitLen;      // 源数据每个元素的位数 (1, 2, 4, 8)
+    u8 dstBitLen;      // 目标数据每个元素的位数 (1, 2, 4, 8, 16, 32)
+    u32 dataOffset;    // 偏置值
+};
+
+void BitUnPack(const void *src, void *dst, const void *data) {
+    if (src == NULL || dst == NULL || data == NULL) return;
+
+    const struct BitUnPackConfig *config = (const struct BitUnPackConfig *)data;
+    const u8 *src8 = (const u8 *)src;
+    u8 *dst8 = (u8 *)dst;
+    
+    u32 srcBitLen = config->srcBitLen;
+    u32 dstBitLen = config->dstBitLen;
+    u32 offset = config->dataOffset & 0x7FFFFFFF;
+    bool zeroOffset = (config->dataOffset & 0x80000000) != 0;
+    
+    // 初始化目标缓冲区为 0
+    u32 totalDstBytes = (config->srcLen * 8 / srcBitLen) * dstBitLen / 8;
+    memset(dst8, 0, totalDstBytes);
+    
+    u32 srcBitPos = 0;
+    u32 dstBitPos = 0;
+    u32 totalBits = config->srcLen * 8;
+    
+    while (srcBitPos < totalBits) {
+        // 读取指定位宽的源数据
+        u32 rawVal = 0;
+        for (u32 i = 0; i < srcBitLen; i++) {
+            u32 bit = (src8[(srcBitPos + i) / 8] >> ((srcBitPos + i) % 8)) & 1;
+            rawVal |= (bit << i);
+        }
+        srcBitPos += srcBitLen;
+        
+        // 偏置计算
+        if (rawVal != 0 || zeroOffset) {
+            rawVal += offset;
+        }
+        
+        // 写入指定位宽的目标数据
+        for (u32 i = 0; i < dstBitLen; i++) {
+            u32 bit = (rawVal >> i) & 1;
+            u32 byteIdx = dstBitPos / 8;
+            u32 bitIdx = dstBitPos % 8;
+            if (bit) {
+                dst8[byteIdx] |= (1 << bitIdx);
+            }
+            dstBitPos++;
+        }
+    }
+}
+
+// 修复 Stub: 确保物理拷贝成功执行
+void FastUnsafeCopy32(void *dst, const void *src, u32 size) {
+    if (dst != NULL && src != NULL && size > 0) {
+        memcpy(dst, src, size);
+    }
+}
+
+// 修复 Stub: 纯 C 语言实现的 GBA 通用 LZ77 解密算法
+void LZ77UnCompWRAMOptimized(const u32 *src, void *dst) {
+    if (src == NULL || dst == NULL) return;
+
+    const u8 *src8 = (const u8 *)src;
+    u8 *dst8 = (u8 *)dst;
+    
+    u32 header = src[0];
+    u32 destSize = header >> 8; // 24-bit 解压大小
+    
+    src8 += 4; // 跳过 32-bit 的头
+    
+    u32 bytesWritten = 0;
+    while (bytesWritten < destSize) {
+        u8 flags = *src8++;
+        for (int i = 0; i < 8; i++) {
+            if (bytesWritten >= destSize) {
+                break;
+            }
+            
+            if (flags & (0x80 >> i)) { // 从 MSB 到 LSB 依次判断
+                u8 byte1 = *src8++;
+                u8 byte2 = *src8++;
+                
+                u32 length = (byte1 >> 4) + 3;
+                u32 disp = ((byte1 & 0x0F) << 8) | byte2;
+                
+                u8 *copySrc = dst8 - disp - 1;
+                for (u32 j = 0; j < length; j++) {
+                    *dst8++ = *copySrc++;
+                    bytesWritten++;
+                }
+            } else {
+                *dst8++ = *src8++;
+                bytesWritten++;
+            }
+        }
+    }
+}
+
 u8 LZ77UnCompWRAMOptimized_end[1];
 u8 __iwram_end[1];
 void GameCubeMultiBoot_Hash(void) {}
