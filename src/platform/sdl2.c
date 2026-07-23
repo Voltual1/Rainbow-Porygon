@@ -29,7 +29,6 @@
 #include "platform/dma.h"
 #include "platform/framedraw.h"
 
-// 修复崩溃：移除 const 修饰符以允许运行时变量寻址
 extern void (*gIntrTable[])(void);
 
 SDL_Thread *mainLoopThread;
@@ -365,7 +364,6 @@ int main(int argc, char **argv)
                     if (REG_DISPSTAT & DISPSTAT_VBLANK_INTR)
 #endif
                     {
-                        // 修复崩溃: 安全判断中断函数指针是否为 NULL
                         if (gIntrTable[4] != NULL)
                             gIntrTable[4]();
                     }
@@ -375,8 +373,16 @@ int main(int argc, char **argv)
 
                     accumulator -= dt;
                 }
+                else
+                {
+                    // 修复死锁/空转死循环: 若游戏主线程未准备好新一帧，退出此 while 并让出 CPU
+                    break;
+                }
             }
         }
+
+        // 避免 SDL 线程无意义吃满 CPU，向系统让出时间片，方便游戏主线程初始化
+        SDL_Delay(1);
 
 #ifndef __ANDROID__
         SDL_RenderPresent(sdlRenderer);
@@ -583,7 +589,7 @@ void Platform_SetSetting(enum PlatformSetting setting, u8 value)
         if (!value)
         {
             int scale = sPlatformSettings[PLATFORM_SETTING_WINDOW_SCALE];
-            SDL_SetWindowSize(sdlWindow, 320 * scale, 180 * scale);
+            SDL_SetWindowSize(sdlWindow, 320 * value, 180 * value);
             SDL_SetWindowPosition(sdlWindow, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
         }
     }
