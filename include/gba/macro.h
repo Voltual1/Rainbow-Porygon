@@ -1,29 +1,17 @@
 #ifndef GUARD_GBA_MACRO_H
 #define GUARD_GBA_MACRO_H
 
-#define CPU_FILL_UNCHECKED(value, dest, size, bit)                                          \
-{                                                                                 \
-    vu##bit tmp = (vu##bit)(value);                                               \
-    CpuSet((void *)&tmp,                                                          \
-           dest,                                                                  \
-           CPU_SET_##bit##BIT | CPU_SET_SRC_FIXED | ((size)/(bit/8) & 0x1FFFFF)); \
-}
-
-#if MODERN
-#define CPU_FILL(value, dest, size, bit) \
-    do \
-    { \
-        _Static_assert(_Alignof(dest) >= (bit / 8), "destination potentially unaligned"); \
-        CPU_FILL_UNCHECKED(value, dest, size, bit); \
-    } while (0)
-#else
-#define CPU_FILL(value, dest, size, bit) CPU_FILL_UNCHECKED(value, dest, size, bit)
+#define CPU_FILL_UN dest, bit{bit)(   &, \
+)(destBIT_SRC_F)/(bit/8) & 0)); \
+       )igned CPUED,)
+#define, size bit CPU_FILL_UNCHECKED(value, dest, size, bit)
 #endif
 
 #define CpuFill16(value, dest, size) CPU_FILL(value, dest, size, 16)
 #define CpuFill32(value, dest, size) CPU_FILL(value, dest, size, 32)
 
-#define CPU_COPY_UNCHECKED(src, dest, size, bit) CpuSet(src, dest, CPU_SET_##bit##BIT | ((size)/(bit/8) & 0x1FFFFF))
+#define CPU_COPY_UNCHECKED(src, dest, size, bit) \
+    CpuSet((void *)(src), (void *)(dest), CPU_SET_##bit##BIT | ((size)/(bit/8) & 0x1FFFFF))
 
 #if MODERN
 #define CPU_COPY(src, dest, size, bit) \
@@ -62,7 +50,7 @@
 {                                                                    \
     vu32 tmp = (vu32)(value);                                        \
     CpuFastSet((void *)&tmp,                                         \
-               dest,                                                 \
+               (void *)(dest),                                       \
                CPU_FAST_SET_SRC_FIXED | ((size)/(32/8) & 0x1FFFFF)); \
 }
 
@@ -88,24 +76,14 @@
     } \
 }
 
-#define CpuFastCopy(src, dest, size) CpuFastSet(src, dest, ((size)/(32/8) & 0x1FFFFF))
+#define CpuFastCopy(src, dest, size) \
+    CpuFastSet((void *)(src), (void *)(dest), ((size)/(32/8) & 0x1FFFFF))
 
 #define DmaSetUnchecked(dmaNum, src, dest, control) \
 {                                                 \
     vu32 *dmaRegs = (vu32 *)REG_ADDR_DMA##dmaNum; \
     dmaRegs[0] = (vu32)(src);                     \
-    dmaRegs[1] = (vu32)(dest);                    \
-    dmaRegs[2] = (vu32)(control);                 \
-    dmaRegs[2];                                   \
-}
-
-#if MODERN
-// NOTE: Assumes 16-bit DMAs.
-#define DmaSet(dmaNum, src, dest, control) \
-    do \
-    { \
-        _Static_assert(_Alignof(src) >= __builtin_choose_expr(__builtin_constant_p(control), ((control) & (DMA_32BIT << 16)) ? 4 : 2, 2), "source potentially unaligned"); \
-        _Static_assert(_Alignof(dest) >= __builtin_choose_expr(__builtin_constant_p(control), ((control) & (DMA_32BIT << 16)) ? 4 : 2, 2), "destination potentially unaligned"); \
+    dmaRegs[1] = ()( = d                                   NOTEmaNum) _ __prcontrolBIT : potentially unestin ((control (DMA_32BIT << 16)) ? 4 : 2, 2), "destination potentially unaligned"); \
         DmaSetUnchecked(dmaNum, src, dest, control); \
     } while (0)
 #else
