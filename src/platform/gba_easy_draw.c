@@ -26,13 +26,6 @@
 #define WINMASK_CLR    (1 << 5)
 #define WINMASK_WINOUT  (1 << 6)
 
-#ifdef PLATFORM_WIN32
-#define inline_hack __attribute__ ((always_inline))
-#else
-#define inline_hack
-#endif
-
-// 修复崩溃: 去掉 const，防止 Clang 优化将其固化为 NULL 指针调用
 extern void (*gIntrTable[])(void);
 
 struct scanlineData {
@@ -278,7 +271,7 @@ static void RenderRotScaleBGScanline(int bgNum, uint16_t control, uint16_t x, ui
 
     if (bgcnt->areaOverflowMode)
     {
-        for (int i = 0; i < DISPLAY_WIDTH; i++)
+        for (int x = 0; x < DISPLAY_WIDTH; x++)
         {
             int xxx = (realX >> 8) & maskX;
             int yyy = (realY >> 8) & maskY;
@@ -291,7 +284,7 @@ static void RenderRotScaleBGScanline(int bgNum, uint16_t control, uint16_t x, ui
             uint8_t pixel = bgtiles[(tile << 6) + (tileY << 3) + tileX];
 
             if (pixel != 0) {
-                line[i] = pal[pixel] | 0x8000;
+                line[x] = pal[pixel] | 0x8000;
             }
 
             realX += pa;
@@ -300,7 +293,7 @@ static void RenderRotScaleBGScanline(int bgNum, uint16_t control, uint16_t x, ui
     }
     else
     {
-        for (int i = 0; i < DISPLAY_WIDTH; i++)
+        for (int x = 0; x < DISPLAY_WIDTH; x++)
         {
             int xxx = (realX >> 8);
             int yyy = (realY >> 8);
@@ -319,7 +312,7 @@ static void RenderRotScaleBGScanline(int bgNum, uint16_t control, uint16_t x, ui
                 uint8_t pixel = bgtiles[(tile << 6) + (tileY << 3) + tileX];
 
                 if (pixel != 0) {
-                    line[i] = pal[pixel] | 0x8000;
+                    line[x] = pal[pixel] | 0x8000;
                 }
             }
             realX += pa;
@@ -330,10 +323,10 @@ static void RenderRotScaleBGScanline(int bgNum, uint16_t control, uint16_t x, ui
     //luckily i dont think pokemon emerald uses mosaic on affine bgs
     if (control & BGCNT_MOSAIC && mosaicBGEffectX > 0)
     {
-        for (int i = 0; i < DISPLAY_WIDTH; i++)
+        for (int x = 0; x < DISPLAY_WIDTH; x++)
         {
-            uint16_t color = line[applyBGHorizontalMosaicEffect(i)];
-            line[i] = color;
+            uint16_t color = line[applyBGHorizontalMosaicEffect(x)];
+            line[x] = color;
             
         }
     }
@@ -882,11 +875,10 @@ static void DrawScanline(uint16_t *pixels, uint16_t vcount)
     }
 }
 
-// 修复崩溃: memsetu16 缺少 return 语句导致 UB 报错，添加 return
 uint16_t *memsetu16(uint16_t *dst, uint16_t fill, size_t count)
 {
     uint16_t *orig = dst;
-    for (int i = 0; i < count; i++)
+    for (size_t i = 0; i < count; i++)
     {
         *dst++ = fill;
     }
@@ -907,7 +899,11 @@ void DrawFrame(uint16_t *pixels)
 #else
             if (REG_DISPSTAT & DISPSTAT_VCOUNT_INTR)
 #endif
+            {
+                // 修复崩溃: 安全判断中断函数指针是否为 NULL
+                if (gIntrTable[0] != NULL)
                     gIntrTable[0]();
+            }
         }
 
         // Render the backdrop color before the each individual scanline.
@@ -935,7 +931,11 @@ void DrawFrame(uint16_t *pixels)
         RunDMAs(DMA_HBLANK);
         
         if (REG_DISPSTAT & DISPSTAT_HBLANK_INTR)
-            gIntrTable[3]();
+        {
+            // 修复崩溃: 安全判断中断函数指针是否为 NULL
+            if (gIntrTable[3] != NULL)
+                gIntrTable[3]();
+        }
 
         REG_DISPSTAT &= ~INTR_FLAG_HBLANK;
         REG_DISPSTAT &= ~INTR_FLAG_VCOUNT;

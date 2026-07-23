@@ -29,7 +29,8 @@
 #include "platform/dma.h"
 #include "platform/framedraw.h"
 
-extern void (*const gIntrTable[])(void);
+// 修复崩溃：移除 const 修饰符以允许运行时变量寻址
+extern void (*gIntrTable[])(void);
 
 SDL_Thread *mainLoopThread;
 SDL_Window *sdlWindow;
@@ -103,7 +104,7 @@ int main(int argc, char **argv)
 #endif
     if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO
 #ifdef __ANDROID__
-                | SDL_INIT_GAMECONTROLLER
+ | SDL_INIT_GAMECONTROLLER
 #endif
                 ) < 0)
     {
@@ -363,7 +364,11 @@ int main(int argc, char **argv)
 #else
                     if (REG_DISPSTAT & DISPSTAT_VBLANK_INTR)
 #endif
-                        gIntrTable[4]();
+                    {
+                        // 修复崩溃: 安全判断中断函数指针是否为 NULL
+                        if (gIntrTable[4] != NULL)
+                            gIntrTable[4]();
+                    }
                     REG_DISPSTAT &= ~INTR_FLAG_VBLANK;
 
                     SDL_SemPost(vBlankSemaphore);
