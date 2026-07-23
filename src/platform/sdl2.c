@@ -29,7 +29,6 @@
 #include "platform/dma.h"
 #include "platform/framedraw.h"
 
-// 修复死锁：确保去掉 const，防止编译器激进优化出 NULL
 extern void (*gIntrTable[])(void);
 
 SDL_Thread *mainLoopThread;
@@ -283,6 +282,8 @@ int main(int argc, char **argv)
     internalClock.status = SIIRTCINFO_24HOUR;
     UpdateInternalClock();
 
+    SDL_Log("CAN DEBUG: SDL main loop starting");
+
     while (isRunning)
     {
         ProcessEvents();
@@ -303,6 +304,7 @@ int main(int argc, char **argv)
             {
                 if (SDL_AtomicGet(&isFrameAvailable))
                 {
+                    SDL_Log("CAN DEBUG: SDL main loop - Frame available, calling VDraw");
                     VDraw(sdlTexture);
                     SDL_RenderClear(sdlRenderer);
 #if defined(NATIVE_LINUX) || defined(_WIN32)
@@ -359,13 +361,13 @@ int main(int argc, char **argv)
 
                     RunDMAs(DMA_HBLANK);
 
-                    // 强制触发 VBLANK
                     if (gIntrTable[4] != NULL)
                     {
                         gIntrTable[4]();
                     }
                     REG_DISPSTAT &= ~INTR_FLAG_VBLANK;
 
+                    SDL_Log("CAN DEBUG: SDL main loop - Posting Semaphore");
                     SDL_SemPost(vBlankSemaphore);
 
                     accumulator -= dt;
@@ -1094,8 +1096,11 @@ int DoMain(void *data)
 
 void VBlankIntrWait(void)
 {
+    SDL_Log("CAN DEBUG: VBlankIntrWait - Setting frame available");
     SDL_AtomicSet(&isFrameAvailable, 1);
+    SDL_Log("CAN DEBUG: VBlankIntrWait - Waiting on semaphore");
     SDL_SemWait(vBlankSemaphore);
+    SDL_Log("CAN DEBUG: VBlankIntrWait - Semaphore released, returning");
 }
 
 u8 BinToBcd(u8 bin)

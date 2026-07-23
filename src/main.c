@@ -30,6 +30,9 @@
 #include "platform.h"
 #endif
 
+// 声明 SDL_Log 供调试输出使用
+extern void SDL_Log(const char *fmt, ...);
+
 static void VBlankIntr(void);
 static void HBlankIntr(void);
 static void VCountIntr(void);
@@ -95,30 +98,47 @@ void EnableVCountIntrAtLine150(void);
 
 void AgbMain(void)
 {
-//    *(vu16 *)BG_PLTT = RGB_WHITE; // Set the backdrop to white on startup
+    SDL_Log("CAN DEBUG: Entering AgbMain");
+    
+    // 设为红色用于调试检测渲染管道
+    *(vu16 *)BG_PLTT = RGB(31, 0, 0); 
     InitGpuRegManager();
     REG_WAITCNT = WAITCNT_PREFETCH_ENABLE
  | WAITCNT_WS0_S_1 | WAITCNT_WS0_N_3
  | WAITCNT_WS1_S_1 | WAITCNT_WS1_N_3;
     InitKeys();
     InitIntrHandlers();
+    
+    SDL_Log("CAN DEBUG: m4aSoundInit starting");
     m4aSoundInit();
+    
     EnableVCountIntrAtLine150();
 #ifndef PORTABLE
     InitRFU();
 #endif
+
+    SDL_Log("CAN DEBUG: RtcInit starting");
     RtcInit();
+    
 #ifndef PORTABLE
     CheckForFlashMemory();
 #endif
+
+    SDL_Log("CAN DEBUG: InitMainCallbacks starting");
     InitMainCallbacks();
+    
+    SDL_Log("CAN DEBUG: InitMapMusic starting");
     InitMapMusic();
+    
 #ifdef BUGFIX
     SeedRngWithRtc(); // see comment at SeedRngWithRtc definition below
 #endif
+
     ClearDma3Requests();
     ResetBgs();
     SetDefaultFontsPointer();
+    
+    SDL_Log("CAN DEBUG: InitHeap starting");
     InitHeap(gHeap, HEAP_SIZE);
 
     gSoftResetDisabled = FALSE;
@@ -140,14 +160,22 @@ void AgbMain(void)
 #endif
 #endif
 
+    SDL_Log("CAN DEBUG: AgbMain complete, starting AgbMainLoop");
     gAgbMainLoop_sp = __builtin_frame_address(0);
     AgbMainLoop();
 }
 
 void AgbMainLoop(void)
 {
+    int loopCount = 0;
     for (;;)
     {
+        if (loopCount % 60 == 0)
+        {
+            SDL_Log("CAN DEBUG: AgbMainLoop ticking, frame count = %d", loopCount);
+        }
+        loopCount++;
+
         ReadKeys();
 
 #ifndef PORTABLE
@@ -459,8 +487,6 @@ static void WaitForVBlank(void)
 
     if (gWirelessCommType != 0)
     {
-        // Desynchronization may occur if wireless adapter is connected
-        // and we call VBlankIntrWait();
         while (!(gMain.intrCheck & INTR_FLAG_VBLANK))
             ;
     }
