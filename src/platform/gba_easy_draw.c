@@ -26,6 +26,12 @@
 #define WINMASK_CLR    (1 << 5)
 #define WINMASK_WINOUT  (1 << 6)
 
+#ifdef PLATFORM_WIN32
+#define inline_hack __attribute__ ((always_inline))
+#else
+#define inline_hack
+#endif
+
 extern void (*gIntrTable[])(void);
 
 struct scanlineData {
@@ -271,7 +277,7 @@ static void RenderRotScaleBGScanline(int bgNum, uint16_t control, uint16_t x, ui
 
     if (bgcnt->areaOverflowMode)
     {
-        for (int x = 0; x < DISPLAY_WIDTH; x++)
+        for (int i = 0; i < DISPLAY_WIDTH; i++)
         {
             int xxx = (realX >> 8) & maskX;
             int yyy = (realY >> 8) & maskY;
@@ -284,7 +290,7 @@ static void RenderRotScaleBGScanline(int bgNum, uint16_t control, uint16_t x, ui
             uint8_t pixel = bgtiles[(tile << 6) + (tileY << 3) + tileX];
 
             if (pixel != 0) {
-                line[x] = pal[pixel] | 0x8000;
+                line[i] = pal[pixel] | 0x8000;
             }
 
             realX += pa;
@@ -293,7 +299,7 @@ static void RenderRotScaleBGScanline(int bgNum, uint16_t control, uint16_t x, ui
     }
     else
     {
-        for (int x = 0; x < DISPLAY_WIDTH; x++)
+        for (int i = 0; i < DISPLAY_WIDTH; i++)
         {
             int xxx = (realX >> 8);
             int yyy = (realY >> 8);
@@ -312,7 +318,7 @@ static void RenderRotScaleBGScanline(int bgNum, uint16_t control, uint16_t x, ui
                 uint8_t pixel = bgtiles[(tile << 6) + (tileY << 3) + tileX];
 
                 if (pixel != 0) {
-                    line[x] = pal[pixel] | 0x8000;
+                    line[i] = pal[pixel] | 0x8000;
                 }
             }
             realX += pa;
@@ -323,10 +329,10 @@ static void RenderRotScaleBGScanline(int bgNum, uint16_t control, uint16_t x, ui
     //luckily i dont think pokemon emerald uses mosaic on affine bgs
     if (control & BGCNT_MOSAIC && mosaicBGEffectX > 0)
     {
-        for (int x = 0; x < DISPLAY_WIDTH; x++)
+        for (int i = 0; i < DISPLAY_WIDTH; i++)
         {
-            uint16_t color = line[applyBGHorizontalMosaicEffect(x)];
-            line[x] = color;
+            uint16_t color = line[applyBGHorizontalMosaicEffect(i)];
+            line[i] = color;
             
         }
     }
@@ -894,15 +900,10 @@ void DrawFrame(uint16_t *pixels)
         if(((REG_DISPSTAT >> 8) & 0xFF) == REG_VCOUNT)
         {
             REG_DISPSTAT |= INTR_FLAG_VCOUNT;
-#ifdef __ANDROID__
-            if (REG_IE & INTR_FLAG_VCOUNT)
-#else
-            if (REG_DISPSTAT & DISPSTAT_VCOUNT_INTR)
-#endif
+            // 强制绕开所有状态校验触发心跳中断
+            if (gIntrTable[0] != NULL)
             {
-                // 修复崩溃: 安全判断中断函数指针是否为 NULL
-                if (gIntrTable[0] != NULL)
-                    gIntrTable[0]();
+                gIntrTable[0]();
             }
         }
 
@@ -930,11 +931,10 @@ void DrawFrame(uint16_t *pixels)
 
         RunDMAs(DMA_HBLANK);
         
-        if (REG_DISPSTAT & DISPSTAT_HBLANK_INTR)
+        // 强制触发 HBlank 中断
+        if (gIntrTable[3] != NULL)
         {
-            // 修复崩溃: 安全判断中断函数指针是否为 NULL
-            if (gIntrTable[3] != NULL)
-                gIntrTable[3]();
+            gIntrTable[3]();
         }
 
         REG_DISPSTAT &= ~INTR_FLAG_HBLANK;

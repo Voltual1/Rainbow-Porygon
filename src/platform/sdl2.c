@@ -29,6 +29,7 @@
 #include "platform/dma.h"
 #include "platform/framedraw.h"
 
+// 修复死锁：确保去掉 const，防止编译器激进优化出 NULL
 extern void (*gIntrTable[])(void);
 
 SDL_Thread *mainLoopThread;
@@ -358,14 +359,10 @@ int main(int argc, char **argv)
 
                     RunDMAs(DMA_HBLANK);
 
-#ifdef __ANDROID__
-                    if (REG_IE & INTR_FLAG_VBLANK)
-#else
-                    if (REG_DISPSTAT & DISPSTAT_VBLANK_INTR)
-#endif
+                    // 强制触发 VBLANK
+                    if (gIntrTable[4] != NULL)
                     {
-                        if (gIntrTable[4] != NULL)
-                            gIntrTable[4]();
+                        gIntrTable[4]();
                     }
                     REG_DISPSTAT &= ~INTR_FLAG_VBLANK;
 
@@ -375,13 +372,11 @@ int main(int argc, char **argv)
                 }
                 else
                 {
-                    // 修复死锁/空转死循环: 若游戏主线程未准备好新一帧，退出此 while 并让出 CPU
                     break;
                 }
             }
         }
 
-        // 避免 SDL 线程无意义吃满 CPU，向系统让出时间片，方便游戏主线程初始化
         SDL_Delay(1);
 
 #ifndef __ANDROID__
