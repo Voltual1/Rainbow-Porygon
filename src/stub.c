@@ -12,7 +12,14 @@
 // --- 1. 底层系统 ---
 void RegisterRamReset(u32 resetFlags) { puts("RegisterRamReset stub"); }
 void IntrMain(void) { puts("IntrMain stub"); }
-void *gInitialMainCB2 = NULL;
+
+// 修复崩溃：将指针变量改为实际的函数。
+// 原版的 gInitialMainCB2 是在 ld_script.txt 中定义为 CB2_InitCopyrightScreenAfterBootup 的别名。
+extern void CB2_InitCopyrightScreenAfterBootup(void);
+void gInitialMainCB2(void) {
+    CB2_InitCopyrightScreenAfterBootup();
+}
+
 const u8 RomHeaderGameCode[4] = "BPEE";
 const u8 RomHeaderSoftwareVersion = 0;
 
