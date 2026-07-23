@@ -63,73 +63,18 @@ char SoundMainRAM[1];
 char gMaxLines[1];
 char gNumMusicPlayers[1];
 s32 Div(s32 num, s32 denom) { return denom != 0 ? num / denom : 0; }
-struct BitUnPackConfig {
-    u16 srcLen;        // 源数据长度 (字节)
-    u8 srcBitLen;      // 源数据每个元素的位数 (1, 2, 4, 8)
-    u8 dstBitLen;      // 目标数据每个元素的位数 (1, 2, 4, 8, 16, 32)
-    u32 dataOffset;    // 偏置值
-};
 
-void BitUnPack(const void *src, void *dst, const void *data) {
-    if (src == NULL || dst == NULL || data == NULL) return;
-
-    const struct BitUnPackConfig *config = (const struct BitUnPackConfig *)data;
-    const u8 *src8 = (const u8 *)src;
-    u8 *dst8 = (u8 *)dst;
-    
-    u32 srcBitLen = config->srcBitLen;
-    u32 dstBitLen = config->dstBitLen;
-    u32 offset = config->dataOffset & 0x7FFFFFFF;
-    bool8 zeroOffset = (config->dataOffset & 0x80000000) != 0;
-    
-    // 初始化目标缓冲区为 0
-    u32 totalDstBytes = (config->srcLen * 8 / srcBitLen) * dstBitLen / 8;
-    memset(dst8, 0, totalDstBytes);
-    
-    u32 srcBitPos = 0;
-    u32 dstBitPos = 0;
-    u32 totalBits = config->srcLen * 8;
-    
-    while (srcBitPos < totalBits) {
-        // 读取指定位宽的源数据
-        u32 rawVal = 0;
-        for (u32 i = 0; i < srcBitLen; i++) {
-            u32 bit = (src8[(srcBitPos + i) / 8] >> ((srcBitPos + i) % 8)) & 1;
-            rawVal |= (bit << i);
-        }
-        srcBitPos += srcBitLen;
-        
-        // 偏置计算
-        if (rawVal != 0 || zeroOffset) {
-            rawVal += offset;
-        }
-        
-        // 写入指定位宽的目标数据
-        for (u32 i = 0; i < dstBitLen; i++) {
-            u32 bit = (rawVal >> i) & 1;
-            u32 byteIdx = dstBitPos / 8;
-            u32 bitIdx = dstBitPos % 8;
-            if (bit) {
-                dst8[byteIdx] |= (1 << bitIdx);
-            }
-            dstBitPos++;
-        }
-    }
-}
-
-// 修复 Stub: 确保物理拷贝成功执行
+// 修复 Stub: 确保物理快速拷贝执行
 void FastUnsafeCopy32(void *dst, const void *src, u32 size) {
     if (dst != NULL && src != NULL && size > 0) {
         memcpy(dst, src, size);
     }
 }
 
-// 修复 Stub: 纯 C 语言实现的 GBA 通用 LZ77 解密算法
-void LZ77UnCompWRAMOptimized(const u32 *src, void *dst) {
-    if (src == NULL || dst == NULL) return;
-
+// 辅助 LZ77 解密算法主体
+static void GbaLZ77Decompress(const u32 *src, void *dest) {
     const u8 *src8 = (const u8 *)src;
-    u8 *dst8 = (u8 *)dst;
+    u8 *dst8 = (u8 *)dest;
     
     u32 header = src[0];
     u32 destSize = header >> 8; // 24-bit 解压大小
@@ -160,6 +105,123 @@ void LZ77UnCompWRAMOptimized(const u32 *src, void *dst) {
                 *dst8++ = *src8++;
                 bytesWritten++;
             }
+        }
+    }
+}
+
+// 修复 Stub: 实现 Wram 与 Vram 版本的 LZ77 Decompress BIOS 函数
+void LZ77UnCompWRAMOptimized(const u32 *src, void *dst) {
+    if (src != NULL && dst != NULL) {
+        GbaLZ77Decompress(src, dst);
+    }
+}
+
+void LZ77UnCompWram(const u32 *src, void *dest) {
+    if (src != NULL && dest != NULL) {
+        GbaLZ77Decompress(src, dest);
+    }
+}
+
+void LZ77UnCompVram(const u32 *src, void *dest) {
+    if (src != NULL && dest != NULL) {
+        GbaLZ77Decompress(src, dest);
+    }
+}
+
+// 辅助 Run-Length 解密算法主体
+static void GbaRLDecompress(const u32 *src, void *dest) {
+    const u8 *src8 = (const u8 *)src;
+    u8 *dst8 = (u8 *)dest;
+    
+    u32 header = src[0];
+    u32 destSize = header >> 8;
+    
+    src8 += 4;
+    u32 bytesWritten = 0;
+    while (bytesWritten < destSize) {
+        u8 flag = *src8++;
+        u32 count = flag & 0x7F;
+        if (flag & 0x80) {
+            // 压缩行程数据块
+            count += 3;
+            u8 val = *src8++;
+            for (u32 i = 0; i < count; i++) {
+                if (bytesWritten >= destSize) break;
+                *dst8++ = val;
+                bytesWritten++;
+            }
+        } else {
+            // 未压缩行程数据块
+            count += 1;
+            for (u32 i = 0; i < count; i++) {
+                if (bytesWritten >= destSize) break;
+                *dst8++ = *src8++;
+                bytesWritten++;
+            }
+        }
+    }
+}
+
+// 修复 Stub: 实现 Wram 与 Vram 版本的 RL Decompress BIOS 函数
+void RLUnCompWram(const u32 *src, void *dest) {
+    if (src != NULL && dest != NULL) {
+        GbaRLDecompress(src, dest);
+    }
+}
+
+void RLUnCompVram(const u32 *src, void *dest) {
+    if (src != NULL && dest != NULL) {
+        GbaRLDecompress(src, dest);
+    }
+}
+
+// 修复 Stub: 实现位合并转换 BitUnPack BIOS 函数
+struct BitUnPackConfig {
+    u16 srcLen;        // 源数据长度 (字节)
+    u8 srcBitLen;      // 源数据每个元素的位数 (1, 2, 4, 8)
+    u8 dstBitLen;      // 目标数据每个元素的位数 (1, 2, 4, 8, 16, 32)
+    u32 dataOffset;    // 偏置值
+};
+
+void BitUnPack(const void *src, void *dst, const void *data) {
+    if (src == NULL || dst == NULL || data == NULL) return;
+
+    const struct BitUnPackConfig *config = (const struct BitUnPackConfig *)data;
+    const u8 *src8 = (const u8 *)src;
+    u8 *dst8 = (u8 *)dst;
+    
+    u32 srcBitLen = config->srcBitLen;
+    u32 dstBitLen = config->dstBitLen;
+    u32 offset = config->dataOffset & 0x7FFFFFFF;
+    bool8 zeroOffset = (config->dataOffset & 0x80000000) != 0;
+    
+    u32 totalDstBytes = (config->srcLen * 8 / srcBitLen) * dstBitLen / 8;
+    memset(dst8, 0, totalDstBytes);
+    
+    u32 srcBitPos = 0;
+    u32 dstBitPos = 0;
+    u32 totalBits = config->srcLen * 8;
+    
+    while (srcBitPos < totalBits) {
+        u32 rawVal = 0;
+        for (u32 i = 0; i < srcBitLen; i++) {
+            u32 bit = (src8[(srcBitPos + i) / 8] >> ((srcBitPos + i) % 8)) & 1;
+            rawVal |= (bit << i);
+        }
+        srcBitPos += srcBitLen;
+        
+        if (rawVal != 0 || zeroOffset) {
+            rawVal += offset;
+        }
+        
+        for (u32 i = 0; i < dstBitLen; i++) {
+            u32 bit = (rawVal >> i) & 1;
+            u32 byteIdx = dstBitPos / 8;
+            u32 bitIdx = dstBitPos % 8;
+            if (bit) {
+                dst8[byteIdx] |= (1 << bitIdx);
+            }
+            dstBitPos++;
         }
     }
 }
