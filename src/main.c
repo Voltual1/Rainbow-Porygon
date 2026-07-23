@@ -30,7 +30,6 @@
 #include "platform.h"
 #endif
 
-// 声明 SDL_Log 供调试输出使用
 extern void SDL_Log(const char *fmt, ...);
 
 static void VBlankIntr(void);
@@ -39,32 +38,18 @@ static void VCountIntr(void);
 static void SerialIntr(void);
 static void IntrDummy(void);
 
-// Defined in the linker script so that the test build can override it.
 extern void gInitialMainCB2(void);
 extern void CB2_FlashNotDetectedScreen(void);
 
 const enum GameVersion gGameVersion = GAME_VERSION;
-
-const enum Language gGameLanguage = GAME_LANGUAGE; // English
-
+const enum Language gGameLanguage = GAME_LANGUAGE; 
 const char BuildDateTime[] = "2005 02 21 11:10";
 
 const IntrFunc gIntrTableTemplate[] =
 {
-    VCountIntr, // V-count interrupt
-    SerialIntr, // Serial interrupt
-    Timer3Intr, // Timer 3 interrupt
-    HBlankIntr, // H-blank interrupt
-    VBlankIntr, // V-blank interrupt
-    IntrDummy,  // Timer 0 interrupt
-    IntrDummy,  // Timer 1 interrupt
-    IntrDummy,  // Timer 2 interrupt
-    IntrDummy,  // DMA 0 interrupt
-    IntrDummy,  // DMA 1 interrupt
-    IntrDummy,  // DMA 2 interrupt
-    IntrDummy,  // DMA 3 interrupt
-    IntrDummy,  // Key interrupt
-    IntrDummy,  // Game Pak interrupt
+    VCountIntr, SerialIntr, Timer3Intr, HBlankIntr, VBlankIntr, 
+    IntrDummy, IntrDummy, IntrDummy, IntrDummy, IntrDummy, 
+    IntrDummy, IntrDummy, IntrDummy, IntrDummy,
 };
 
 #define INTR_COUNT ((int)(sizeof(gIntrTableTemplate)/sizeof(IntrFunc)))
@@ -81,8 +66,6 @@ COMMON_DATA void *gAgbMainLoop_sp = NULL;
 
 static EWRAM_DATA u16 sTrainerId = 0;
 
-//EWRAM_DATA void (**gFlashTimerIntrFunc)(void) = NULL;
-
 static void UpdateLinkAndCallCallbacks(void);
 static void InitMainCallbacks(void);
 static void CallCallbacks(void);
@@ -98,9 +81,8 @@ void EnableVCountIntrAtLine150(void);
 
 void AgbMain(void)
 {
-    SDL_Log("CAN DEBUG: Entering AgbMain");
+    SDL_Log("CAN DEBUG: [Main] AgbMain Booting...");
     
-    // 【已修复】：撤销红色 Debug
     *(vu16 *)BG_PLTT = RGB_WHITE; 
     InitGpuRegManager();
     REG_WAITCNT = WAITCNT_PREFETCH_ENABLE
@@ -108,60 +90,30 @@ void AgbMain(void)
  | WAITCNT_WS1_S_1 | WAITCNT_WS1_N_3;
     InitKeys();
     InitIntrHandlers();
-    
-    SDL_Log("CAN DEBUG: m4aSoundInit starting");
     m4aSoundInit();
-    
     EnableVCountIntrAtLine150();
 #ifndef PORTABLE
     InitRFU();
 #endif
-
-    SDL_Log("CAN DEBUG: RtcInit starting");
     RtcInit();
-    
 #ifndef PORTABLE
     CheckForFlashMemory();
 #endif
-
-    SDL_Log("CAN DEBUG: InitMainCallbacks starting");
     InitMainCallbacks();
-    
-    SDL_Log("CAN DEBUG: InitMapMusic starting");
     InitMapMusic();
-    
 #ifdef BUGFIX
-    SeedRngWithRtc(); // see comment at SeedRngWithRtc definition below
+    SeedRngWithRtc(); 
 #endif
-
     ClearDma3Requests();
     ResetBgs();
     SetDefaultFontsPointer();
-    
-    SDL_Log("CAN DEBUG: InitHeap starting");
     InitHeap(gHeap, HEAP_SIZE);
 
     gSoftResetDisabled = FALSE;
-
-#ifndef PORTABLE
-    if (gFlashMemoryPresent != TRUE)
-        SetMainCallback2(CB2_FlashNotDetectedScreen);
-#endif
-
     gLinkTransferringData = FALSE;
 
-#ifndef PORTABLE
-#ifndef NDEBUG
-#if (LOG_HANDLER == LOG_HANDLER_MGBA_PRINT)
-    (void) MgbaOpen();
-#elif (LOG_HANDLER == LOG_HANDLER_AGB_PRINT)
-    AGBPrintInit();
-#endif
-#endif
-#endif
-
-    SDL_Log("CAN DEBUG: AgbMain complete, starting AgbMainLoop");
     gAgbMainLoop_sp = __builtin_frame_address(0);
+    SDL_Log("CAN DEBUG: [Main] Entering AgbMainLoop.");
     AgbMainLoop();
 }
 
@@ -172,22 +124,13 @@ void AgbMainLoop(void)
     {
         if (loopCount % 60 == 0)
         {
-            SDL_Log("CAN DEBUG: AgbMainLoop ticking, frame count = %d", loopCount);
+            // 【终极状态探针】：每秒打印一次当前的执行状态和回调函数地址！
+            SDL_Log("CAN DEBUG: [AgbMainLoop] Frame=%d, State=%d, CB1=%p, CB2=%p", 
+                    loopCount, gMain.state, (void*)gMain.callback1, (void*)gMain.callback2);
         }
         loopCount++;
 
         ReadKeys();
-
-#ifndef PORTABLE
-        if (gSoftResetDisabled == FALSE
-         && JOY_HELD_RAW(A_BUTTON)
-         && JOY_HELD_RAW(B_START_SELECT) == B_START_SELECT)
-        {
-            rfu_REQ_stopMode();
-            rfu_waitREQComplete();
-            DoSoftReset();
-        }
-#endif
 
         if (Overworld_SendKeysToLinkIsRunning() == TRUE)
         {
@@ -250,7 +193,6 @@ void SetMainCallback2(MainCallback callback)
 
 void StartTimer1(void)
 {
-
     REG_TM2CNT_L = 0;
     REG_TM2CNT_H = TIMER_ENABLE | TIMER_COUNTUP;
     REG_TM1CNT_H = TIMER_ENABLE;
@@ -260,7 +202,6 @@ void SeedRngAndSetTrainerId(void)
 {
 #ifndef PORTABLE
     u32 val;
-
     REG_TM1CNT_H = 0;
     REG_TM2CNT_H = 0;
     val = ((u32)REG_TM2CNT_L) << 16;
@@ -268,10 +209,8 @@ void SeedRngAndSetTrainerId(void)
     SeedRng(val);
     sTrainerId = Random();
 #else
-    // PC/Android 平台的简化逻辑
-    u16 val = Platform_GetKeyInput(); // 或者使用平台相关的随机源
-    SeedRng(val);
-    sTrainerId = val;
+    SeedRng(0x1234);
+    sTrainerId = 0x1234;
 #endif
 }
 
@@ -287,7 +226,6 @@ void EnableVCountIntrAtLine150(void)
     EnableInterrupts(INTR_FLAG_VCOUNT);
 }
 
-// FRLG commented this out to remove RTC, however Emerald didn't undo this!
 #ifdef BUGFIX
 static void SeedRngWithRtc(void)
 {
@@ -327,14 +265,9 @@ static void ReadKeys(void)
     gMain.newKeys = gMain.newKeysRaw;
     gMain.newAndRepeatedKeys = gMain.newKeysRaw;
 
-    // BUG: Key repeat won't work when pressing L using L=A button mode
-    // because it compares the raw key input with the remapped held keys.
-    // Note that newAndRepeatedKeys is never remapped either.
-
     if (keyInput != 0 && gMain.heldKeys == keyInput)
     {
         gMain.keyRepeatCounter--;
-
         if (gMain.keyRepeatCounter == 0)
         {
             gMain.newAndRepeatedKeys = keyInput;
@@ -343,19 +276,16 @@ static void ReadKeys(void)
     }
     else
     {
-        // If there is no input or the input has changed, reset the counter.
         gMain.keyRepeatCounter = gKeyRepeatStartDelay;
     }
 
     gMain.heldKeysRaw = keyInput;
     gMain.heldKeys = gMain.heldKeysRaw;
 
-    // Remap L to A if the L=A option is enabled.
     if (gSaveBlock2Ptr->optionsButtonMode == OPTIONS_BUTTON_MODE_L_EQUALS_A)
     {
         if (JOY_NEW(L_BUTTON))
             gMain.newKeys |= A_BUTTON;
-
         if (JOY_HELD(L_BUTTON))
             gMain.heldKeys |= A_BUTTON;
     }
@@ -367,7 +297,6 @@ static void ReadKeys(void)
 void InitIntrHandlers(void)
 {
     int i;
-
     for (i = 0; i < INTR_COUNT; i++)
         gIntrTable[i] = gIntrTableTemplate[i];
 
@@ -378,7 +307,6 @@ void InitIntrHandlers(void)
     SetSerialCallback(NULL);
 
     REG_IME = 1;
-
     EnableInterrupts(INTR_FLAG_VBLANK);
 }
 
@@ -484,7 +412,6 @@ static void WaitForVBlank(void)
     VBlankIntrWait();
 #else
     gMain.intrCheck &= ~INTR_FLAG_VBLANK;
-
     if (gWirelessCommType != 0)
     {
         while (!(gMain.intrCheck & INTR_FLAG_VBLANK))
@@ -525,18 +452,13 @@ void ClearPokemonCrySongs(void)
 }
 
 #ifndef PORTABLE
-// GBA 硬件端构建存根：阻断标准库对 libnosys.a(sbrk) 的自动拉取，完全避开对 end 符号的依赖。
-void *_sbrk(int incr)
-{
-    return (void *)-1;
-}
+void *_sbrk(int incr) { return (void *)-1; }
 int _close(int file) { return -1; }
 int _fstat(int file, void *st) { return -1; }
 int _getpid(void) { return 1; }
 int _isatty(int file) { return 1; }
 int _kill(int pid, int sig) { return -1; }
 int _lseek(int file, int ptr, int dir) { return 0; }
-int _read(int file, char *ptr, int len) { return 0; }
 int _read(int file, char *ptr, int len) { return 0; }
 int _write(int file, char *ptr, int len) { return 0; }
 #endif
