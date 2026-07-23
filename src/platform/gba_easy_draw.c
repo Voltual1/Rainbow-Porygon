@@ -900,17 +900,24 @@ void DrawFrame(uint16_t *pixels)
         if(((REG_DISPSTAT >> 8) & 0xFF) == REG_VCOUNT)
         {
             REG_DISPSTAT |= INTR_FLAG_VCOUNT;
-            // 强制绕开所有状态校验触发心跳中断
-            if (gIntrTable[0] != NULL)
+#ifdef __ANDROID__
+            if (REG_IE & INTR_FLAG_VCOUNT)
+#else
+            if (REG_DISPSTAT & DISPSTAT_VCOUNT_INTR)
+#endif
             {
-                gIntrTable[0]();
+                if (gIntrTable[0] != NULL)
+                    gIntrTable[0]();
             }
         }
 
         // Render the backdrop color before the each individual scanline.
         // backdrop color brightness effects
         unsigned int blendMode = (REG_BLDCNT >> 6) & 3;
-        uint16_t backdropColor = *(uint16_t *)PLTT;
+        
+        // 【DEBUG 测试】：强行将背景色设为 GBA 的红光 (15-bit BGR: 0x001F)
+        uint16_t backdropColor = 0x001F; 
+        
         if (REG_BLDCNT & BLDCNT_TGT1_BD)
         {
             switch (blendMode)
@@ -931,10 +938,10 @@ void DrawFrame(uint16_t *pixels)
 
         RunDMAs(DMA_HBLANK);
         
-        // 强制触发 HBlank 中断
-        if (gIntrTable[3] != NULL)
+        if (REG_DISPSTAT & DISPSTAT_HBLANK_INTR)
         {
-            gIntrTable[3]();
+            if (gIntrTable[3] != NULL)
+                gIntrTable[3]();
         }
 
         REG_DISPSTAT &= ~INTR_FLAG_HBLANK;
