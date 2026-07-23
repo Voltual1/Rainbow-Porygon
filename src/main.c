@@ -130,6 +130,7 @@ void AgbMain(void)
 
     gLinkTransferringData = FALSE;
 
+#ifndef PORTABLE
 #ifndef NDEBUG
 #if (LOG_HANDLER == LOG_HANDLER_MGBA_PRINT)
     (void) MgbaOpen();
@@ -137,6 +138,8 @@ void AgbMain(void)
     AGBPrintInit();
 #endif
 #endif
+#endif
+
     gAgbMainLoop_sp = __builtin_frame_address(0);
     AgbMainLoop();
 }
