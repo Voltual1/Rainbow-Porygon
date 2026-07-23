@@ -14,16 +14,10 @@ public class PokeEmeraldActivity extends SDLActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        
-        // 使用 post 延迟添加控制视图，确保父类 SDLActivity 已完成 mLayout 的初始化
-        getWindow().getDecorView().post(() -> {
-            if (mLayout != null) {
-                GbaControlsView controls = new GbaControlsView(PokeEmeraldActivity.this);
-                mLayout.addView(controls, new ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT));
-            }
-        });
+        GbaControlsView controls = new GbaControlsView(this);
+        mLayout.addView(controls, new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
     }
 
     @Override

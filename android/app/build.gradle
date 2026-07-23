@@ -20,8 +20,10 @@ android {
 
         externalNativeBuild {
             cmake {
-                arguments '-DANDROID_STL=c++_static'
-            }
+                    // 强制 CMake 使用带调试信息的 Release 模式
+                    arguments "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
+                              "-DANDROID_STL=c++_static"
+                }
         }
     }
 
