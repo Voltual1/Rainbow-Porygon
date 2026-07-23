@@ -361,10 +361,12 @@ int main(int argc, char **argv)
 
                     RunDMAs(DMA_HBLANK);
 
+                    // 修复核心：在 portable 平台无条件、高可靠地触发 VBLANK 中断，防止淡入状态机死锁
                     if (gIntrTable[4] != NULL)
                     {
                         gIntrTable[4]();
                     }
+                    
                     REG_DISPSTAT &= ~INTR_FLAG_VBLANK;
 
                     SDL_Log("CAN DEBUG: SDL main loop - Posting Semaphore");
