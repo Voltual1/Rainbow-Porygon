@@ -95,7 +95,7 @@ void EnableVCountIntrAtLine150(void);
 
 void AgbMain(void)
 {
-    *(vu16 *)BG_PLTT = RGB_WHITE; // Set the backdrop to white on startup
+    *(vu16 *)BG_PLTT = RGB(31, 0, 0);// for debug
     InitGpuRegManager();
     REG_WAITCNT = WAITCNT_PREFETCH_ENABLE
  | WAITCNT_WS0_S_1 | WAITCNT_WS0_N_3
