@@ -57,6 +57,7 @@ jobs:
             data/maps/groups.inc
             data/maps/headers.inc
             data/maps/**/*.inc
+            data/tilesets/**/*.4bpp
             graphics/**/*.4bpp
             graphics/**/*.gbapal
             graphics/**/*.smolTM
