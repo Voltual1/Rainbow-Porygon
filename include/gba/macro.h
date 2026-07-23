@@ -113,6 +113,12 @@
     DmaSetUnchecked(dmaNum, src, dest, control)
 #endif
 
+#ifdef PORTABLE
+#define DMA_FILL_UNCHECKED(dmaNum, value, dest, size, bit) CPU_FILL_UNCHECKED(value, dest, size, bit)
+
+#define DMA_COPY_UNCHECKED(dmaNum, src, dest, size, bit) CPU_COPY_UNCHECKED(src, dest, size, bit)
+#else
+// 原版 GBA 硬件 DMA 实现
 #define DMA_FILL_UNCHECKED(dmaNum, value, dest, size, bit)                                    \
 {                                                                                             \
     vu##bit tmp = (vu##bit)(value);                                                           \
@@ -120,7 +126,7 @@
            &tmp,                                                                              \
            dest,                                                                              \
            (DMA_ENABLE | DMA_START_NOW | DMA_##bit##BIT | DMA_SRC_FIXED | DMA_DEST_INC) << 16 \
-         | ((size)/(bit/8)));                                                                 \
+ | ((size)/(bit/8)));                                                                 \
 }
 
 #if MODERN
@@ -168,18 +174,18 @@
            src,                                                                             \
            dest,                                                                            \
            (DMA_ENABLE | DMA_START_NOW | DMA_##bit##BIT | DMA_SRC_INC | DMA_DEST_INC) << 16 \
-         | ((size)/(bit/8)))
+ | ((size)/(bit/8)))
+#endif
 
 #if MODERN
-#define DMA_COPY(dmaNum, src, dest, size, bit) \
+#define DMA_FILL(dmaNum, value, dest, size, bit) \
     do \
     { \
-        _Static_assert(_Alignof(src) >= (bit / 8), "source potentially unaligned"); \
         _Static_assert(_Alignof(dest) >= (bit / 8), "destination potentially unaligned"); \
-        DMA_COPY_UNCHECKED(dmaNum, src, dest, size, bit); \
+        DMA_FILL_UNCHECKED(dmaNum, value, dest, size, bit); \
     } while (0)
 #else
-#define DMA_COPY(dmaNum, src, dest, size, bit) DMA_COPY_UNCHECKED(dmaNum, src, dest, size, bit)
+#define DMA_FILL(dmaNum, value, dest, size, bit) DMA_FILL_UNCHECKED(dmaNum, value, dest, size, bit)
 #endif
 
 #define DmaCopy16(dmaNum, src, dest, size) DMA_COPY(dmaNum, src, dest, size, 16)

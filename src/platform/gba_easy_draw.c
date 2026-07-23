@@ -912,24 +912,24 @@ void DrawFrame(uint16_t *pixels)
         }
 
         // Render the backdrop color before the each individual scanline.
-        // backdrop color brightness effects
-        unsigned int blendMode = (REG_BLDCNT >> 6) & 3;
-        
-        // 【DEBUG 测试】：强行将背景色设为 GBA 的红光 (15-bit BGR: 0x001F)
-        uint16_t backdropColor = 0x001F; 
-        
-        if (REG_BLDCNT & BLDCNT_TGT1_BD)
-        {
-            switch (blendMode)
-            {
-            case 2:
-                backdropColor = alphaBrightnessIncrease(backdropColor);
-                break;
-            case 3:
-                backdropColor = alphaBrightnessDecrease(backdropColor);
-                break;
-            }
-        }
+// backdrop color brightness effects
+unsigned int blendMode = (REG_BLDCNT >> 6) & 3;
+
+// 【已修复】：撤销红光 Debug，恢复真实的 GBA 调色板背景
+uint16_t backdropColor = *(uint16_t *)PLTT; 
+
+if (REG_BLDCNT & BLDCNT_TGT1_BD)
+{
+    switch (blendMode)
+    {
+    case 2:
+        backdropColor = alphaBrightnessIncrease(backdropColor);
+        break;
+    case 3:
+        backdropColor = alphaBrightnessDecrease(backdropColor);
+        break;
+    }
+}
 
         memsetu16(&pixels[i * DISPLAY_WIDTH], backdropColor, DISPLAY_WIDTH);
         DrawScanline(&pixels[i * DISPLAY_WIDTH], i);

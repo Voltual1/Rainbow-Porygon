@@ -100,8 +100,8 @@ void AgbMain(void)
 {
     SDL_Log("CAN DEBUG: Entering AgbMain");
     
-    // 设为红色用于调试检测渲染管道
-    *(vu16 *)BG_PLTT = RGB(31, 0, 0); 
+    // 【已修复】：撤销红色 Debug
+    *(vu16 *)BG_PLTT = RGB_WHITE; 
     InitGpuRegManager();
     REG_WAITCNT = WAITCNT_PREFETCH_ENABLE
  | WAITCNT_WS0_S_1 | WAITCNT_WS0_N_3
