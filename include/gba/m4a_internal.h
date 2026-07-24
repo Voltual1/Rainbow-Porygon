@@ -205,7 +205,13 @@ struct SoundInfo
     u8 gap[3];
     s32 pcmSamplesPerVBlank;
     s32 pcmFreq;
-    s32 divFreq;
+    
+    // 增加 sampleRateReciprocal 联合体，以便跨平台浮点混音器正确读写倒数频率值
+    union {
+        s32 divFreq;
+        float sampleRateReciprocal;
+    };
+
     struct CgbChannel *cgbChans;
     MPlayMainFunc MPlayMainHead;
     struct MusicPlayerInfo *musicPlayerHead;
@@ -217,7 +223,13 @@ struct SoundInfo
     ExtVolPitFunc ExtVolPit;
     u8 gap2[16];
     struct SoundChannel chans[MAX_DIRECTSOUND_CHANNELS];
-    s8 ALIGNED(4) pcmBuffer[PCM_DMA_BUF_SIZE * 2];
+
+    // 核心修复：联合体化 pcmBuffer 并且将大小扩充至浮点混音器 outBuffer 的实际大小 (4907 * 2 * sizeof(float))
+    // 从而使 gSoundInfo 占用的内存完美匹配 SoundMixerState，阻止越界覆盖 .bss 段核心内存的灾难
+    union {
+        s8 pcmBuffer[PCM_DMA_BUF_SIZE * 2];
+        float outBuffer[4907 * 2];
+    } ALIGNED(4);
 };
 
 struct SongHeader
@@ -367,14 +379,7 @@ struct Song
 extern const struct MusicPlayer gMPlayTable[];
 extern const struct Song gSongTable[];
 
-
-
 extern u8 gMPlayMemAccArea[];
-
-//u8 gPokemonCrySong[52];
-//u8 gPokemonCrySongs[52 * MAX_POKEMON_CRIES];
-
-#define MAX_POKEMON_CRIES 2
 
 extern struct PokemonCrySong gPokemonCrySong;
 extern struct PokemonCrySong gPokemonCrySongs[];
@@ -403,7 +408,6 @@ extern const struct PokemonCrySong gPokemonCrySongTemplate;
 
 extern const struct ToneData voicegroup_dummy;
 
-
 #ifdef PORTABLE
 #define NUM_MUSIC_PLAYERS 4
 #define MAX_LINES 0
@@ -414,7 +418,6 @@ extern char gMaxLines[];
 #define NUM_MUSIC_PLAYERS ((u16)gNumMusicPlayers)
 #define MAX_LINES ((u32)gMaxLines)
 #endif
-
 
 u32 umul3232H32(u32 multiplier, u32 multiplicand);
 void SoundMain(void);

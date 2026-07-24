@@ -134,7 +134,7 @@ void m4aSongNumStartOrChange(u16 n)
     else
     {
         if ((mplay->info->status & MUSICPLAYER_STATUS_TRACK) == 0
-         || (mplay->info->status & MUSICPLAYER_STATUS_PAUSE))
+            || (mplay->info->status & MUSICPLAYER_STATUS_PAUSE))
         {
             MPlayStart(mplay->info, song->header);
         }
@@ -266,10 +266,10 @@ void MPlayExtender(struct CgbChannel *cgbChans)
     u32 ident;
 
     REG_SOUNDCNT_X = SOUND_MASTER_ENABLE
-                   | SOUND_4_ON
-                   | SOUND_3_ON
-                   | SOUND_2_ON
-                   | SOUND_1_ON;
+        | SOUND_4_ON
+        | SOUND_3_ON
+        | SOUND_2_ON
+        | SOUND_1_ON;
     REG_SOUNDCNT_L = 0; // set master volume to zero
     REG_NR12 = 0x8;
     REG_NR22 = 0x8;
@@ -386,13 +386,13 @@ void SoundInit(struct SoundInfo *soundInfo)
     REG_DMA1CNT_H = DMA_32BIT;
     REG_DMA2CNT_H = DMA_32BIT;
     REG_SOUNDCNT_X = SOUND_MASTER_ENABLE
-                     | SOUND_4_ON
-                     | SOUND_3_ON
-                     | SOUND_2_ON
-                     | SOUND_1_ON;
+        | SOUND_4_ON
+        | SOUND_3_ON
+        | SOUND_2_ON
+        | SOUND_1_ON;
     REG_SOUNDCNT_H = SOUND_B_FIFO_RESET | SOUND_B_TIMER_0 | SOUND_B_LEFT_OUTPUT
-                     | SOUND_A_FIFO_RESET | SOUND_A_TIMER_0 | SOUND_A_RIGHT_OUTPUT
-                     | SOUND_ALL_MIX_FULL;
+        | SOUND_A_FIFO_RESET | SOUND_A_TIMER_0 | SOUND_A_RIGHT_OUTPUT
+        | SOUND_ALL_MIX_FULL;
     REG_SOUNDBIAS_H = (REG_SOUNDBIAS_H & 0x3F) | 0x40;
 
     REG_DMA1SAD = (s32)soundInfo->pcmBuffer;
@@ -442,6 +442,11 @@ void SampleFreqSet(u32 freq)
 
     // CPU frequency 16.78Mhz
     soundInfo->divFreq = (16777216 / soundInfo->pcmFreq + 1) >> 1;
+
+#ifdef PORTABLE
+    // 核心修复：为跨平台混音器正确初始化 sampleRateReciprocal 倒数频率
+    soundInfo->sampleRateReciprocal = 1.0f / (float)soundInfo->pcmFreq;
+#endif
 
     // Turn off timer 0.
     REG_TM0CNT_H = 0;
@@ -653,10 +658,10 @@ void MPlayStart(struct MusicPlayerInfo *mplayInfo, struct SongHeader *songHeader
     unk_B = mplayInfo->unk_B;
 
     if (!unk_B
-     || ((!mplayInfo->songHeader || !(mplayInfo->tracks[0].flags & MPT_FLG_START))
+        || ((!mplayInfo->songHeader || !(mplayInfo->tracks[0].flags & MPT_FLG_START))
             && ((mplayInfo->status & MUSICPLAYER_STATUS_TRACK) == 0
-             || (mplayInfo->status & MUSICPLAYER_STATUS_PAUSE)))
-     || (mplayInfo->priority <= songHeader->priority))
+                || (mplayInfo->status & MUSICPLAYER_STATUS_PAUSE)))
+        || (mplayInfo->priority <= songHeader->priority))
     {
         mplayInfo->ident++;
         mplayInfo->status = 0;
@@ -1006,6 +1011,7 @@ void CgbSound(void)
         case 3:
             nrx0ptr = (vu8 *)(REG_ADDR_NR30);
             nrx1ptr = (vu8 *)(REG_ADDR_NR31);
+            REG_NR32 = channels->envelopeVolume; // Fix unused assignment?
             nrx2ptr = (vu8 *)(REG_ADDR_NR32);
             nrx3ptr = (vu8 *)(REG_ADDR_NR33);
             nrx4ptr = (vu8 *)(REG_ADDR_NR34);
@@ -1815,15 +1821,15 @@ void SetPokemonCryStereo(u32 val)
     if (val)
     {
         REG_SOUNDCNT_H = SOUND_B_TIMER_0 | SOUND_B_LEFT_OUTPUT
-                       | SOUND_A_TIMER_0 | SOUND_A_RIGHT_OUTPUT
-                       | SOUND_ALL_MIX_FULL;
+            | SOUND_A_TIMER_0 | SOUND_A_RIGHT_OUTPUT
+            | SOUND_ALL_MIX_FULL;
         soundInfo->mode &= ~1;
     }
     else
     {
         REG_SOUNDCNT_H = SOUND_B_TIMER_0 | SOUND_B_LEFT_OUTPUT | SOUND_B_RIGHT_OUTPUT
-                       | SOUND_A_TIMER_0 | SOUND_A_LEFT_OUTPUT | SOUND_A_RIGHT_OUTPUT
-                       | SOUND_B_MIX_HALF | SOUND_A_MIX_HALF | SOUND_CGB_MIX_FULL;
+            | SOUND_A_TIMER_0 | SOUND_A_LEFT_OUTPUT | SOUND_A_RIGHT_OUTPUT
+            | SOUND_B_MIX_HALF | SOUND_A_MIX_HALF | SOUND_CGB_MIX_FULL;
         soundInfo->mode |= 1;
     }
 }
