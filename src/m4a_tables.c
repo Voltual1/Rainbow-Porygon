@@ -39,17 +39,21 @@ extern void ply_xswee(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
 extern void ply_xwait(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
 extern void ply_xcmd_0D(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
 
-// 定义适用于跨平台的 C 指令集跳转表模板
-const MPlayFunc gMPlayJumpTableTemplate[36] = {
+// CAN FIX: 将原版中 gMPlayJumpTableTemplate 声明为正确的 MPlayFunc[36] 类型，以解决重定义和类型不兼容问题
+const MPlayFunc gMPlayJumpTableTemplate[36] =
+{
     (MPlayFunc)ply_fine,
     (MPlayFunc)ply_goto,
     (MPlayFunc)ply_patt,
     (MPlayFunc)ply_pend,
     (MPlayFunc)ply_rept,
+    (MPlayFunc)ply_fine,
+    (MPlayFunc)ply_fine,
+    (MPlayFunc)ply_fine,
+    (MPlayFunc)ply_fine,
     (MPlayFunc)ply_prio,
     (MPlayFunc)ply_tempo,
     (MPlayFunc)ply_keysh,
-    (MPlayFunc)ply_memacc,
     (MPlayFunc)ply_voice,
     (MPlayFunc)ply_vol,
     (MPlayFunc)ply_pan,
@@ -59,67 +63,21 @@ const MPlayFunc gMPlayJumpTableTemplate[36] = {
     (MPlayFunc)ply_lfodl,
     (MPlayFunc)ply_mod,
     (MPlayFunc)ply_modt,
+    (MPlayFunc)ply_fine,
+    (MPlayFunc)ply_fine,
     (MPlayFunc)ply_tune,
+    (MPlayFunc)ply_fine,
+    (MPlayFunc)ply_fine,
+    (MPlayFunc)ply_fine,
     (MPlayFunc)ply_port,
-    (MPlayFunc)ply_xcmd,
+    (MPlayFunc)ply_fine,
     (MPlayFunc)ply_endtie,
-    (MPlayFunc)ply_note,
-    (MPlayFunc)ply_xxx,
-    (MPlayFunc)ply_xwave,
-    (MPlayFunc)ply_xtype,
-    (MPlayFunc)ply_xatta,
-    (MPlayFunc)ply_xdeca,
-    (MPlayFunc)ply_xsust,
-    (MPlayFunc)ply_xrele,
-    (MPlayFunc)ply_xiecv,
-    (MPlayFunc)ply_xiecl,
-    (MPlayFunc)ply_xleng,
-    (MPlayFunc)ply_xswee,
-    (MPlayFunc)ply_xwait,
-    (MPlayFunc)ply_xcmd_0D
-};
-
-// Some of these functions have different signatures, so we need to make this
-// an array of void pointers or a struct. It's simpler to just make it an array
-// for now.
-void *const gMPlayJumpTableTemplate[] =
-{
-    ply_fine,
-    ply_goto,
-    ply_patt,
-    ply_pend,
-    ply_rept,
-    ply_fine,
-    ply_fine,
-    ply_fine,
-    ply_fine,
-    ply_prio,
-    ply_tempo,
-    ply_keysh,
-    ply_voice,
-    ply_vol,
-    ply_pan,
-    ply_bend,
-    ply_bendr,
-    ply_lfos,
-    ply_lfodl,
-    ply_mod,
-    ply_modt,
-    ply_fine,
-    ply_fine,
-    ply_tune,
-    ply_fine,
-    ply_fine,
-    ply_fine,
-    ply_port,
-    ply_fine,
-    ply_endtie,
-    SampleFreqSet,
-    TrackStop,
-    FadeOutBody,
-    TrkVolPitSet,
-    RealClearChain,
-    SoundMainBTM,
+    (MPlayFunc)SampleFreqSet,
+    (MPlayFunc)TrackStop,
+    (MPlayFunc)FadeOutBody,
+    (MPlayFunc)TrkVolPitSet,
+    (MPlayFunc)RealClearChain,
+    (MPlayFunc)SoundMainBTM,
 };
 
 // This is a table of deltas between sample values in compressed PCM data.
@@ -189,7 +147,7 @@ const u16 gPcmSamplesPerVBlankTable[] =
     352,
     448,
     528,
-    608,
+logcat_2026-07-24_19-45-47.txt    608,
     672,
     704,
 };
