@@ -10,7 +10,7 @@ extern const u8 gCgb3Vol[];
 
 #define BSS_CODE __attribute__((section(".bss.code")))
 
-COMMON_DATA struct SoundInfo __attribute__((aligned(4))) gSoundInfo = {0};
+COMMON_DATA struct SoundInfo gSoundInfo = {0};
 COMMON_DATA struct PokemonCrySong gPokemonCrySongs[MAX_POKEMON_CRIES] = {0};
 COMMON_DATA struct MusicPlayerInfo gPokemonCryMusicPlayers[MAX_POKEMON_CRIES] = {0};
 COMMON_DATA struct MusicPlayerInfo gMPlayInfo_BGM = {0};

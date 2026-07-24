@@ -208,8 +208,8 @@ struct SoundInfo
     
     // 增加 sampleRateReciprocal 联合体，以便跨平台浮点混音器正确读写倒数频率值
     union {
-        s32 divFreq;
-        float sampleRateReciprocal;
+        s8 pcmBuffer[PCM_DMA_BUF_SIZE * 2] ALIGNED(4); // 将对齐直接写在 pcmBuffer 声明上
+        float outBuffer[4907 * 2];
     };
 
     struct CgbChannel *cgbChans;
