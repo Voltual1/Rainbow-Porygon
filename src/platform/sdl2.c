@@ -101,7 +101,6 @@ int main(int argc, char **argv)
     SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
     SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
 #endif
-    // CAN FIX: Added missing '|' for SDL_INIT_GAMECONTROLLER
     if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO
 #ifdef __ANDROID__
  | SDL_INIT_GAMECONTROLLER
@@ -456,7 +455,7 @@ static void ReadConfigFile(void)
 
     if (configFile == NULL)
         return;
-    while (fgets(line, sizeof(line), configFile) != NULL)
+    while (configFile != NULL && fgets(line, sizeof(line), configFile) != NULL)
     {
         if (sscanf(line, "borderBackground=%u", &value) == 1 && value < 16)
         {
@@ -915,6 +914,11 @@ void ProcessEvents(void)
             isRunning = false;
             break;
 #ifdef __ANDROID__
+        case SDL_FINGERDOWN:
+        case SDL_FINGERUP:
+        case SDL_FINGERMOTION:
+            HandleTouchEvent(&event.tfinger);
+            break;
         case SDL_CONTROLLERDEVICEADDED:
             if (androidController == NULL && SDL_IsGameController(event.cdevice.which))
                 androidController = SDL_GameControllerOpen(event.cdevice.which);
@@ -1076,7 +1080,8 @@ u16 Platform_GetKeyInput(void)
     u16 gamepadKeys = GetXInputKeys();
     return gamepadKeys | keyboardKeys;
 #elif defined(__ANDROID__)
-    return keyboardKeys | controllerKeys | controllerAxisKeys;
+    // CAN FIX: Added touchKeys to input mapping so touch controls work on Android
+    return keyboardKeys | controllerKeys | controllerAxisKeys | touchKeys;
 #endif
 
     return keyboardKeys;
@@ -1099,6 +1104,13 @@ void VDraw(SDL_Texture *texture)
     }
     SDL_UpdateTexture(texture, NULL, image, DISPLAY_WIDTH * sizeof(Uint32));
     REG_VCOUNT = 161; // prep for being in VBlank period
+}
+
+extern void DrawTouchControls(void)
+{
+#ifdef __ANDROID__
+    DrawTouchControls();
+#endif
 }
 
 int DoMain(void *data)
