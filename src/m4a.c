@@ -547,7 +547,8 @@ void m4aSoundMode(u32 mode)
     if (temp)
         soundInfo->masterVolume = temp >> SOUND_MODE_MASVOL_SHIFT;
 
-    temp = mode & SOUND_MODE_DA;
+    // CAN FIX: 恢复使用正确的宏 SOUND_MODE_DA_BIT
+    temp = mode & SOUND_MODE_DA_BIT;
 
     if (temp)
     {
