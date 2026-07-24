@@ -59,9 +59,11 @@ void ply_port(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
 void ply_endtie(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
 
 // --- 4. 其它 ---
-u8 SoundMainRAM[0x8000]; // 32KB
-u8 gMaxLines[0x400];
-u8 gNumMusicPlayers[0x400];
+// 修复类型匹配：将 u8 替换为 char，并提供足够的安全空间防止 BSS 段被 CpuFill 覆盖
+char SoundMainRAM[0x8000]; // 32KB
+char gMaxLines[0x400];
+char gNumMusicPlayers[0x400];
+u8 gMPlayMemAccArea[0x400]; // 头文件中为 u8[]，保持 u8
 s32 Div(s32 num, s32 denom) { return denom != 0 ? num / denom : 0; }
 
 // 修复 Stub: 确保物理快速拷贝执行
