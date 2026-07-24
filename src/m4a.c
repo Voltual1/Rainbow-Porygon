@@ -76,10 +76,10 @@ void m4aSoundInit(void)
 
     SoundInit(&gSoundInfo);
     MPlayExtender(gCgbChans);
-    m4aSoundMode(SOUND_MODE_DA_BIT_8
- | SOUND_MODE_FREQ_13379
- | (12 << SOUND_MODE_MASVOL_SHIFT)
- | (5 << SOUND_MODE_MAXCHN_SHIFT));
+    m4aSoundMode(SOUND_MODE_DA_BIT_8 |
+                 SOUND_MODE_FREQ_13379 |
+                 (12 << SOUND_MODE_MASVOL_SHIFT) |
+                 (5 << SOUND_MODE_MAXCHN_SHIFT));
 
     for (i = 0; i < NUM_MUSIC_PLAYERS; i++)
     {
@@ -133,8 +133,8 @@ void m4aSongNumStartOrChange(u16 n)
     }
     else
     {
-        if ((mplay->info->status & MUSICPLAYER_STATUS_TRACK) == 0
-            || (mplay->info->status & MUSICPLAYER_STATUS_PAUSE))
+        if ((mplay->info->status & MUSICPLAYER_STATUS_TRACK) == 0 ||
+            (mplay->info->status & MUSICPLAYER_STATUS_PAUSE))
         {
             MPlayStart(mplay->info, song->header);
         }
@@ -265,11 +265,11 @@ void MPlayExtender(struct CgbChannel *cgbChans)
     struct SoundInfo *soundInfo;
     u32 ident;
 
-    REG_SOUNDCNT_X = SOUND_MASTER_ENABLE
-        | SOUND_4_ON
-        | SOUND_3_ON
-        | SOUND_2_ON
-        | SOUND_1_ON;
+    REG_SOUNDCNT_X = SOUND_MASTER_ENABLE |
+                     SOUND_4_ON |
+                     SOUND_3_ON |
+                     SOUND_2_ON |
+                     SOUND_1_ON;
     REG_SOUNDCNT_L = 0; // set master volume to zero
     REG_NR12 = 0x8;
     REG_NR22 = 0x8;
@@ -385,14 +385,14 @@ void SoundInit(struct SoundInfo *soundInfo)
 
     REG_DMA1CNT_H = DMA_32BIT;
     REG_DMA2CNT_H = DMA_32BIT;
-    REG_SOUNDCNT_X = SOUND_MASTER_ENABLE
-        | SOUND_4_ON
-        | SOUND_3_ON
-        | SOUND_2_ON
-        | SOUND_1_ON;
-    REG_SOUNDCNT_H = SOUND_B_FIFO_RESET | SOUND_B_TIMER_0 | SOUND_B_LEFT_OUTPUT
-        | SOUND_A_FIFO_RESET | SOUND_A_TIMER_0 | SOUND_A_RIGHT_OUTPUT
-        | SOUND_ALL_MIX_FULL;
+    REG_SOUNDCNT_X = SOUND_MASTER_ENABLE |
+                     SOUND_4_ON |
+                     SOUND_3_ON |
+                     SOUND_2_ON |
+                     SOUND_1_ON;
+    REG_SOUNDCNT_H = SOUND_B_FIFO_RESET | SOUND_B_TIMER_0 | SOUND_B_LEFT_OUTPUT |
+                     SOUND_A_FIFO_RESET | SOUND_A_TIMER_0 | SOUND_A_RIGHT_OUTPUT |
+                     SOUND_ALL_MIX_FULL;
     REG_SOUNDBIAS_H = (REG_SOUNDBIAS_H & 0x3F) | 0x40;
 
     REG_DMA1SAD = (s32)soundInfo->pcmBuffer;
@@ -413,6 +413,43 @@ void SoundInit(struct SoundInfo *soundInfo)
 
 #ifndef PORTABLE
     MPlayJumpTableCopy(gMPlayJumpTable);
+#else
+    // CAN FIX: 在 Portable (安卓等非 GBA 平台) 静态初始化 GBA 音频引擎跳转指令表
+    gMPlayJumpTable[0] = ply_fine;
+    gMPlayJumpTable[1] = ply_goto;
+    gMPlayJumpTable[2] = ply_patt;
+    gMPlayJumpTable[3] = ply_pend;
+    gMPlayJumpTable[4] = ply_rept;
+    gMPlayJumpTable[5] = ply_prio;
+    gMPlayJumpTable[6] = ply_tempo;
+    gMPlayJumpTable[7] = ply_keysh;
+    gMPlayJumpTable[8] = ply_memacc;
+    gMPlayJumpTable[9] = ply_voice;
+    gMPlayJumpTable[10] = ply_vol;
+    gMPlayJumpTable[11] = ply_pan;
+    gMPlayJumpTable[12] = ply_bend;
+    gMPlayJumpTable[13] = ply_bendr;
+    gMPlayJumpTable[14] = ply_lfos;
+    gMPlayJumpTable[15] = ply_lfodl;
+    gMPlayJumpTable[16] = ply_mod;
+    gMPlayJumpTable[17] = ply_modt;
+    gMPlayJumpTable[18] = ply_tune;
+    gMPlayJumpTable[19] = ply_port;
+    gMPlayJumpTable[20] = ply_xcmd;
+    gMPlayJumpTable[21] = ply_endtie;
+    gMPlayJumpTable[22] = (MPlayFunc)ply_note;
+    gMPlayJumpTable[23] = ply_xxx;
+    gMPlayJumpTable[24] = ply_xwave;
+    gMPlayJumpTable[25] = ply_xtype;
+    gMPlayJumpTable[26] = ply_xatta;
+    gMPlayJumpTable[27] = ply_xdeca;
+    gMPlayJumpTable[28] = ply_xcmd;
+    gMPlayJumpTable[29] = ply_endtie;
+    gMPlayJumpTable[30] = (MPlayFunc)SampleFreqSet;
+    gMPlayJumpTable[31] = (MPlayFunc)TrackStop;
+    gMPlayJumpTable[32] = (MPlayFunc)FadeOutBody;
+    gMPlayJumpTable[33] = (MPlayFunc)TrkVolPitSet;
+    gMPlayJumpTable[34] = (MPlayFunc)RealClearChain;
 #endif
 
     soundInfo->MPlayJumpTable = gMPlayJumpTable;
@@ -657,11 +694,11 @@ void MPlayStart(struct MusicPlayerInfo *mplayInfo, struct SongHeader *songHeader
 
     unk_B = mplayInfo->unk_B;
 
-    if (!unk_B
-        || ((!mplayInfo->songHeader || !(mplayInfo->tracks[0].flags & MPT_FLG_START))
-            && ((mplayInfo->status & MUSICPLAYER_STATUS_TRACK) == 0
-                || (mplayInfo->status & MUSICPLAYER_STATUS_PAUSE)))
-        || (mplayInfo->priority <= songHeader->priority))
+    if (!unk_B ||
+        ((!mplayInfo->songHeader || !(mplayInfo->tracks[0].flags & MPT_FLG_START)) &&
+         (((mplayInfo->status & MUSICPLAYER_STATUS_TRACK) == 0) ||
+          (mplayInfo->status & MUSICPLAYER_STATUS_PAUSE))) ||
+        (mplayInfo->priority <= songHeader->priority))
     {
         mplayInfo->ident++;
         mplayInfo->status = 0;
@@ -1820,16 +1857,16 @@ void SetPokemonCryStereo(u32 val)
 
     if (val)
     {
-        REG_SOUNDCNT_H = SOUND_B_TIMER_0 | SOUND_B_LEFT_OUTPUT
-            | SOUND_A_TIMER_0 | SOUND_A_RIGHT_OUTPUT
-            | SOUND_ALL_MIX_FULL;
+        REG_SOUNDCNT_H = SOUND_B_TIMER_0 | SOUND_B_LEFT_OUTPUT |
+                         SOUND_A_TIMER_0 | SOUND_A_RIGHT_OUTPUT |
+                         SOUND_ALL_MIX_FULL;
         soundInfo->mode &= ~1;
     }
     else
     {
-        REG_SOUNDCNT_H = SOUND_B_TIMER_0 | SOUND_B_LEFT_OUTPUT | SOUND_B_RIGHT_OUTPUT
-            | SOUND_A_TIMER_0 | SOUND_A_LEFT_OUTPUT | SOUND_A_RIGHT_OUTPUT
-            | SOUND_B_MIX_HALF | SOUND_A_MIX_HALF | SOUND_CGB_MIX_FULL;
+        REG_SOUNDCNT_H = SOUND_B_TIMER_0 | SOUND_B_LEFT_OUTPUT | SOUND_B_RIGHT_OUTPUT |
+                         SOUND_A_TIMER_0 | SOUND_A_LEFT_OUTPUT | SOUND_A_RIGHT_OUTPUT |
+                         SOUND_B_MIX_HALF | SOUND_A_MIX_HALF | SOUND_CGB_MIX_FULL;
         soundInfo->mode |= 1;
     }
 }
