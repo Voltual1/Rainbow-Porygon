@@ -14,11 +14,8 @@
 void RegisterRamReset(u32 resetFlags) { puts("RegisterRamReset stub"); }
 void IntrMain(void) { puts("IntrMain stub"); }
 
-// 将指针变量改为实际的函数。
 extern void CB2_InitCopyrightScreenAfterBootup(void);
-void gInitialMainCB2(void) {
-    CB2_InitCopyrightScreenAfterBootup();
-}
+void (*const gInitialMainCB2)(void) = CB2_InitCopyrightScreenAfterBootup;
 
 const u8 RomHeaderGameCode[4] = "BPEE";
 const u8 RomHeaderSoftwareVersion = 0;
