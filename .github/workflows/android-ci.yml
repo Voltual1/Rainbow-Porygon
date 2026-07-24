@@ -120,5 +120,6 @@ jobs:
           files: |
             android/app/build/outputs/apk/release/*.apk
             android/app/build/outputs/apk/debug/*.apk
+            android/app/build/*.map
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
