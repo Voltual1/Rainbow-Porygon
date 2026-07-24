@@ -59,9 +59,9 @@ void ply_port(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
 void ply_endtie(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
 
 // --- 4. 其它 ---
-char SoundMainRAM[1];
-char gMaxLines[1];
-char gNumMusicPlayers[1];
+u8 SoundMainRAM[0x8000]; // 32KB
+u8 gMaxLines[0x400];
+u8 gNumMusicPlayers[0x400];
 s32 Div(s32 num, s32 denom) { return denom != 0 ? num / denom : 0; }
 
 // 修复 Stub: 确保物理快速拷贝执行
@@ -162,8 +162,8 @@ void BitUnPack(const void *src, void *dst, const void *data) {
     }
 }
 
-u8 LZ77UnCompWRAMOptimized_end[1];
-u8 __iwram_end[1];
+u8 LZ77UnCompWRAMOptimized_end[0x100];
+u8 __iwram_end[0x100];
 void GameCubeMultiBoot_Hash(void) {}
 void GameCubeMultiBoot_Main(struct GcmbStruct *pStruct) {}
 void GameCubeMultiBoot_ExecuteProgram(struct GcmbStruct *pStruct) {}
