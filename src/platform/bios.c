@@ -54,109 +54,62 @@ static void CPUWriteByte(void *dest, uint8_t val)
     *(uint8_t *)dest = val;
 }
 
-void CpuSet(const void *src, void *dst, u32 cnt)
+void CpuSet(const void *src, void *dst, u32 control)
 {
-    if(dst == NULL)
-    {
-        puts("Attempted to CpuSet to NULL\n");
-        return;
-    }
+    if (!dst || !src) return;
     
-    int count = cnt & 0x1FFFFF;
+    u32 count = control & 0x1FFFFF;
+    bool8 is32 = (control & CPU_SET_32BIT) != 0;
+    bool8 fixedSrc = (control & CPU_SET_SRC_FIXED) != 0;
 
-    const u8 *source = src;
-    u8 *dest = dst;
-
-    // 32-bit ?
-    if ((cnt >> 26) & 1) {
-        
-        //assert(((uintptr_t)src & ~3) == (uintptr_t)src);
-        //assert(((uintptr_t)dst & ~3) == (uintptr_t)dst);
-        
-        // needed for 32-bit mode!
-        //source = (u8 *)((uint32_t )source & ~3);
-        //dest = (u8 *)((uint32_t )dest & ~3);
-
-        // fill ?
-        if ((cnt >> 24) & 1) {
-            uint32_t value = CPUReadMemory(source);
-            while (count) {
-                CPUWriteMemory(dest, value);
-                dest += 4;
-                count--;
+    if (is32) {
+        u32 *d = (u32 *)dst;
+        if (fixedSrc) {
+            u32 v = *(volatile u32 *)src;
+            while (count-- > 0) {
+                *d++ = v;
             }
         } else {
-            // copy
-            while (count) {
-                CPUWriteMemory(dest, CPUReadMemory(source));
-                source += 4;
-                dest += 4;
-                count--;
+            const u32 *s = (const u32 *)src;
+            while (count-- > 0) {
+                *d++ = *s++;
             }
         }
     } else {
-        // No align on 16-bit fill?
-        //assert(((uintptr_t)src & ~1) == (uintptr_t)src);
-        //assert(((uintptr_t)dst & ~1) == (uintptr_t)dst);
-
-        // 16-bit fill?
-        if ((cnt >> 24) & 1) {
-            uint16_t value = CPUReadHalfWord(source);
-            while (count) {
-                CPUWriteHalfWord(dest, value);
-                dest += 2;
-                count--;
+        u16 *d = (u16 *)dst;
+        if (fixedSrc) {
+            u16 v = *(volatile u16 *)src;
+            while (count-- > 0) {
+                *d++ = v;
             }
         } else {
-            // copy
-            while (count) {
-                CPUWriteHalfWord(dest, CPUReadHalfWord(source));
-                source += 2;
-                dest += 2;
-                count--;
+            const u16 *s = (const u16 *)src;
+            while (count-- > 0) {
+                *d++ = *s++;
             }
         }
     }
 }
 
-void CpuFastSet(const void *src, void *dst, u32 cnt)
+void CpuFastSet(const void *src, void *dst, u32 control)
 {
-    if(dst == NULL)
-    {
-        puts("Attempted to CpuFastSet to NULL\n");
-        return;
-    }
+    if (!dst || !src) return;
     
-    int count = cnt & 0x1FFFFF;
+    // CpuFastSet 强制为 32 位传输
+    u32 count = control & 0x1FFFFF;
+    bool8 fixedSrc = (control & CPU_FAST_SET_SRC_FIXED) != 0;
+    u32 *d = (u32 *)dst;
 
-    const u8 *source = src;
-    u8 *dest = dst;
-    
-    //source = (u8 *)((uint32_t )source & ~3);
-    //dest = (u8 *)((uint32_t )dest & ~3);
-
-    // fill?
-    if((cnt >> 24) & 1) {
-        uint32_t value = CPUReadMemory(source);
-        while(count > 0) {
-            // BIOS always transfers 32 bytes at a time
-            for(int i = 0; i < 8; i++) {
-                CPUWriteMemory(dest, value);
-                dest += 4;
-            }
-            count -= 8;
+    if (fixedSrc) {
+        u32 v = *(volatile u32 *)src;
+        // 摒弃 32 字节的强行对齐块，精确复制 count 个字
+        while (count-- > 0) {
+            *d++ = v;
         }
     } else {
-        // copy
-        while(count > 0) {
-            // BIOS always transfers 32 bytes at a time
-            for(int i = 0; i < 8; i++) {
-                uint32_t value = CPUReadMemory(source);
-                CPUWriteMemory(dest, value);
-                source += 4;
-                dest += 4;
-            }
-            count -= 8;
+        const u32 *s = (const u32 *)src;
+        while (count-- > 0) {
+            *d++ = *s++;
         }
     }
 }
