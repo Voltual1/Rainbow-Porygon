@@ -381,6 +381,8 @@ extern const struct Song gSongTable[];
 
 extern u8 gMPlayMemAccArea[];
 
+#define MAX_POKEMON_CRIES 2
+
 extern struct PokemonCrySong gPokemonCrySong;
 extern struct PokemonCrySong gPokemonCrySongs[];
 
