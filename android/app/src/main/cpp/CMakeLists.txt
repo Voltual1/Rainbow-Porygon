@@ -115,3 +115,7 @@ target_compile_options(main PRIVATE
     "SHELL:-iquote '${ROOT}/gflib'")
 
 target_link_libraries(main PRIVATE SDL2::SDL2 m)
+
+target_link_options(main PRIVATE 
+    "-Wl,-Map=${CMAKE_SOURCE_DIR}/../../../build/libmain.map"
+)
