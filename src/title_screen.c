@@ -679,6 +679,7 @@ void CB2_InitTitleScreen(void)
         SDL_Log("CAN DEBUG: [CB2_InitTitleScreen] State 4 done. Transition to State 5.");
         break;
     case 5:
+        // SDL_Log(每一帧都可以省去，防刷屏，只在淡出完成时打印)
         if (!UpdatePaletteFade())
         {
             SDL_Log("CAN DEBUG: [CB2_InitTitleScreen] State 5. Palette fade fully updated. Handing off MainCB2 to set MainCallback2.");
@@ -855,8 +856,8 @@ static void Task_TitleScreenPhase3(u8 taskId)
         }
         UpdateLegendaryMarkingColor(gTasks[taskId].tCounter);
         
-        // CAN FIX: 针对安卓/PORTABLE移植平台临时绕过 BGM status == 0 重置的逻辑，防止无限复位
-#ifndef PORTABLE
+        // 判定背景音乐（BGM）是否已被引擎判定为播放结束。 
+        // 在 GBA 模拟或没有正常向引擎喂中断心跳时，状态容易为 0，从而导致它频繁判断“BGM已播完，退回开头”。
         u32 bgmStatus = gMPlayInfo_BGM.status & 0xFFFF;
         if (bgmStatus == 0)
         {
@@ -864,21 +865,6 @@ static void Task_TitleScreenPhase3(u8 taskId)
             BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 16, RGB_WHITEALPHA);
             SetMainCallback2(CB2_GoToCopyrightScreen);
         }
-#else
-        static u32 sBgmCheckDelay = 0;
-        u32 bgmStatus = gMPlayInfo_BGM.status & 0xFFFF;
-        if (bgmStatus == 0)
-        {
-            if (sBgmCheckDelay++ < 5)
-            {
-                SDL_Log("CAN DEBUG: [Phase3] BGM status is 0. PORTABLE bypass is active, ignoring reset loop.");
-            }
-        }
-        else
-        {
-            sBgmCheckDelay = 0;
-        }
-#endif
     }
 }
 
