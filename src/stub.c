@@ -14,7 +14,7 @@
 void RegisterRamReset(u32 resetFlags) { puts("RegisterRamReset stub"); }
 void IntrMain(void) { puts("IntrMain stub"); }
 
-// 修复 ACCERR 崩溃：gInitialMainCB2 必须是真正的函数实体，以匹配主引擎的 extern void 声明
+// 确保 gInitialMainCB2 是正确的函数实体
 extern void CB2_InitCopyrightScreenAfterBootup(void);
 void gInitialMainCB2(void)
 {
@@ -59,14 +59,24 @@ void ply_tune(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
 void ply_port(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
 void ply_endtie(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
 
-// --- 4. 其它 ---
-// 保持安全的缓冲区大小，防止越界写破坏 BSS 全局段
-char SoundMainRAM[0x8000]; // 32KB
-char gMaxLines[0x400];
-char gNumMusicPlayers[0x400];
+// --- 4. 防灾防御隔离区 (Memory Padding Guard) ---
+// 利用 static 强制对齐的隔离缓冲区将可能发生越界写的符号隔离保护，阻止其伤害 .bss 中的核心变量
+
+static u8 SoundMainRAM_pad_before[0x4000] ALIGNED(8); // 前置防火墙 16KB
+char SoundMainRAM[0x40000] ALIGNED(8);                 // 极大化混音工作区为 256KB
+static u8 SoundMainRAM_pad_after[0x4000] ALIGNED(8);  // 后置防火墙 16KB
+
+static u8 gMaxLines_pad_before[0x1000] ALIGNED(8);
+char gMaxLines[0x100] ALIGNED(8);
+static u8 gMaxLines_pad_after[0x1000] ALIGNED(8);
+
+static u8 gNumMusicPlayers_pad_before[0x1000] ALIGNED(8);
+char gNumMusicPlayers[0x100] ALIGNED(8);
+static u8 gNumMusicPlayers_pad_after[0x1000] ALIGNED(8);
+
 s32 Div(s32 num, s32 denom) { return denom != 0 ? num / denom : 0; }
 
-// 确保物理快速拷贝执行
+// --- 5. 工具函数 ---
 void FastUnsafeCopy32(void *dst, const void *src, u32 size) {
     if (dst != NULL && src != NULL && size > 0) {
         memcpy(dst, src, size);
