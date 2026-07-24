@@ -25,6 +25,9 @@
 #include "constants/rgb.h"
 #include "constants/songs.h"
 
+// 引入 SDL_Log 声明，用于在安卓平台输出调试日志
+extern void SDL_Log(const char *fmt, ...);
+
 enum {
     TAG_VERSION = 1000,
     TAG_PRESS_START_COPYRIGHT,
@@ -565,9 +568,13 @@ void CB2_InitTitleScreen(void)
 {
     if (IS_FRLG)
     {
+        SDL_Log("CAN DEBUG: [CB2_InitTitleScreen] FRLG Game detected, redirecting to CB2_InitTitleScreenFrlg");
         CB2_InitTitleScreenFrlg();
         return;
     }
+
+    SDL_Log("CAN DEBUG: [CB2_InitTitleScreen] State = %d", gMain.state);
+
     switch (gMain.state)
     {
     default:
@@ -592,8 +599,10 @@ void CB2_InitTitleScreen(void)
         DmaFill16(3, 0, (void *)(PLTT + 2), PLTT_SIZE - 2);
         ResetPaletteFade();
         gMain.state = 1;
+        SDL_Log("CAN DEBUG: [CB2_InitTitleScreen] State 0 done. Transition to State 1.");
         break;
     case 1:
+        SDL_Log("CAN DEBUG: [CB2_InitTitleScreen] State 1 starting. Decompressing assets...");
         // bg2
         DecompressDataWithHeaderVram(gTitleScreenPokemonLogoGfx, (void *)(BG_CHAR_ADDR(0)));
         DecompressDataWithHeaderVram(gTitleScreenPokemonLogoTilemap, (void *)(BG_SCREEN_ADDR(9)));
@@ -615,9 +624,11 @@ void CB2_InitTitleScreen(void)
         LoadPalette(gTitleScreenEmeraldVersionPal, OBJ_PLTT_ID(0), PLTT_SIZE_4BPP);
         LoadSpritePalette(&sSpritePalette_PressStart[0]);
         gMain.state = 2;
+        SDL_Log("CAN DEBUG: [CB2_InitTitleScreen] State 1 done. Assets loaded, transition to State 2.");
         break;
     case 2:
     {
+        SDL_Log("CAN DEBUG: [CB2_InitTitleScreen] State 2 starting. Creating main title screen task...");
         u8 taskId = CreateTask(Task_TitleScreenPhase1, 0);
 
         gTasks[taskId].tCounter = 256;
@@ -625,14 +636,18 @@ void CB2_InitTitleScreen(void)
         gTasks[taskId].tPointless = -16;
         gTasks[taskId].tBg2Y = -32;
         gMain.state = 3;
+        SDL_Log("CAN DEBUG: [CB2_InitTitleScreen] State 2 done. Main task created, transition to State 3.");
         break;
     }
     case 3:
+        SDL_Log("CAN DEBUG: [CB2_InitTitleScreen] State 3 starting. Fading in palette...");
         BeginNormalPaletteFade(PALETTES_ALL, 1, 16, 0, RGB_WHITEALPHA);
         SetVBlankCallback(VBlankCB);
         gMain.state = 4;
+        SDL_Log("CAN DEBUG: [CB2_InitTitleScreen] State 3 done. VBlank CB configured, transition to State 4.");
         break;
     case 4:
+        SDL_Log("CAN DEBUG: [CB2_InitTitleScreen] State 4 starting. Registering display registers...");
         PanFadeAndZoomScreen(DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2, 0x100, 0);
         SetGpuReg(REG_OFFSET_BG2X_L, -29 * 256);
         SetGpuReg(REG_OFFSET_BG2X_H, -1);
@@ -651,19 +666,23 @@ void CB2_InitTitleScreen(void)
         SetGpuReg(REG_OFFSET_BG1CNT, BGCNT_PRIORITY(2) | BGCNT_CHARBASE(3) | BGCNT_SCREENBASE(27) | BGCNT_16COLOR | BGCNT_TXT256x256);
         SetGpuReg(REG_OFFSET_BG2CNT, BGCNT_PRIORITY(1) | BGCNT_CHARBASE(0) | BGCNT_SCREENBASE(9) | BGCNT_256COLOR | BGCNT_AFF256x256);
         EnableInterrupts(INTR_FLAG_VBLANK);
-        // CAN FIX: Added missing '|' bitwise operators for SetGpuReg DISPCNT configuration
+        
         SetGpuReg(REG_OFFSET_DISPCNT, DISPCNT_MODE_1 |
                                       DISPCNT_OBJ_1D_MAP |
                                       DISPCNT_BG2_ON |
                                       DISPCNT_OBJ_ON |
                                       DISPCNT_WIN0_ON |
                                       DISPCNT_OBJWIN_ON);
+        SDL_Log("CAN DEBUG: [CB2_InitTitleScreen] Play Emerald Title theme BGM...");
         m4aSongNumStart(MUS_TITLE);
         gMain.state = 5;
+        SDL_Log("CAN DEBUG: [CB2_InitTitleScreen] State 4 done. Transition to State 5.");
         break;
     case 5:
+        // SDL_Log(每一帧都可以省去，防刷屏，只在淡出完成时打印)
         if (!UpdatePaletteFade())
         {
+            SDL_Log("CAN DEBUG: [CB2_InitTitleScreen] State 5. Palette fade fully updated. Handing off MainCB2 to set MainCallback2.");
             StartPokemonLogoShine(SHINE_MODE_SINGLE_NO_BG_COLOR);
             ScanlineEffect_InitWave(0, DISPLAY_HEIGHT, 4, 4, 0, SCANLINE_EFFECT_REG_BG1HOFS, TRUE);
             SetMainCallback2(MainCB2);
@@ -686,6 +705,7 @@ static void Task_TitleScreenPhase1(u8 taskId)
     // Skip to next phase when A, B, Start, or Select is pressed
     if (JOY_NEW(A_B_START_SELECT) || gTasks[taskId].tSkipToNext)
     {
+        SDL_Log("CAN DEBUG: [Phase1] Skip requested! Keys detected: 0x%04X", gMain.newKeys);
         gTasks[taskId].tSkipToNext = TRUE;
         gTasks[taskId].tCounter = 0;
     }
@@ -694,14 +714,21 @@ static void Task_TitleScreenPhase1(u8 taskId)
     {
         u16 frameNum = gTasks[taskId].tCounter;
         if (frameNum == 176)
+        {
+            SDL_Log("CAN DEBUG: [Phase1] Trigger logo shine: DOUBLE");
             StartPokemonLogoShine(SHINE_MODE_DOUBLE);
+        }
         else if (frameNum == 64)
+        {
+            SDL_Log("CAN DEBUG: [Phase1] Trigger logo shine: SINGLE");
             StartPokemonLogoShine(SHINE_MODE_SINGLE);
+        }
 
         gTasks[taskId].tCounter--;
     }
     else
     {
+        SDL_Log("CAN DEBUG: [Phase1] Ended. Initializing Emerald Version banner and transitioning to Task_TitleScreenPhase2.");
         u8 spriteId;
 
         SetGpuReg(REG_OFFSET_DISPCNT, DISPCNT_MODE_1 | DISPCNT_OBJ_1D_MAP | DISPCNT_BG2_ON | DISPCNT_OBJ_ON);
@@ -736,6 +763,7 @@ static void Task_TitleScreenPhase2(u8 taskId)
     // Skip to next phase when A, B, Start, or Select is pressed
     if (JOY_NEW(A_B_START_SELECT) || gTasks[taskId].tSkipToNext)
     {
+        SDL_Log("CAN DEBUG: [Phase2] Skip requested! Keys detected: 0x%04X", gMain.newKeys);
         gTasks[taskId].tSkipToNext = TRUE;
         gTasks[taskId].tCounter = 0;
     }
@@ -746,11 +774,12 @@ static void Task_TitleScreenPhase2(u8 taskId)
     }
     else
     {
+        SDL_Log("CAN DEBUG: [Phase2] Ended. Spawning Press Start/Copyright banners and transitioning to Task_TitleScreenPhase3.");
         gTasks[taskId].tSkipToNext = TRUE;
         SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT1_BG1 | BLDCNT_EFFECT_BLEND | BLDCNT_TGT2_BG0 | BLDCNT_TGT2_BD);
         SetGpuReg(REG_OFFSET_BLDALPHA, BLDALPHA_BLEND(6, 15));
         SetGpuReg(REG_OFFSET_BLDY, 0);
-        // CAN FIX: Added missing '|' bitwise operators for SetGpuReg DISPCNT configuration
+        
         SetGpuReg(REG_OFFSET_DISPCNT, DISPCNT_MODE_1 |
                                       DISPCNT_OBJ_1D_MAP |
                                       DISPCNT_BG0_ON |
@@ -783,31 +812,34 @@ static void Task_TitleScreenPhase2(u8 taskId)
 static void Task_TitleScreenPhase3(u8 taskId)
 {
     if (QUICKSTART && JOY_NEW(SELECT_BUTTON))
+    {
+        SDL_Log("CAN DEBUG: [Phase3] QUICKSTART with SELECT button.");
         Quickstart();
+    }
 
     if (JOY_NEW(A_BUTTON) || JOY_NEW(START_BUTTON))
     {
-        SDL_Log("CAN DEBUG: [TitleScreen] JOY_NEW Triggered: A_BUTTON or START_BUTTON. Transitioning to Main Menu.");
+        SDL_Log("CAN DEBUG: [Phase3] Transition Triggered: A_BUTTON or START_BUTTON pressed. Transitioning to CB2_GoToMainMenu.");
         FadeOutBGM(4);
         BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 16, RGB_WHITEALPHA);
         SetMainCallback2(CB2_GoToMainMenu);
     }
     else if (JOY_HELD(CLEAR_SAVE_BUTTON_COMBO) == CLEAR_SAVE_BUTTON_COMBO)
     {
-        SDL_Log("CAN DEBUG: [TitleScreen] KEY_HELD Triggered: CLEAR_SAVE_BUTTON_COMBO. Transitioning to Clear Save Screen.");
+        SDL_Log("CAN DEBUG: [Phase3] Transition Triggered: CLEAR_SAVE_BUTTON_COMBO. Transitioning to CB2_GoToClearSaveDataScreen.");
         SetMainCallback2(CB2_GoToClearSaveDataScreen);
     }
     else if (JOY_HELD(RESET_RTC_BUTTON_COMBO) == RESET_RTC_BUTTON_COMBO
       && CanResetRTC() == TRUE)
     {
-        SDL_Log("CAN DEBUG: [TitleScreen] KEY_HELD Triggered: RESET_RTC_BUTTON_COMBO. Transitioning to Reset RTC Screen.");
+        SDL_Log("CAN DEBUG: [Phase3] Transition Triggered: RESET_RTC_BUTTON_COMBO. Transitioning to CB2_GoToResetRtcScreen.");
         FadeOutBGM(4);
         BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 16, RGB_BLACK);
         SetMainCallback2(CB2_GoToResetRtcScreen);
     }
     else if (JOY_HELD(BERRY_UPDATE_BUTTON_COMBO) == BERRY_UPDATE_BUTTON_COMBO)
     {
-        SDL_Log("CAN DEBUG: [TitleScreen] KEY_HELD Triggered: BERRY_UPDATE_BUTTON_COMBO. Transitioning to Berry Fix Screen.");
+        SDL_Log("CAN DEBUG: [Phase3] Transition Triggered: BERRY_UPDATE_BUTTON_COMBO. Transitioning to CB2_GoToBerryFixScreen.");
         FadeOutBGM(4);
         BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 16, RGB_BLACK);
         SetMainCallback2(CB2_GoToBerryFixScreen);
@@ -824,10 +856,12 @@ static void Task_TitleScreenPhase3(u8 taskId)
         }
         UpdateLegendaryMarkingColor(gTasks[taskId].tCounter);
         
-        // 关键心跳检测：判定 BGM 音频流是否已终止
-        if ((gMPlayInfo_BGM.status & 0xFFFF) == 0)
+        // 判定背景音乐（BGM）是否已被引擎判定为播放结束。 
+        // 在 GBA 模拟或没有正常向引擎喂中断心跳时，状态容易为 0，从而导致它频繁判断“BGM已播完，退回开头”。
+        u32 bgmStatus = gMPlayInfo_BGM.status & 0xFFFF;
+        if (bgmStatus == 0)
         {
-            SDL_Log("CAN DEBUG: [TitleScreen] Reset Condition Triggered! BGM.status is 0. Resetting back to Copyright screen.");
+            SDL_Log("CAN DEBUG: [Phase3] BGM status is 0 (Inactive/Finished). Reset loop triggered! Redirecting to CB2_GoToCopyrightScreen. (gMPlayInfo_BGM.status=0x%08X)", gMPlayInfo_BGM.status);
             BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 16, RGB_WHITEALPHA);
             SetMainCallback2(CB2_GoToCopyrightScreen);
         }
@@ -836,32 +870,50 @@ static void Task_TitleScreenPhase3(u8 taskId)
 
 static void CB2_GoToMainMenu(void)
 {
+    SDL_Log("CAN DEBUG: [CB2_GoToMainMenu] Waiting for palette fade...");
     if (!UpdatePaletteFade())
+    {
+        SDL_Log("CAN DEBUG: [CB2_GoToMainMenu] Palette fade done. Handing off to CB2_InitMainMenu.");
         SetMainCallback2(CB2_InitMainMenu);
+    }
 }
 
 static void CB2_GoToCopyrightScreen(void)
 {
+    SDL_Log("CAN DEBUG: [CB2_GoToCopyrightScreen] Waiting for palette fade...");
     if (!UpdatePaletteFade())
+    {
+        SDL_Log("CAN DEBUG: [CB2_GoToCopyrightScreen] Palette fade done. Handing off to CB2_InitCopyrightScreenAfterTitleScreen.");
         SetMainCallback2(CB2_InitCopyrightScreenAfterTitleScreen);
+    }
 }
 
 static void CB2_GoToClearSaveDataScreen(void)
 {
+    SDL_Log("CAN DEBUG: [CB2_GoToClearSaveDataScreen] Waiting for palette fade...");
     if (!UpdatePaletteFade())
+    {
+        SDL_Log("CAN DEBUG: [CB2_GoToClearSaveDataScreen] Palette fade done. Handing off to CB2_InitClearSaveDataScreen.");
         SetMainCallback2(CB2_InitClearSaveDataScreen);
+    }
 }
 
 static void CB2_GoToResetRtcScreen(void)
 {
+    SDL_Log("CAN DEBUG: [CB2_GoToResetRtcScreen] Waiting for palette fade...");
     if (!UpdatePaletteFade())
+    {
+        SDL_Log("CAN DEBUG: [CB2_GoToResetRtcScreen] Palette fade done. Handing off to CB2_InitResetRtcScreen.");
         SetMainCallback2(CB2_InitResetRtcScreen);
+    }
 }
 
 static void CB2_GoToBerryFixScreen(void)
 {
+    SDL_Log("CAN DEBUG: [CB2_GoToBerryFixScreen] Waiting for palette fade...");
     if (!UpdatePaletteFade())
     {
+        SDL_Log("CAN DEBUG: [CB2_GoToBerryFixScreen] Palette fade done. Handing off to CB2_InitBerryFixProgram.");
         m4aMPlayAllStop();
         SetMainCallback2(CB2_InitBerryFixProgram);
     }
