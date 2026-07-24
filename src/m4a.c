@@ -4,7 +4,7 @@
 
 #ifdef PORTABLE
     #include "cgb_audio.h"
-    // 引用由 m4a_tables.c 导出的标准 MIDI 指令跳转表模板
+    // 引用标准跳转表模板
     extern const MPlayFunc gMPlayJumpTableTemplate[36];
     extern void SDL_Log(const char *fmt, ...);
 #endif
@@ -76,6 +76,7 @@ void MPlayFadeOut(struct MusicPlayerInfo *mplayInfo, u16 speed)
 void m4aSoundInit(void)
 {
     s32 i;
+    SDL_Log("CAN DEBUG: [m4a] m4aSoundInit starting...");
 
     SoundInit(&gSoundInfo);
     MPlayExtender(gCgbChans);
@@ -101,29 +102,43 @@ void m4aSoundInit(void)
         MPlayOpen(mplayInfo, track, 2);
         track->chan = 0;
     }
+    SDL_Log("CAN DEBUG: [m4a] m4aSoundInit finished.");
 }
 
 void m4aSoundMain(void)
 {
+    struct SoundInfo *soundInfo = SOUND_INFO_PTR;
+    
+#ifdef PORTABLE
+    u32 preStatus = gMPlayInfo_BGM.status;
+#endif
+
 #ifndef PORTABLE
     SoundMain();
 #else
     extern void RunMixerFrame(void);
-    struct SoundInfo *soundInfo = SOUND_INFO_PTR;
     
-    // 显式调用 MPlayMain 驱动音轨状态更新，避免依赖 RunMixerFrame 中不确定的结构体偏移量强制转换
+    // 显式驱动 MPlayMain 音频序列器，更新 MIDI 轨道
     if (soundInfo && soundInfo->MPlayMainHead && soundInfo->musicPlayerHead)
     {
-        struct MusicPlayerInfo *bgm = soundInfo->musicPlayerHead;
-        soundInfo->MPlayMainHead(bgm);
+        soundInfo->MPlayMainHead(soundInfo->musicPlayerHead);
     }
     
     RunMixerFrame();
+#endif
+
+#ifdef PORTABLE
+    // 监控 BGM 状态在每帧 VBlank 期间的改变情况
+    if (gMPlayInfo_BGM.status != preStatus)
+    {
+        SDL_Log("CAN DEBUG: [m4aSoundMain] BGM status changed: 0x%08X -> 0x%08X", preStatus, gMPlayInfo_BGM.status);
+    }
 #endif
 }
 
 void m4aSongNumStart(u16 n)
 {
+    SDL_Log("CAN DEBUG: [m4a] m4aSongNumStart requested for SongNum: %d", n);
     const struct MusicPlayer *mplayTable = gMPlayTable;
     const struct Song *songTable = gSongTable;
     const struct Song *song = &songTable[n];
@@ -134,6 +149,7 @@ void m4aSongNumStart(u16 n)
 
 void m4aSongNumStartOrChange(u16 n)
 {
+    SDL_Log("CAN DEBUG: [m4a] m4aSongNumStartOrChange requested for SongNum: %d", n);
     const struct MusicPlayer *mplayTable = gMPlayTable;
     const struct Song *songTable = gSongTable;
     const struct Song *song = &songTable[n];
@@ -170,6 +186,7 @@ static void UNUSED m4aSongNumStartOrContinue(u16 n)
 
 void m4aSongNumStop(u16 n)
 {
+    SDL_Log("CAN DEBUG: [m4a] m4aSongNumStop requested for SongNum: %d", n);
     const struct MusicPlayer *mplayTable = gMPlayTable;
     const struct Song *songTable = gSongTable;
     const struct Song *song = &songTable[n];
@@ -193,6 +210,7 @@ static void UNUSED m4aSongNumContinue(u16 n)
 void m4aMPlayAllStop(void)
 {
     s32 i;
+    SDL_Log("CAN DEBUG: [m4a] m4aMPlayAllStop called.");
 
     for (i = 0; i < NUM_MUSIC_PLAYERS; i++)
         m4aMPlayStop(gMPlayTable[i].info);
@@ -219,6 +237,7 @@ void m4aMPlayAllContinue(void)
 
 void m4aMPlayFadeOut(struct MusicPlayerInfo *mplayInfo, u16 speed)
 {
+    SDL_Log("CAN DEBUG: [m4a] m4aMPlayFadeOut called. MPlayInfo = %p, Speed = %d", (void*)mplayInfo, speed);
     MPlayFadeOut(mplayInfo, speed);
 }
 
@@ -236,6 +255,7 @@ void m4aMPlayFadeOutTemporarily(struct MusicPlayerInfo *mplayInfo, u16 speed)
 
 void m4aMPlayFadeIn(struct MusicPlayerInfo *mplayInfo, u16 speed)
 {
+    SDL_Log("CAN DEBUG: [m4a] m4aMPlayFadeIn called. MPlayInfo = %p, Speed = %d", (void*)mplayInfo, speed);
     if (mplayInfo->ident == ID_NUMBER)
     {
         mplayInfo->ident++;
@@ -426,7 +446,13 @@ void SoundInit(struct SoundInfo *soundInfo)
 #ifndef PORTABLE
     MPlayJumpTableCopy(gMPlayJumpTable);
 #else
-    // CAN FIX: 在 PORTABLE 模式下，直接复制 C 版本的跳转表，防止因表为空导致序列器 MPlayMain 奔溃或立刻退出
+    // 核心排查：打印跳转表模板内容以确定是否为全 0
+    SDL_Log("CAN DEBUG: [SoundInit] Template index 0: %p, index 22 (ply_note): %p, index 34: %p",
+            (void*)gMPlayJumpTableTemplate[0],
+            (void*)gMPlayJumpTableTemplate[22],
+            (void*)gMPlayJumpTableTemplate[34]);
+
+    // 在 PORTABLE 模式下拷贝 C 版本的跳转表，规避 BIOS ROM 地址越界保护
     memcpy(gMPlayJumpTable, gMPlayJumpTableTemplate, 36 * sizeof(MPlayFunc));
 #endif
 
@@ -521,7 +547,7 @@ void m4aSoundMode(u32 mode)
     if (temp)
         soundInfo->masterVolume = temp >> SOUND_MODE_MASVOL_SHIFT;
 
-    temp = mode & SOUND_MODE_DA_BIT;
+    temp = mode & SOUND_MODE_DA;
 
     if (temp)
     {
@@ -645,13 +671,10 @@ void MPlayOpen(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *track
         tracks++;
     }
 
-    // append music player and MPlayMain to linked list
-
     if (soundInfo->MPlayMainHead != NULL)
     {
         mplayInfo->MPlayMainNext = soundInfo->MPlayMainHead;
         mplayInfo->musicPlayerNext = soundInfo->musicPlayerHead;
-        // NULL assignment semantically useless, but required for match
         soundInfo->MPlayMainHead = NULL;
     }
 
@@ -671,6 +694,9 @@ void MPlayStart(struct MusicPlayerInfo *mplayInfo, struct SongHeader *songHeader
         return;
 
     unk_B = mplayInfo->unk_B;
+
+    SDL_Log("CAN DEBUG: [MPlayStart] Requesting start. Priority=%d, Current BGM Priority=%d, Status=0x%08X",
+            songHeader->priority, mplayInfo->priority, mplayInfo->status);
 
     if (!unk_B ||
         ((!mplayInfo->songHeader || !(mplayInfo->tracks[0].flags & MPT_FLG_START)) &&
@@ -715,6 +741,11 @@ void MPlayStart(struct MusicPlayerInfo *mplayInfo, struct SongHeader *songHeader
             m4aSoundMode(songHeader->reverb);
 
         mplayInfo->ident = ID_NUMBER;
+        SDL_Log("CAN DEBUG: [MPlayStart] Start completed. SongHeader=%p, status initialized to 0", (void*)songHeader);
+    }
+    else
+    {
+        SDL_Log("CAN DEBUG: [MPlayStart] WARNING: BGM Start rejected due to priority check.");
     }
 }
 
@@ -935,7 +966,6 @@ void CgbOscOff(u8 chanNum)
 
 static inline int ChnVolSetAsm(struct MusicPlayerTrack *track, struct SoundChannel *chan)
 {
-    // C version of ChnVolSetAsm used in portable/c targets
     s32 velocity = chan->velocity;
     s32 rhythmPan = (s8)chan->rhythmPan;
     s32 right = 0x80 + rhythmPan;
@@ -1255,8 +1285,6 @@ void CgbSound(void)
         }
 
     envelope_step_complete:
-        // every 15 frames, envelope calculation has to be done twice
-        // to keep up with the hardware envelope rate (1/64 s)
         channels->envelopeCounter--;
         if (prevC15 == 0)
         {

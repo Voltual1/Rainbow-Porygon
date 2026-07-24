@@ -1,4 +1,83 @@
+#include "global.h"
 #include "gba/m4a_internal.h"
+
+// 显式声明所有 MIDI 处理器 C 函数
+extern void ply_fine(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_goto(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_patt(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_pend(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_rept(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_memacc(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_prio(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_tempo(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_keysh(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_voice(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_vol(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_pan(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_bend(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_bendr(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_lfos(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_lfodl(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_mod(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_modt(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_tune(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_port(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_xcmd(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_endtie(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_note(u32, struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_xxx(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_xwave(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_xtype(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_xatta(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_xdeca(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_xsust(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_xrele(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_xiecv(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_xiecl(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_xleng(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_xswee(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_xwait(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+extern void ply_xcmd_0D(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
+
+// 定义适用于跨平台的 C 指令集跳转表模板
+const MPlayFunc gMPlayJumpTableTemplate[36] = {
+    (MPlayFunc)ply_fine,
+    (MPlayFunc)ply_goto,
+    (MPlayFunc)ply_patt,
+    (MPlayFunc)ply_pend,
+    (MPlayFunc)ply_rept,
+    (MPlayFunc)ply_prio,
+    (MPlayFunc)ply_tempo,
+    (MPlayFunc)ply_keysh,
+    (MPlayFunc)ply_memacc,
+    (MPlayFunc)ply_voice,
+    (MPlayFunc)ply_vol,
+    (MPlayFunc)ply_pan,
+    (MPlayFunc)ply_bend,
+    (MPlayFunc)ply_bendr,
+    (MPlayFunc)ply_lfos,
+    (MPlayFunc)ply_lfodl,
+    (MPlayFunc)ply_mod,
+    (MPlayFunc)ply_modt,
+    (MPlayFunc)ply_tune,
+    (MPlayFunc)ply_port,
+    (MPlayFunc)ply_xcmd,
+    (MPlayFunc)ply_endtie,
+    (MPlayFunc)ply_note,
+    (MPlayFunc)ply_xxx,
+    (MPlayFunc)ply_xwave,
+    (MPlayFunc)ply_xtype,
+    (MPlayFunc)ply_xatta,
+    (MPlayFunc)ply_xdeca,
+    (MPlayFunc)ply_xsust,
+    (MPlayFunc)ply_xrele,
+    (MPlayFunc)ply_xiecv,
+    (MPlayFunc)ply_xiecl,
+    (MPlayFunc)ply_xleng,
+    (MPlayFunc)ply_xswee,
+    (MPlayFunc)ply_xwait,
+    (MPlayFunc)ply_xcmd_0D
+};
 
 // Some of these functions have different signatures, so we need to make this
 // an array of void pointers or a struct. It's simpler to just make it an array
