@@ -101,9 +101,10 @@ int main(int argc, char **argv)
     SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
     SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
 #endif
+    // CAN FIX: Added missing '|' for SDL_INIT_GAMECONTROLLER
     if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO
 #ifdef __ANDROID__
- SDL_INIT_GAMECONTROLLER
+ | SDL_INIT_GAMECONTROLLER
 #endif
                 ) < 0)
     {
@@ -863,7 +864,7 @@ static void DrawTouchControls(void)
     DrawControlRect((SDL_Rect){dpadX - dpadUnit * 3 / 2, dpadY - dpadUnit / 2,
                                dpadUnit, dpadUnit}, touchKeys & DPAD_LEFT, NULL);
     DrawControlRect((SDL_Rect){dpadX + dpadUnit / 2, dpadY - dpadUnit / 2,
-                               dpadUnit, dpadUnit}, touchKeys & DPAD_RIGHT, NULL);
+                          dpadUnit, dpadUnit}, touchKeys & DPAD_RIGHT, NULL);
     DrawControlRect((SDL_Rect){windowWidth - sideWidth / 4 - buttonSize,
                                windowHeight * 58 / 100, buttonSize, buttonSize}, touchKeys & A_BUTTON, "A");
     DrawControlRect((SDL_Rect){windowWidth - sideWidth + sideWidth / 4,
