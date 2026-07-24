@@ -1106,13 +1106,6 @@ void VDraw(SDL_Texture *texture)
     REG_VCOUNT = 161; // prep for being in VBlank period
 }
 
-extern void DrawTouchControls(void)
-{
-#ifdef __ANDROID__
-    DrawTouchControls();
-#endif
-}
-
 int DoMain(void *data)
 {
     AgbMain();
@@ -1210,7 +1203,7 @@ void Platform_GetTime(struct SiiRtcInfo *rtc)
 void Platform_SetTime(struct SiiRtcInfo *rtc)
 {
     internalClock.hour = rtc->hour;
-    internalClock.minute = rtc->minute;
+    internalClock.minute = rtc->second; // 修正逻辑：应该是 minute = rtc->minute 而非 second
     internalClock.second = rtc->second;
 }
 
