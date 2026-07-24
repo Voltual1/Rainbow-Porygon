@@ -181,12 +181,28 @@ static void CallCallbacks(void)
     if (gMain.callback1)
         gMain.callback1();
 
-    if (gMain.callback2)
+    if (gMain.callback2) {
         gMain.callback2();
+    } else {
+        // 如果心脏停跳，疯狂报警！
+        SDL_Log("CAN DEBUG: [Main] ENGINE DEAD! CB2 is NULL during CallCallbacks!");
+        
+        // 强制复苏尝试（仅作测试）：强制踢回版权初始化屏幕
+        extern void CB2_InitCopyrightScreenAfterBootup(void);
+        SDL_Log("CAN DEBUG: [Main] Attempting CPR... Forcing CB2 to CB2_InitCopyrightScreenAfterBootup");
+        SetMainCallback2(CB2_InitCopyrightScreenAfterBootup);
+    }
 }
 
 void SetMainCallback2(MainCallback callback)
 {
+    SDL_Log("CAN DEBUG: [Main] SetMainCallback2 called! Old CB2=%p, New CB2=%p", 
+            (void*)gMain.callback2, (void*)callback);
+            
+    if (callback == NULL) {
+        SDL_Log("CAN DEBUG: [Main] FATAL WARNING! Someone explicitly set CB2 to NULL!");
+    }
+    
     gMain.callback2 = callback;
     gMain.state = 0;
 }
