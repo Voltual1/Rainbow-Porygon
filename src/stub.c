@@ -63,7 +63,6 @@ void ply_endtie(struct MusicPlayerInfo *m, struct MusicPlayerTrack *t) {}
 char SoundMainRAM[0x8000]; // 32KB
 char gMaxLines[0x400];
 char gNumMusicPlayers[0x400];
-u8 gMPlayMemAccArea[0x400]; // 头文件中为 u8[]，保持 u8
 s32 Div(s32 num, s32 denom) { return denom != 0 ? num / denom : 0; }
 
 // 修复 Stub: 确保物理快速拷贝执行
