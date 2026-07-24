@@ -204,7 +204,13 @@ struct SoundInfo
     u8 maxLines;
     u8 gap[3];
     s32 pcmSamplesPerVBlank;
-    s32 pcmFreq;       
+    s32 pcmFreq;
+    
+    // 增加 sampleRateReciprocal 联合体，以便跨平台浮点混音器正确读写倒数频率值
+    union {
+        s32 divFreq;
+        float sampleRateReciprocal;
+    };
 
     struct CgbChannel *cgbChans;
     MPlayMainFunc MPlayMainHead;
@@ -218,11 +224,11 @@ struct SoundInfo
     u8 gap2[16];
     struct SoundChannel chans[MAX_DIRECTSOUND_CHANNELS];
 
-    // 核心修复：联合体化 pcmBuffer 并且将大小扩充至浮点混音器 outBuffer 的实际大小 (4907 * 2 * sizeof(float))
-    // 从而使 gSoundInfo 占用的内存完美匹配 SoundMixerState，阻止越界覆盖 .bss 段核心内存的灾难
-     // 增加 sampleRateReciprocal 联合体，以便跨平台浮点混音器正确读写倒数频率值
+    // 核心修复：联合体化 pcmBuffer 并在 pcmBuffer 字段上显式加上 4 字节对齐
+    // 1. 满足 CpuFill32 展开后 Clang 的 _Alignof(soundInfo->pcmBuffer) >= 4 断言
+    // 2. 使 gSoundInfo 占用的内存匹配 SoundMixerState，防止越界覆盖 .bss 段
     union {
-        s8 pcmBuffer[PCM_DMA_BUF_SIZE * 2] ALIGNED(4); // 将对齐直接写在 pcmBuffer 声明上
+        s8 pcmBuffer[PCM_DMA_BUF_SIZE * 2] __attribute__((aligned(4)));
         float outBuffer[4907 * 2];
     };
 };
