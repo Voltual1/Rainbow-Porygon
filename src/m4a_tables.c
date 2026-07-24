@@ -39,45 +39,45 @@ extern void ply_xswee(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
 extern void ply_xwait(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
 extern void ply_xcmd_0D(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
 
-// CAN FIX: 将原版中 gMPlayJumpTableTemplate 声明为正确的 MPlayFunc[36] 类型，以解决重定义和类型不兼容问题
+// 定义适用于跨平台的 C 指令集跳转表模板（统一修改为 MPlayFunc[36] 类型以避免 redefinition 错误）
 const MPlayFunc gMPlayJumpTableTemplate[36] =
 {
-    (MPlayFunc)ply_fine,
-    (MPlayFunc)ply_goto,
-    (MPlayFunc)ply_patt,
-    (MPlayFunc)ply_pend,
-    (MPlayFunc)ply_rept,
-    (MPlayFunc)ply_fine,
-    (MPlayFunc)ply_fine,
-    (MPlayFunc)ply_fine,
-    (MPlayFunc)ply_fine,
-    (MPlayFunc)ply_prio,
-    (MPlayFunc)ply_tempo,
-    (MPlayFunc)ply_keysh,
-    (MPlayFunc)ply_voice,
-    (MPlayFunc)ply_vol,
-    (MPlayFunc)ply_pan,
-    (MPlayFunc)ply_bend,
-    (MPlayFunc)ply_bendr,
-    (MPlayFunc)ply_lfos,
-    (MPlayFunc)ply_lfodl,
-    (MPlayFunc)ply_mod,
-    (MPlayFunc)ply_modt,
-    (MPlayFunc)ply_fine,
-    (MPlayFunc)ply_fine,
-    (MPlayFunc)ply_tune,
-    (MPlayFunc)ply_fine,
-    (MPlayFunc)ply_fine,
-    (MPlayFunc)ply_fine,
-    (MPlayFunc)ply_port,
-    (MPlayFunc)ply_fine,
-    (MPlayFunc)ply_endtie,
-    (MPlayFunc)SampleFreqSet,
-    (MPlayFunc)TrackStop,
-    (MPlayFunc)FadeOutBody,
-    (MPlayFunc)TrkVolPitSet,
-    (MPlayFunc)RealClearChain,
-    (MPlayFunc)SoundMainBTM,
+    (MPlayFunc)ply_fine,        // 0
+    (MPlayFunc)ply_goto,        // 1
+    (MPlayFunc)ply_patt,        // 2
+    (MPlayFunc)ply_pend,        // 3
+    (MPlayFunc)ply_rept,        // 4
+    (MPlayFunc)ply_fine,        // 5
+    (MPlayFunc)ply_fine,        // 6
+    (MPlayFunc)ply_fine,        // 7
+    (MPlayFunc)ply_fine,        // 8
+    (MPlayFunc)ply_prio,        // 9
+    (MPlayFunc)ply_tempo,       // 10
+    (MPlayFunc)ply_keysh,       // 11
+    (MPlayFunc)ply_voice,       // 12
+    (MPlayFunc)ply_vol,         // 13
+    (MPlayFunc)ply_pan,         // 14
+    (MPlayFunc)ply_bend,        // 15
+    (MPlayFunc)ply_bendr,       // 16
+    (MPlayFunc)ply_lfos,        // 17
+    (MPlayFunc)ply_lfodl,       // 18
+    (MPlayFunc)ply_mod,         // 19
+    (MPlayFunc)ply_modt,        // 20
+    (MPlayFunc)ply_fine,        // 21
+    (MPlayFunc)ply_fine,        // 22
+    (MPlayFunc)ply_tune,        // 23
+    (MPlayFunc)ply_fine,        // 24
+    (MPlayFunc)ply_fine,        // 25
+    (MPlayFunc)ply_fine,        // 26
+    (MPlayFunc)ply_port,        // 27
+    (MPlayFunc)ply_fine,        // 28
+    (MPlayFunc)ply_endtie,      // 29
+    (MPlayFunc)SampleFreqSet,   // 30
+    (MPlayFunc)TrackStop,       // 31
+    (MPlayFunc)FadeOutBody,     // 32
+    (MPlayFunc)TrkVolPitSet,    // 33
+    (MPlayFunc)RealClearChain,  // 34
+    (MPlayFunc)SoundMainBTM     // 35
 };
 
 // This is a table of deltas between sample values in compressed PCM data.
@@ -147,7 +147,7 @@ const u16 gPcmSamplesPerVBlankTable[] =
     352,
     448,
     528,
-logcat_2026-07-24_19-45-47.txt    608,
+    608, // CAN FIX: 移除了多余的 txt 文件名错误行
     672,
     704,
 };
