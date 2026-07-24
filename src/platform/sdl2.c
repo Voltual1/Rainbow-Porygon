@@ -103,7 +103,7 @@ int main(int argc, char **argv)
 #endif
     if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO
 #ifdef __ANDROID__
- | SDL_INIT_GAMECONTROLLER
+ SDL_INIT_GAMECONTROLLER
 #endif
                 ) < 0)
     {
@@ -360,6 +360,16 @@ int main(int argc, char **argv)
                     REG_DISPSTAT |= INTR_FLAG_VBLANK;
 
                     RunDMAs(DMA_HBLANK);
+
+                    // 1. 模拟触发 V-Count 中断 (第 150 行触发线)，驱动音频系统的主心跳，更新 m4a 播放器状态
+                    REG_VCOUNT = 150;
+                    if (gIntrTable[0] != NULL)
+                    {
+                        gIntrTable[0]();
+                    }
+
+                    // 2. 准备恢复到 V-Blank 扫描线并触发 V-Blank 中断
+                    REG_VCOUNT = 161; // prep for being in VBlank period
 
                     // 修复核心：在 portable 平台无条件、高可靠地触发 VBLANK 中断，防止淡入状态机死锁
                     if (gIntrTable[4] != NULL)

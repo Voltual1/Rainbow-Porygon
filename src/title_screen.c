@@ -490,9 +490,9 @@ static void SpriteCB_PokemonLogoShine(struct Sprite *sprite)
             // Flash the background green for 4 frames of movement.
             // Otherwise use the updating color.
             if (sprite->x == DISPLAY_WIDTH / 2 + (3 * SHINE_SPEED)
-             || sprite->x == DISPLAY_WIDTH / 2 + (4 * SHINE_SPEED)
-             || sprite->x == DISPLAY_WIDTH / 2 + (5 * SHINE_SPEED)
-             || sprite->x == DISPLAY_WIDTH / 2 + (6 * SHINE_SPEED))
+|| sprite->x == DISPLAY_WIDTH / 2 + (4 * SHINE_SPEED)
+|| sprite->x == DISPLAY_WIDTH / 2 + (5 * SHINE_SPEED)
+|| sprite->x == DISPLAY_WIDTH / 2 + (6 * SHINE_SPEED))
                 gPlttBufferFaded[0] = RGB(24, 31, 12);
             else
                 gPlttBufferFaded[0] = backgroundColor;
@@ -652,11 +652,11 @@ void CB2_InitTitleScreen(void)
         SetGpuReg(REG_OFFSET_BG2CNT, BGCNT_PRIORITY(1) | BGCNT_CHARBASE(0) | BGCNT_SCREENBASE(9) | BGCNT_256COLOR | BGCNT_AFF256x256);
         EnableInterrupts(INTR_FLAG_VBLANK);
         SetGpuReg(REG_OFFSET_DISPCNT, DISPCNT_MODE_1
-                                    | DISPCNT_OBJ_1D_MAP
-                                    | DISPCNT_BG2_ON
-                                    | DISPCNT_OBJ_ON
-                                    | DISPCNT_WIN0_ON
-                                    | DISPCNT_OBJWIN_ON);
+ DISPCNT_OBJ_1D_MAP
+ DISPCNT_BG2_ON
+ DISPCNT_OBJ_ON
+ DISPCNT_WIN0_ON
+ DISPCNT_OBJWIN_ON);
         m4aSongNumStart(MUS_TITLE);
         gMain.state = 5;
         break;
@@ -750,11 +750,11 @@ static void Task_TitleScreenPhase2(u8 taskId)
         SetGpuReg(REG_OFFSET_BLDALPHA, BLDALPHA_BLEND(6, 15));
         SetGpuReg(REG_OFFSET_BLDY, 0);
         SetGpuReg(REG_OFFSET_DISPCNT, DISPCNT_MODE_1
-                                    | DISPCNT_OBJ_1D_MAP
-                                    | DISPCNT_BG0_ON
-                                    | DISPCNT_BG1_ON
-                                    | DISPCNT_BG2_ON
-                                    | DISPCNT_OBJ_ON);
+ DISPCNT_OBJ_1D_MAP
+ DISPCNT_BG0_ON
+ DISPCNT_BG1_ON
+ DISPCNT_BG2_ON
+ DISPCNT_OBJ_ON);
         CreatePressStartBanner(START_BANNER_X, 108);
         CreateCopyrightBanner(START_BANNER_X, 148);
         if (QUICKSTART && QUICKSTART_HUD)
@@ -785,23 +785,27 @@ static void Task_TitleScreenPhase3(u8 taskId)
 
     if (JOY_NEW(A_BUTTON) || JOY_NEW(START_BUTTON))
     {
+        SDL_Log("CAN DEBUG: [TitleScreen] JOY_NEW Triggered: A_BUTTON or START_BUTTON. Transitioning to Main Menu.");
         FadeOutBGM(4);
         BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 16, RGB_WHITEALPHA);
         SetMainCallback2(CB2_GoToMainMenu);
     }
     else if (JOY_HELD(CLEAR_SAVE_BUTTON_COMBO) == CLEAR_SAVE_BUTTON_COMBO)
     {
+        SDL_Log("CAN DEBUG: [TitleScreen] KEY_HELD Triggered: CLEAR_SAVE_BUTTON_COMBO. Transitioning to Clear Save Screen.");
         SetMainCallback2(CB2_GoToClearSaveDataScreen);
     }
     else if (JOY_HELD(RESET_RTC_BUTTON_COMBO) == RESET_RTC_BUTTON_COMBO
       && CanResetRTC() == TRUE)
     {
+        SDL_Log("CAN DEBUG: [TitleScreen] KEY_HELD Triggered: RESET_RTC_BUTTON_COMBO. Transitioning to Reset RTC Screen.");
         FadeOutBGM(4);
         BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 16, RGB_BLACK);
         SetMainCallback2(CB2_GoToResetRtcScreen);
     }
     else if (JOY_HELD(BERRY_UPDATE_BUTTON_COMBO) == BERRY_UPDATE_BUTTON_COMBO)
     {
+        SDL_Log("CAN DEBUG: [TitleScreen] KEY_HELD Triggered: BERRY_UPDATE_BUTTON_COMBO. Transitioning to Berry Fix Screen.");
         FadeOutBGM(4);
         BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 16, RGB_BLACK);
         SetMainCallback2(CB2_GoToBerryFixScreen);
@@ -817,8 +821,11 @@ static void Task_TitleScreenPhase3(u8 taskId)
             gBattle_BG1_X = 0;
         }
         UpdateLegendaryMarkingColor(gTasks[taskId].tCounter);
+        
+        // 关键心跳检测：判定 BGM 音频流是否已终止
         if ((gMPlayInfo_BGM.status & 0xFFFF) == 0)
         {
+            SDL_Log("CAN DEBUG: [TitleScreen] Reset Condition Triggered! BGM.status is 0. Resetting back to Copyright screen.");
             BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 16, RGB_WHITEALPHA);
             SetMainCallback2(CB2_GoToCopyrightScreen);
         }
