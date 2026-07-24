@@ -86,8 +86,8 @@ void AgbMain(void)
     *(vu16 *)BG_PLTT = RGB_WHITE; 
     InitGpuRegManager();
     REG_WAITCNT = WAITCNT_PREFETCH_ENABLE
- | WAITCNT_WS0_S_1 | WAITCNT_WS0_N_3
- | WAITCNT_WS1_S_1 | WAITCNT_WS1_N_3;
+    | WAITCNT_WS0_S_1 | WAITCNT_WS0_N_3
+    | WAITCNT_WS1_S_1 | WAITCNT_WS1_N_3;
     InitKeys();
     InitIntrHandlers();
     m4aSoundInit();
@@ -122,12 +122,8 @@ void AgbMainLoop(void)
     int loopCount = 0;
     for (;;)
     {
-        if (loopCount % 60 == 0)
-        {
-            // 【终极状态探针】：每秒打印一次当前的执行状态和回调函数地址！
-            SDL_Log("CAN DEBUG: [AgbMainLoop] Frame=%d, State=%d, CB1=%p, CB2=%p", 
-                    loopCount, gMain.state, (void*)gMain.callback1, (void*)gMain.callback2);
-        }
+        SDL_Log("CAN DEBUG: [AgbMainLoop] LoopStart. Frame=%d, State=%d, CB2=%p", 
+                loopCount, gMain.state, (void*)gMain.callback2);
         loopCount++;
 
         ReadKeys();
@@ -155,7 +151,10 @@ void AgbMainLoop(void)
 
         PlayTimeCounter_Update();
         MapMusicMain();
+        
+        SDL_Log("CAN DEBUG: [AgbMainLoop] Before WaitForVBlank. CB2=%p", (void*)gMain.callback2);
         WaitForVBlank();
+        SDL_Log("CAN DEBUG: [AgbMainLoop] After WaitForVBlank. CB2=%p", (void*)gMain.callback2);
     }
 }
 
@@ -178,31 +177,24 @@ static void InitMainCallbacks(void)
 
 static void CallCallbacks(void)
 {
-    if (gMain.callback1)
+    if (gMain.callback1) {
+        SDL_Log("CAN DEBUG: [CallCallbacks] Calling CB1=%p", (void*)gMain.callback1);
         gMain.callback1();
+        SDL_Log("CAN DEBUG: [CallCallbacks] Returned from CB1. CB2=%p", (void*)gMain.callback2);
+    }
 
     if (gMain.callback2) {
+        SDL_Log("CAN DEBUG: [CallCallbacks] Calling CB2=%p", (void*)gMain.callback2);
         gMain.callback2();
+        SDL_Log("CAN DEBUG: [CallCallbacks] Returned from CB2. CB2=%p", (void*)gMain.callback2);
     } else {
-        // 如果心脏停跳，疯狂报警！
-        SDL_Log("CAN DEBUG: [Main] ENGINE DEAD! CB2 is NULL during CallCallbacks!");
-        
-        // 强制复苏尝试（仅作测试）：强制踢回版权初始化屏幕
-        extern void CB2_InitCopyrightScreenAfterBootup(void);
-        SDL_Log("CAN DEBUG: [Main] Attempting CPR... Forcing CB2 to CB2_InitCopyrightScreenAfterBootup");
-        SetMainCallback2(CB2_InitCopyrightScreenAfterBootup);
+        SDL_Log("CAN DEBUG: [CallCallbacks] WARNING! CB2 is NULL during CallCallbacks!");
     }
 }
 
 void SetMainCallback2(MainCallback callback)
 {
-    SDL_Log("CAN DEBUG: [Main] SetMainCallback2 called! Old CB2=%p, New CB2=%p", 
-            (void*)gMain.callback2, (void*)callback);
-            
-    if (callback == NULL) {
-        SDL_Log("CAN DEBUG: [Main] FATAL WARNING! Someone explicitly set CB2 to NULL!");
-    }
-    
+    SDL_Log("CAN DEBUG: [SetMainCallback2] Changing CB2 from %p to %p", (void*)gMain.callback2, (void*)callback);
     gMain.callback2 = callback;
     gMain.state = 0;
 }
@@ -354,6 +346,7 @@ void SetSerialCallback(IntrCallback callback)
 
 static void VBlankIntr(void)
 {
+    SDL_Log("CAN DEBUG: [VBlankIntr] Start. CB2=%p", (void*)gMain.callback2);
     if (gWirelessCommType != 0)
         RfuVSync();
     else if (gLinkVSyncDisabled == FALSE)
@@ -369,12 +362,16 @@ static void VBlankIntr(void)
 
     gMain.vblankCounter2++;
 
+    SDL_Log("CAN DEBUG: [VBlankIntr] Before CopyBufferedValues. CB2=%p", (void*)gMain.callback2);
     CopyBufferedValuesToGpuRegs();
+    SDL_Log("CAN DEBUG: [VBlankIntr] Before ProcessDma3. CB2=%p", (void*)gMain.callback2);
     ProcessDma3Requests();
+    SDL_Log("CAN DEBUG: [VBlankIntr] After ProcessDma3. CB2=%p", (void*)gMain.callback2);
 
     gPcmDmaCounter = gSoundInfo.pcmDmaCounter;
 
     m4aSoundMain();
+    SDL_Log("CAN DEBUG: [VBlankIntr] After m4aSoundMain. CB2=%p", (void*)gMain.callback2);
     TryReceiveLinkBattleData();
 
     if (!gTestRunnerEnabled && (!gMain.inBattle || !(gBattleTypeFlags & (BATTLE_TYPE_LINK | BATTLE_TYPE_FRONTIER | BATTLE_TYPE_RECORDED))))
@@ -384,6 +381,7 @@ static void VBlankIntr(void)
 
     INTR_CHECK |= INTR_FLAG_VBLANK;
     gMain.intrCheck |= INTR_FLAG_VBLANK;
+    SDL_Log("CAN DEBUG: [VBlankIntr] End. CB2=%p", (void*)gMain.callback2);
 }
 
 void InitFlashTimer(void)
