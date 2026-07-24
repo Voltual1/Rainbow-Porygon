@@ -53,7 +53,7 @@ void RunMixerFrame(void) {
     #ifdef PORTABLE
         cgb_audio_generate(samplesPerFrame);
         
-        // CAN FIX: 将 CGB 的 PSG 音量输出与 DirectSound 的混音结果叠加
+        // CAN FIX: 将 CGB PSG PSG方波与噪声混音通道的数据合并到 DirectSound 的 float 混合音频流
         float *cgbBuffer = cgb_get_buffer();
         for (int i = 0; i < samplesPerFrame * 2; i++) {
             outBuffer[i] += cgbBuffer[i];
@@ -61,7 +61,7 @@ void RunMixerFrame(void) {
         
         // 将混音后渲染结果队列投递至跨平台底层 SDL 驱动
         extern void Platform_QueueAudio(float *audioBuffer, s32 samplesPerFrame);
-        Platform_QueueAudio(outBuffer, samplesPerFrame * 2 * sizeof(float));
+        Platform_QueueAudio(outBuffer, samplesPerFrame * 2 * (s32)sizeof(float));
     #endif
 }
 
