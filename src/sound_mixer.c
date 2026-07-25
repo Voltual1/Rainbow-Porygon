@@ -47,14 +47,8 @@ void RunMixerFrame(void) {
         }
     }
     
-    // CAN FIX: 致命双重 Tick 消除！
-    // 永远不要在混音器（RunMixerFrame）中驱动游戏层序列器，
-    // 因为这已经在 m4aSoundMain 里面精确驱动过了。
-    /*
-    if (mixer->firstPlayerFunc != NULL) {
-        mixer->firstPlayerFunc(mixer->firstPlayer);
-    }
-    */
+    // CAN FIX: 移除 double-tick 行为，不再此处反向调用 Sequencer。
+    // firstPlayerFunc 已由 m4aSoundMain() 统一驱动推进。
     
     mixer->cgbMixerFunc();
     
@@ -82,6 +76,7 @@ void RunMixerFrame(void) {
     #endif
 }
 
+//__attribute__((target("thumb")))
 void SampleMixer(struct SoundMixerState *mixer, u32 scanlineLimit, u16 samplesPerFrame, float *outBuffer, u8 dmaCounter, u16 maxBufSize) {
     u32 reverb = mixer->reverb;
     if (reverb) {
@@ -134,6 +129,7 @@ returnEarly:
     mixer->lockStatus = MIXER_UNLOCKED;
 }
 
+//__attribute__((target("thumb")))
 static inline bool32 TickEnvelope(struct MixerSource *chan, struct WaveData2 *wav) {
     u8 status = chan->status;
     if ((status & 0xC7) == 0) {
@@ -222,6 +218,7 @@ static inline bool32 TickEnvelope(struct MixerSource *chan, struct WaveData2 *wa
     }
 }
 
+//__attribute__((target("thumb")))
 static inline void GenerateAudio(struct SoundMixerState *mixer, struct MixerSource *chan, struct WaveData2 *wav, float *outBuffer, u16 samplesPerFrame, float sampleRateReciprocal) {
     uf8 v = chan->envelopeVol * (mixer->masterVol + 1) / 16U;
     chan->envelopeVolR = chan->rightVol * v / 256U;

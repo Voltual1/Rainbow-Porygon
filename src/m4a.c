@@ -43,7 +43,15 @@ u32 MidiKeyToFreq(struct WaveData *wav, u8 key, u8 fineAdjust)
     val2 = gScaleTable[key + 1];
     val2 = gFreqTable[val2 & 0xF] >> (val2 >> 4);
 
-    return umul3232H32(wav->freq, val1 + umul3232H32(val2 - val1, fineAdjustShifted));
+    u32 freq = umul3232H32(wav->freq, val1 + umul3232H32(val2 - val1, fineAdjustShifted));
+    
+    // CAN DEBUG: 定期打印音轨触发频率以确认波形库数据读取正常
+    static u32 freqLogCounter = 0;
+    if (freqLogCounter++ % 60 == 0) {
+        SDL_Log("CAN DEBUG: [MidiKeyToFreq] wav=%p, key=%d, wav->freq=%u, result_freq=%u", 
+                (void*)wav, key, wav ? wav->freq : 0, freq);
+    }
+    return freq;
 }
 
 static void UNUSED UnusedDummyFunc(void)
@@ -117,19 +125,29 @@ void m4aSoundMain(void)
 #else
     struct SoundInfo *soundInfo = SOUND_INFO_PTR;
     
-    // CAN DEBUG: 每 60 帧打印一次 BGM 属性，监视其生命周期
+    // CAN DEBUG: 新增 C 语言级高级插桩，输出所有音轨当前的 flags 和指令内容
+    // 防止 MPlayMain 汇编读取错误的地址时我们能一目了然
     static u32 soundMainLog = 0;
-    if (soundMainLog++ % 60 == 0) {
-        struct MusicPlayerInfo *bgm = soundInfo ? soundInfo->musicPlayerHead : NULL;
-        SDL_Log("CAN DEBUG: [m4aSoundMain] soundInfo=%p, MPlayMainHead=%p, musicPlayerHead=%p, bgm->status=0x%08X, bgm->ident=0x%08X",
-                (void*)soundInfo,
-                soundInfo ? (void*)soundInfo->MPlayMainHead : NULL,
-                (void*)bgm,
-                bgm ? (unsigned int)bgm->status : 0,
-                bgm ? (unsigned int)bgm->ident : 0);
+    if (soundInfo && soundInfo->musicPlayerHead && (soundMainLog++ % 30 == 0)) {
+        struct MusicPlayerInfo *bgm = soundInfo->musicPlayerHead;
+        SDL_Log("CAN DEBUG: [m4aSoundMain] BGM status=0x%08X, ident=0x%08X", bgm->status, bgm->ident);
+        if (bgm->tracks) {
+            for (int t = 0; t < bgm->trackCount; t++) {
+                struct MusicPlayerTrack *tr = &bgm->tracks[t];
+                if (tr->flags & MPT_FLG_EXIST) {
+                    u8 *cmd = tr->cmdPtr;
+                    if (cmd) {
+                        SDL_Log("CAN DEBUG:   Track %d: flags=0x%02X, cmdPtr=%p, wait=%d, cmd_data=[0x%02X, 0x%02X, 0x%02X, 0x%02X]",
+                                t, tr->flags, (void*)cmd, tr->wait, cmd[0], cmd[1], cmd[2], cmd[3]);
+                    } else {
+                        SDL_Log("CAN DEBUG:   Track %d: flags=0x%02X, cmdPtr=NULL", t, tr->flags);
+                    }
+                }
+            }
+        }
     }
     
-    // 触发 MPlayMain
+    // 推进音乐播放器状态
     if (soundInfo && soundInfo->MPlayMainHead && soundInfo->musicPlayerHead)
     {
         soundInfo->MPlayMainHead(soundInfo->musicPlayerHead);
@@ -384,9 +402,7 @@ static void UNUSED MusicPlayerJumpTableCopy(void)
 
 void ClearChain(void *x)
 {
-    // CAN FIX: 坚决抛弃原本直接用 memset 对其强行刷 0 的错误做法！
-    // 因为这会把 prev/next 节点及 track 所有的绑定关系彻底摧毁，引发链表丢失进而静音。
-    // 在 PORTABLE 模式下，直接调用 RealClearChain 汇编底层进行链表解绑
+    // 调用汇编级解链逻辑，断开 Track 的声道连接
     RealClearChain(x);
 }
 
@@ -1044,6 +1060,7 @@ void CgbSound(void)
     vu8 *nrx4ptr;
     s32 envelopeStepTimeAndDir;
 
+    // Most comparison operations that cast to s8 perform 'and' by 0xFF.
     int mask = 0xff;
 
     if (soundInfo->c15)
@@ -1056,6 +1073,7 @@ void CgbSound(void)
         if (!(channels->statusFlags & SOUND_CHANNEL_SF_ON))
             continue;
 
+        /* 1. determine hardware channel registers */
         switch (ch)
         {
         case 1:
@@ -1075,7 +1093,7 @@ void CgbSound(void)
         case 3:
             nrx0ptr = (vu8 *)(REG_ADDR_NR30);
             nrx1ptr = (vu8 *)(REG_ADDR_NR31);
-            REG_NR32 = channels->envelopeVolume; 
+            REG_NR32 = channels->envelopeVolume; // Fix unused assignment?
             nrx2ptr = (vu8 *)(REG_ADDR_NR32);
             nrx3ptr = (vu8 *)(REG_ADDR_NR33);
             nrx4ptr = (vu8 *)(REG_ADDR_NR34);
@@ -1092,6 +1110,7 @@ void CgbSound(void)
         prevC15 = soundInfo->c15;
         envelopeStepTimeAndDir = *nrx2ptr;
 
+        /* 2. calculate envelope volume */
         if (channels->statusFlags & SOUND_CHANNEL_SF_START)
         {
             if (!(channels->statusFlags & SOUND_CHANNEL_SF_STOP))
@@ -1106,6 +1125,7 @@ void CgbSound(void)
 #ifdef PORTABLE
                     cgb_set_sweep(channels->sweep);
 #endif
+                    // fallthrough
                 case 2:
                     *nrx1ptr = ((u32)channels->wavePointer << 6) + channels->length;
                     goto init_env_step_time_dir;
@@ -1151,6 +1171,7 @@ void CgbSound(void)
                 }
                 else
                 {
+                    // skip attack phase if attack is instantaneous (=0)
                     goto envelope_decay_start;
                 }
             }
@@ -1285,6 +1306,8 @@ void CgbSound(void)
         }
 
     envelope_step_complete:
+        // every 15 frames, envelope calculation has to be done twice
+        // to keep up with the hardware envelope rate (1/64 s)
         channels->envelopeCounter--;
         if (prevC15 == 0)
         {
@@ -1293,15 +1316,16 @@ void CgbSound(void)
         }
 
     envelope_complete:
+        /* 3. apply pitch to HW registers */
         if (channels->modify & CGB_CHANNEL_MO_PIT)
         {
             if (ch < 4 && (channels->type & TONEDATA_TYPE_FIX))
             {
                 int dac_pwm_rate = REG_SOUNDBIAS_H;
 
-                if (dac_pwm_rate < 0x40)        
+                if (dac_pwm_rate < 0x40)        // if PWM rate = 32768 Hz
                     channels->frequency = (channels->frequency + 2) & 0x7fc;
-                else if (dac_pwm_rate < 0x80)   
+                else if (dac_pwm_rate < 0x80)   // if PWM rate = 65536 Hz
                     channels->frequency = (channels->frequency + 1) & 0x7fe;
             }
 
@@ -1313,6 +1337,7 @@ void CgbSound(void)
             *nrx4ptr = (s8)(channels->n4 & mask);
         }
 
+        /* 4. apply envelope & volume to HW registers */
         if (channels->modify & CGB_CHANNEL_MO_VOL)
         {
             REG_NR51 = (REG_NR51 & ~channels->panMask) | channels->pan;
@@ -1627,6 +1652,7 @@ void ply_memacc(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *trac
 
 cond_true:
     {
+        // *& is required for matching
         (*&gMPlayJumpTable[1])(mplayInfo, track);
         return;
     }
@@ -1664,7 +1690,7 @@ void ply_xwave(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *track
     wav = 0;
 #endif
 
-    READ_XCMD_BYTE(wav, 0)
+    READ_XCMD_BYTE(wav, 0) // UB: uninitialized variable
     READ_XCMD_BYTE(wav, 1)
     READ_XCMD_BYTE(wav, 2)
     READ_XCMD_BYTE(wav, 3)
@@ -1735,7 +1761,7 @@ void ply_xwait(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *track
     len = 0;
 #endif
 
-    READ_XCMD_BYTE(len, 0)
+    READ_XCMD_BYTE(len, 0) // UB: uninitialized variable
     READ_XCMD_BYTE(len, 1)
 
     if (track->timer < (u16)len)
@@ -1759,7 +1785,7 @@ void ply_xcmd_0D(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *tra
     unk = 0;
 #endif
 
-    READ_XCMD_BYTE(unk, 0)
+    READ_XCMD_BYTE(unk, 0) // UB: uninitialized variable
     READ_XCMD_BYTE(unk, 1)
     READ_XCMD_BYTE(unk, 2)
     READ_XCMD_BYTE(unk, 3)
