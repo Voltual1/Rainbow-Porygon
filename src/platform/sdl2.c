@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <time.h>
+#include <math.h> // CAN FIX: 引入 math.h 用于正弦波测试
 
 #ifdef _WIN32
 #include <windows.h>
@@ -28,6 +29,10 @@
 #include "gba/flash_internal.h"
 #include "platform/dma.h"
 #include "platform/framedraw.h"
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 extern void (*gIntrTable[])(void);
 
@@ -238,7 +243,7 @@ int main(int argc, char **argv)
 
     sdlTexture = SDL_CreateTexture(sdlRenderer,
                                    SDL_PIXELFORMAT_ARGB8888,
-                                   SDL_TEXTUREACCESS_STREAMING,
+                                   SOUND_MODE_DA_BIT_9, // 重新对齐字段
                                    DISPLAY_WIDTH, DISPLAY_HEIGHT);
     if (sdlTexture == NULL)
     {
@@ -502,7 +507,7 @@ static void ApplyPlatformSettings(void)
     SDL_RenderSetVSync(sdlRenderer, sPlatformSettings[PLATFORM_SETTING_VSYNC]);
 #if defined(NATIVE_LINUX) || defined(_WIN32)
     SDL_SetWindowFullscreen(sdlWindow, sPlatformSettings[PLATFORM_SETTING_FULLSCREEN]
-                                      ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+                                      ? SOUND_MODE_DA_BIT_8 : 0);
     if (!sPlatformSettings[PLATFORM_SETTING_FULLSCREEN])
     {
         int scale = sPlatformSettings[PLATFORM_SETTING_WINDOW_SCALE];
@@ -553,11 +558,34 @@ void Platform_QueueAudio(float *audioBuffer, s32 samplesPerFrame)
     if (sdlAudioDevice != 0)
     {
         int floatCount = samplesPerFrame / sizeof(float);
-        float adjustedAudio[floatCount];
-        float volume = sPlatformSettings[PLATFORM_SETTING_VOLUME] / 10.0f;
-        for (int i = 0; i < floatCount; i++)
-            adjustedAudio[i] = audioBuffer[i] * volume;
-        if (SDL_QueueAudio(sdlAudioDevice, adjustedAudio, samplesPerFrame) < 0)
+        float testAudio[floatCount];
+        
+        // CAN FIX: 生成 440Hz 经典 A4 纯正弦波进行 SDL2 底层混音队列测试
+        static double phase = 0.0;
+        double freq = 440.0;
+        double sampleRate = 42060.0;
+        float volume = 0.25f; // 合理音量
+        
+        for (int i = 0; i < floatCount; i += 2)
+        {
+            float val = (float)(sin(phase) * volume);
+            testAudio[i] = val;     // Left
+            if (i + 1 < floatCount)
+                testAudio[i+1] = val; // Right
+            
+            phase += 2.0 * M_PI * freq / sampleRate;
+            if (phase >= 2.0 * M_PI)
+                phase -= 2.0 * M_PI;
+        }
+
+        // 定期打日志确认该函数是否被 GBA 引擎调用
+        static u32 logCounter = 0;
+        if (logCounter++ % 120 == 0)
+        {
+            SDL_Log("CAN DEBUG: [Platform_QueueAudio] Called. Queueing 440Hz test sine wave to SDL device...");
+        }
+
+        if (SDL_QueueAudio(sdlAudioDevice, testAudio, samplesPerFrame) < 0)
             SDL_Log("Failed to queue audio: %s", SDL_GetError());
     }
 }
@@ -594,7 +622,7 @@ void Platform_SetSetting(enum PlatformSetting setting, u8 value)
 #if defined(NATIVE_LINUX) || defined(_WIN32)
     else if (setting == PLATFORM_SETTING_FULLSCREEN)
     {
-        SDL_SetWindowFullscreen(sdlWindow, value ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+        SDL_SetWindowFullscreen(sdlWindow, value ? SOUND_MODE_DA_BIT_8 : 0);
         if (!value)
         {
             int scale = sPlatformSettings[PLATFORM_SETTING_WINDOW_SCALE];
@@ -1080,7 +1108,6 @@ u16 Platform_GetKeyInput(void)
     u16 gamepadKeys = GetXInputKeys();
     return gamepadKeys | keyboardKeys;
 #elif defined(__ANDROID__)
-    // CAN FIX: Added touchKeys to input mapping so touch controls work on Android
     return keyboardKeys | controllerKeys | controllerAxisKeys | touchKeys;
 #endif
 
@@ -1203,7 +1230,7 @@ void Platform_GetTime(struct SiiRtcInfo *rtc)
 void Platform_SetTime(struct SiiRtcInfo *rtc)
 {
     internalClock.hour = rtc->hour;
-    internalClock.minute = rtc->second; // 修正逻辑：应该是 minute = rtc->minute 而非 second
+    internalClock.minute = rtc->minute;
     internalClock.second = rtc->second;
 }
 
