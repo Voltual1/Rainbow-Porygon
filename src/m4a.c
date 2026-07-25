@@ -113,23 +113,10 @@ void m4aSoundMain(void)
     extern void RunMixerFrame(void);
     struct SoundInfo *soundInfo = SOUND_INFO_PTR;
     
-    // CAN FIX: 核心修复 - 使用 C 语言显式遍历音频播放器单向链表
-    // 确保 BGM, SE1, SE2, SE3 等所有播放器在每一帧都能获得 VBlank 心跳驱动
-    if (soundInfo)
+    // CAN FIX: 只需触发一次 musicPlayerHead，MPlayMain 会在内部顺着 MPlayMainNext 递归遍历整条链表，修复双重遍历导致的计数损坏
+    if (soundInfo && soundInfo->MPlayMainHead && soundInfo->musicPlayerHead)
     {
-        struct MusicPlayerInfo *mplayInfo = soundInfo->musicPlayerHead;
-        MPlayMainFunc mplayMain = soundInfo->MPlayMainHead;
-        
-        while (mplayInfo != NULL)
-        {
-            if (mplayMain != NULL)
-            {
-                mplayMain(mplayInfo);
-            }
-            // 顺着链表向下寻找下一个播放器及对应的 MPlayMain 驱动函数
-            mplayMain = mplayInfo->MPlayMainNext;
-            mplayInfo = mplayInfo->musicPlayerNext;
-        }
+        soundInfo->MPlayMainHead(soundInfo->musicPlayerHead);
     }
     
     RunMixerFrame();

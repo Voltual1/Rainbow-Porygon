@@ -39,39 +39,39 @@ extern void ply_xswee(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
 extern void ply_xwait(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
 extern void ply_xcmd_0D(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
 
-// 定义适用于跨平台的 C 指令集跳转表模板（统一修改为 MPlayFunc[36] 类型以避免 redefinition 错误）
+// CAN FIX: 合并并定义唯一且类型正确的跨平台音频跳转表模板，保留全部占位符以确保指令映射绝对精确
 const MPlayFunc gMPlayJumpTableTemplate[36] =
 {
-    (MPlayFunc)ply_fine,        // 0
-    (MPlayFunc)ply_goto,        // 1
-    (MPlayFunc)ply_patt,        // 2
-    (MPlayFunc)ply_pend,        // 3
-    (MPlayFunc)ply_rept,        // 4
-    (MPlayFunc)ply_fine,        // 5
-    (MPlayFunc)ply_fine,        // 6
-    (MPlayFunc)ply_fine,        // 7
-    (MPlayFunc)ply_fine,        // 8
-    (MPlayFunc)ply_prio,        // 9
-    (MPlayFunc)ply_tempo,       // 10
-    (MPlayFunc)ply_keysh,       // 11
-    (MPlayFunc)ply_voice,       // 12
-    (MPlayFunc)ply_vol,         // 13
-    (MPlayFunc)ply_pan,         // 14
-    (MPlayFunc)ply_bend,        // 15
-    (MPlayFunc)ply_bendr,       // 16
-    (MPlayFunc)ply_lfos,        // 17
-    (MPlayFunc)ply_lfodl,       // 18
-    (MPlayFunc)ply_mod,         // 19
-    (MPlayFunc)ply_modt,        // 20
-    (MPlayFunc)ply_fine,        // 21
-    (MPlayFunc)ply_fine,        // 22
-    (MPlayFunc)ply_tune,        // 23
-    (MPlayFunc)ply_fine,        // 24
-    (MPlayFunc)ply_fine,        // 25
-    (MPlayFunc)ply_fine,        // 26
-    (MPlayFunc)ply_port,        // 27
-    (MPlayFunc)ply_fine,        // 28
-    (MPlayFunc)ply_endtie,      // 29
+    (MPlayFunc)ply_fine,        // 0 (0xB1: FINE)
+    (MPlayFunc)ply_goto,        // 1 (0xB2: GOTO)
+    (MPlayFunc)ply_patt,        // 2 (0xB3: PATT)
+    (MPlayFunc)ply_pend,        // 3 (0xB4: PEND)
+    (MPlayFunc)ply_rept,        // 4 (0xB5: REPT)
+    (MPlayFunc)ply_fine,        // 5 (0xB6: Placeholder)
+    (MPlayFunc)ply_fine,        // 6 (0xB7: Placeholder)
+    (MPlayFunc)ply_fine,        // 7 (0xB8: Placeholder)
+    (MPlayFunc)ply_fine,        // 8 (0xB9: MEMACC, overwritten by Extender)
+    (MPlayFunc)ply_prio,        // 9 (0xBA: PRIO)
+    (MPlayFunc)ply_tempo,       // 10 (0xBB: TEMPO)
+    (MPlayFunc)ply_keysh,       // 11 (0xBC: KEYSH)
+    (MPlayFunc)ply_voice,       // 12 (0xBD: VOICE)
+    (MPlayFunc)ply_vol,         // 13 (0xBE: VOL)
+    (MPlayFunc)ply_pan,         // 14 (0xBF: PAN)
+    (MPlayFunc)ply_bend,        // 15 (0xC0: BEND)
+    (MPlayFunc)ply_bendr,       // 16 (0xC1: BENDR)
+    (MPlayFunc)ply_lfos,        // 17 (0xC2: LFOS, overwritten by Extender)
+    (MPlayFunc)ply_lfodl,       // 18 (0xC3: LFODL)
+    (MPlayFunc)ply_mod,         // 19 (0xC4: MOD, overwritten by Extender)
+    (MPlayFunc)ply_modt,        // 20 (0xC5: MODT)
+    (MPlayFunc)ply_fine,        // 21 (0xC6: Placeholder)
+    (MPlayFunc)ply_fine,        // 22 (0xC7: Placeholder)
+    (MPlayFunc)ply_tune,        // 23 (0xC8: TUNE)
+    (MPlayFunc)ply_fine,        // 24 (0xC9: Placeholder)
+    (MPlayFunc)ply_fine,        // 25 (0xCA: Placeholder)
+    (MPlayFunc)ply_fine,        // 26 (0xCB: Placeholder)
+    (MPlayFunc)ply_port,        // 27 (0xCC: PORT)
+    (MPlayFunc)ply_fine,        // 28 (0xCD: XCMD, overwritten by Extender)
+    (MPlayFunc)ply_endtie,      // 29 (0xCE: EOT)
     (MPlayFunc)SampleFreqSet,   // 30
     (MPlayFunc)TrackStop,       // 31
     (MPlayFunc)FadeOutBody,     // 32
@@ -147,7 +147,7 @@ const u16 gPcmSamplesPerVBlankTable[] =
     352,
     448,
     528,
-    608, // CAN FIX: 移除了多余的 txt 文件名错误行
+    608,
     672,
     704,
 };
