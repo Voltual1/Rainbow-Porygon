@@ -4,6 +4,7 @@
 
 #ifdef PORTABLE
     #include "cgb_audio.h"
+    // 引用由 m4a_tables.c 导出的标准 MIDI 指令跳转表模板
     extern const MPlayFunc gMPlayJumpTableTemplate[36];
     extern void SDL_Log(const char *fmt, ...);
 #endif
@@ -47,7 +48,7 @@ u32 MidiKeyToFreq(struct WaveData *wav, u8 key, u8 fineAdjust)
     
     // CAN DEBUG: 定期打印音轨触发频率以确认波形库数据读取正常
     static u32 freqLogCounter = 0;
-    if (freqLogCounter++ % 60 == 0) {
+    if (freqLogCounter++ % 120 == 0) {
         SDL_Log("CAN DEBUG: [MidiKeyToFreq] wav=%p, key=%d, wav->freq=%u, result_freq=%u", 
                 (void*)wav, key, wav ? wav->freq : 0, freq);
     }
@@ -91,6 +92,17 @@ void m4aSoundInit(void)
     s32 i;
     SDL_Log("CAN DEBUG: [m4a] m4aSoundInit starting...");
 
+    // CAN FIX: 进行底层结构体成员偏移量校对打印，防止 ARM 32-bit 对齐差异导致汇编解析错位
+    SDL_Log("CAN DEBUG: [Struct Verification]");
+    SDL_Log("CAN DEBUG:   sizeof(SoundInfo) = %u (Expected: 4016)", (unsigned)sizeof(struct SoundInfo));
+    SDL_Log("CAN DEBUG:   sizeof(MusicPlayerInfo) = %u (Expected: 64)", (unsigned)sizeof(struct MusicPlayerInfo));
+    SDL_Log("CAN DEBUG:   sizeof(MusicPlayerTrack) = %u (Expected: 80)", (unsigned)sizeof(struct MusicPlayerTrack));
+    SDL_Log("CAN DEBUG:   sizeof(SoundChannel) = %u (Expected: 64)", (unsigned)sizeof(struct SoundChannel));
+    SDL_Log("CAN DEBUG:   offset of chans in SoundInfo = %u (Expected: 80)", (unsigned)((uintptr_t)&((struct SoundInfo*)0)->chans - (uintptr_t)0));
+    SDL_Log("CAN DEBUG:   offset of ident in MusicPlayerInfo = %u (Expected: 52)", (unsigned)((uintptr_t)&((struct MusicPlayerInfo*)0)->ident - (uintptr_t)0));
+    SDL_Log("CAN DEBUG:   offset of tracks in MusicPlayerInfo = %u (Expected: 44)", (unsigned)((uintptr_t)&((struct MusicPlayerInfo*)0)->tracks - (uintptr_t)0));
+    SDL_Log("CAN DEBUG:   offset of cmdPtr in MusicPlayerTrack = %u (Expected: 64)", (unsigned)((uintptr_t)&((struct MusicPlayerTrack*)0)->cmdPtr - (uintptr_t)0));
+
     SoundInit(&gSoundInfo);
     MPlayExtender(gCgbChans);
     m4aSoundMode(SOUND_MODE_DA_BIT_8 |
@@ -125,25 +137,27 @@ void m4aSoundMain(void)
 #else
     struct SoundInfo *soundInfo = SOUND_INFO_PTR;
     
-    // CAN DEBUG: 新增 C 语言级高级插桩，输出所有音轨当前的 flags 和指令内容
-    // 防止 MPlayMain 汇编读取错误的地址时我们能一目了然
+    // CAN DEBUG: 每 60 帧遍历并输出所有的 MusicPlayer 状态链，排查 ident 锁和 status 异常
     static u32 soundMainLog = 0;
-    if (soundInfo && soundInfo->musicPlayerHead && (soundMainLog++ % 30 == 0)) {
-        struct MusicPlayerInfo *bgm = soundInfo->musicPlayerHead;
-        SDL_Log("CAN DEBUG: [m4aSoundMain] BGM status=0x%08X, ident=0x%08X", bgm->status, bgm->ident);
-        if (bgm->tracks) {
-            for (int t = 0; t < bgm->trackCount; t++) {
-                struct MusicPlayerTrack *tr = &bgm->tracks[t];
-                if (tr->flags & MPT_FLG_EXIST) {
-                    u8 *cmd = tr->cmdPtr;
-                    if (cmd) {
-                        SDL_Log("CAN DEBUG:   Track %d: flags=0x%02X, cmdPtr=%p, wait=%d, cmd_data=[0x%02X, 0x%02X, 0x%02X, 0x%02X]",
-                                t, tr->flags, (void*)cmd, tr->wait, cmd[0], cmd[1], cmd[2], cmd[3]);
-                    } else {
-                        SDL_Log("CAN DEBUG:   Track %d: flags=0x%02X, cmdPtr=NULL", t, tr->flags);
+    if (soundInfo && (soundMainLog++ % 60 == 0)) {
+        struct MusicPlayerInfo *curr = soundInfo->musicPlayerHead;
+        int idx = 0;
+        SDL_Log("CAN DEBUG: [m4aSoundMain] Start traversing music players...");
+        while (curr) {
+            SDL_Log("CAN DEBUG:   Player %d: addr=%p, status=0x%08X, ident=0x%08X, priority=%d", 
+                    idx++, (void*)curr, curr->status, curr->ident, curr->priority);
+            
+            // 顺便打印活动音轨的状况
+            if (curr->tracks) {
+                for (int t = 0; t < curr->trackCount; t++) {
+                    struct MusicPlayerTrack *tr = &curr->tracks[t];
+                    if (tr->flags & MPT_FLG_EXIST) {
+                        SDL_Log("CAN DEBUG:     Track %d: flags=0x%02X, wait=%d, cmdPtr=%p", 
+                                t, tr->flags, tr->wait, (void*)tr->cmdPtr);
                     }
                 }
             }
+            curr = curr->musicPlayerNext;
         }
     }
     
@@ -402,7 +416,8 @@ static void UNUSED MusicPlayerJumpTableCopy(void)
 
 void ClearChain(void *x)
 {
-    // 调用汇编级解链逻辑，断开 Track 的声道连接
+    // CAN FIX: 移植模式下，如果对通道使用 memset 强行刷 0 会破坏 next/prev 节点关系导致链表断裂！
+    // 必须调用 RealClearChain 汇编底层进行链表解绑
     RealClearChain(x);
 }
 
@@ -466,7 +481,8 @@ void SoundInit(struct SoundInfo *soundInfo)
             (void*)gMPlayJumpTableTemplate[22],
             (void*)gMPlayJumpTableTemplate[34]);
 
-    memcpy(gMPlayJumpTable, gMPlayJumpTableTemplate, 36 * sizeof(MPlayFunc));
+                    // 在 PORTABLE 模式下拷贝 C 版本的跳转表，规避 BIOS ROM 地址越界保护
+                memcpy(gMPlayJumpTable, gMPlayJumpTableTemplate, 36 * sizeof(MPlayFunc));
 #endif
 
     soundInfo->MPlayJumpTable = gMPlayJumpTable;
@@ -491,16 +507,21 @@ void SampleFreqSet(u32 freq)
 
     soundInfo->pcmDmaPeriod = PCM_DMA_BUF_SIZE / soundInfo->pcmSamplesPerVBlank;
 
+    // LCD refresh rate 59.7275Hz
     soundInfo->pcmFreq = (597275 * soundInfo->pcmSamplesPerVBlank + 5000) / 10000;
 
+    // CPU frequency 16.78Mhz
     soundInfo->divFreq = (16777216 / soundInfo->pcmFreq + 1) >> 1;
 
 #ifdef PORTABLE
+    // 核心修复：为跨平台混音器正确初始化 sampleRateReciprocal 倒数频率
     soundInfo->sampleRateReciprocal = 1.0f / (float)soundInfo->pcmFreq;
 #endif
 
+    // Turn off timer 0.
     REG_TM0CNT_H = 0;
 
+    // cycles per LCD fresh 280896
     REG_TM0CNT_L = -(280896 / soundInfo->pcmSamplesPerVBlank);
 
     m4aSoundVSyncOn();
@@ -679,10 +700,13 @@ void MPlayOpen(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *track
         tracks++;
     }
 
+    // append music player and MPlayMain to linked list
+
     if (soundInfo->MPlayMainHead != NULL)
     {
         mplayInfo->MPlayMainNext = soundInfo->MPlayMainHead;
         mplayInfo->musicPlayerNext = soundInfo->musicPlayerHead;
+        // NULL assignment semantically useless, but required for match
         soundInfo->MPlayMainHead = NULL;
     }
 
@@ -749,6 +773,9 @@ void MPlayStart(struct MusicPlayerInfo *mplayInfo, struct SongHeader *songHeader
             m4aSoundMode(songHeader->reverb);
 
 #ifdef PORTABLE
+        // CAN FIX: 跨平台多线程保护
+        // 必须等前面所有的轨道 flags 与指针写入完毕之后，再激活 status
+        // 否则如果在此时 m4aSoundMain 被触发执行了 MPlayMain，就会发生竞态条件导致状态被误置为 0x80000000
         __sync_synchronize();
 #endif
 
