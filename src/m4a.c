@@ -56,7 +56,13 @@ void MPlayContinue(struct MusicPlayerInfo *mplayInfo)
     if (mplayInfo->ident == ID_NUMBER)
     {
         mplayInfo->ident++;
+#ifdef PORTABLE
+        __sync_synchronize();
+#endif
         mplayInfo->status &= ~MUSICPLAYER_STATUS_PAUSE;
+#ifdef PORTABLE
+        __sync_synchronize();
+#endif
         mplayInfo->ident = ID_NUMBER;
     }
 }
@@ -261,7 +267,13 @@ void m4aMPlayFadeIn(struct MusicPlayerInfo *mplayInfo, u16 speed)
         mplayInfo->fadeOC = speed;
         mplayInfo->fadeOI = speed;
         mplayInfo->fadeOV = (0 << FADE_VOL_SHIFT) | FADE_IN;
+#ifdef PORTABLE
+        __sync_synchronize();
+#endif
         mplayInfo->status &= ~MUSICPLAYER_STATUS_PAUSE;
+#ifdef PORTABLE
+        __sync_synchronize();
+#endif
         mplayInfo->ident = ID_NUMBER;
     }
 }
@@ -707,7 +719,7 @@ void MPlayStart(struct MusicPlayerInfo *mplayInfo, struct SongHeader *songHeader
         (mplayInfo->priority <= songHeader->priority))
     {
         mplayInfo->ident++;
-        mplayInfo->status = 0;
+        
         mplayInfo->songHeader = songHeader;
         mplayInfo->tone = songHeader->tone;
         mplayInfo->priority = songHeader->priority;
@@ -742,6 +754,19 @@ void MPlayStart(struct MusicPlayerInfo *mplayInfo, struct SongHeader *songHeader
         if (songHeader->reverb & SOUND_MODE_REVERB_SET)
             m4aSoundMode(songHeader->reverb);
 
+#ifdef PORTABLE
+        // CAN FIX: 跨平台多线程保护
+        // 必须等前面所有的轨道 flags 与指针写入完毕之后，再激活 status
+        // 否则如果在此时 m4aSoundMain 被触发执行了 MPlayMain，就会发生竞态条件导致状态被误置为 0x80000000
+        __sync_synchronize();
+#endif
+
+        mplayInfo->status = 0;
+
+#ifdef PORTABLE
+        __sync_synchronize();
+#endif
+
         mplayInfo->ident = ID_NUMBER;
         SDL_Log("CAN DEBUG: [MPlayStart] Start completed. SongHeader=%p, status initialized to 0", (void*)songHeader);
     }
@@ -760,6 +785,9 @@ void m4aMPlayStop(struct MusicPlayerInfo *mplayInfo)
         return;
 
     mplayInfo->ident++;
+#ifdef PORTABLE
+    __sync_synchronize();
+#endif
     mplayInfo->status |= MUSICPLAYER_STATUS_PAUSE;
 
     i = mplayInfo->trackCount;
@@ -1287,6 +1315,8 @@ void CgbSound(void)
         }
 
     envelope_step_complete:
+        // every 15 frames, envelope calculation has to be done twice
+        // to keep up with the hardware envelope rate (1/64 s)
         channels->envelopeCounter--;
         if (prevC15 == 0)
         {
