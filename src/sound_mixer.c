@@ -19,7 +19,6 @@ static inline bool32 TickEnvelope(struct MixerSource *chan, struct WaveData2 *wa
 void GeneratePokemonSampleAudio(struct SoundMixerState *mixer, struct MixerSource *chan, s8 *current, float *outBuffer, u16 samplesPerFrame, float sampleRateReciprocal, s32 samplesLeftInWav, signed envR, signed envL, s32 loopLen);
 static s8 sub_82DF758(struct MixerSource *chan, u32 current);
 
-// 在 sound_mixer.c 中
 void RunMixerFrame(void) {
     struct SoundMixerState *mixer = (struct SoundMixerState *)SOUND_INFO_PTR;
     
@@ -37,17 +36,18 @@ void RunMixerFrame(void) {
         }
     }
     
-    // CAN FIX: 致命的双重 TICK！
-    // 移植版引擎中，MPlayMain 已经在 m4aSoundMain 里被 VBLANK 准时推动过了。
-    // 如果混音器再推动一次，会导致 MIDI 时序崩坏，音轨被瞬间吃干抹净并提前终止！
-    // 注释掉这里的 firstPlayerFunc 调用：
+    // CAN FIX 核心: 绝对禁止混音器反向驱动序列器！
+    // 注释或删除以下几行代码，防止同一个帧双重消耗 track->wait
     /*
     if (mixer->firstPlayerFunc != NULL) {
         mixer->firstPlayerFunc(mixer->firstPlayer);
     }
     */
     
-    mixer->cgbMixerFunc();
+    // CGB 混音更新
+    if (mixer->cgbMixerFunc) {
+        mixer->cgbMixerFunc();
+    }
     
     s32 samplesPerFrame = mixer->samplesPerFrame;
     float *outBuffer = mixer->outBuffer;
@@ -62,11 +62,13 @@ void RunMixerFrame(void) {
     #ifdef PORTABLE
         cgb_audio_generate(samplesPerFrame);
         
+        // 将 CGB PSG PSG方波与噪声混音通道的数据合并到 DirectSound 的 float 混合音频流
         float *cgbBuffer = cgb_get_buffer();
         for (int i = 0; i < samplesPerFrame * 2; i++) {
             outBuffer[i] += cgbBuffer[i];
         }
         
+        // 将混音后渲染结果队列投递至跨平台底层 SDL 驱动
         extern void Platform_QueueAudio(float *audioBuffer, s32 samplesPerFrame);
         Platform_QueueAudio(outBuffer, samplesPerFrame * 2 * (s32)sizeof(float));
     #endif

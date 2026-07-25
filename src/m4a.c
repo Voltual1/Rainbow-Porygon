@@ -116,29 +116,27 @@ void m4aSoundMain(void)
 #ifndef PORTABLE
     SoundMain();
 #else
-    extern void RunMixerFrame(void);
     struct SoundInfo *soundInfo = SOUND_INFO_PTR;
     
-    // CAN DEBUG: 每 60 帧打印一次 BGM 引擎的内存状况，检查是否因为 ident 锁损坏或地址为空导致 sequencer 被越过
+    // CAN DEBUG: 保留日志观察状态
     static u32 soundMainLog = 0;
     if (soundMainLog++ % 60 == 0) {
         struct MusicPlayerInfo *bgm = soundInfo ? soundInfo->musicPlayerHead : NULL;
-        SDL_Log("CAN DEBUG: [m4aSoundMain] soundInfo=%p, MPlayMainHead=%p, musicPlayerHead=%p, bgm->status=0x%08X, bgm->ident=0x%08X",
-                (void*)soundInfo,
-                soundInfo ? (void*)soundInfo->MPlayMainHead : NULL,
-                (void*)bgm,
-                bgm ? (unsigned int)bgm->status : 0,
-                bgm ? (unsigned int)bgm->ident : 0);
+        SDL_Log("CAN DEBUG: [m4aSoundMain] MPlayMain triggered! bgm->status=0x%08X",
+                bgm ? (unsigned int)bgm->status : 0);
     }
     
-    // CAN FIX: 只负责推进 MPlay 序列器状态，绝不能在这里触发真正的合成器。
-    // 去掉对 RunMixerFrame() 的直接调用，合成器将在专门的地方被调用
+    // 仅仅触发 MPlayMain 状态机，绝不在这里调用 RunMixerFrame() !
     if (soundInfo && soundInfo->MPlayMainHead && soundInfo->musicPlayerHead)
     {
         soundInfo->MPlayMainHead(soundInfo->musicPlayerHead);
     }
     
-    RunMixerFrame();
+    // 原生 GBA CGB (方波/噪音) 音频通道波长推进
+    if (soundInfo && soundInfo->CgbSound)
+    {
+        soundInfo->CgbSound();
+    }
 #endif
 }
 

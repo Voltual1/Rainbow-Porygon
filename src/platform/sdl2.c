@@ -1103,28 +1103,29 @@ void VBlankIntrWait(void)
     SDL_AtomicSet(&isFrameAvailable, 1);
     SDL_SemWait(vBlankSemaphore);
 
-    // 1. 模拟触发 V-Count 中断，驱动部分音频组件心跳
+    // 1. 模拟触发 V-Count 中断 (如需要，驱动音频等外设心跳)
     REG_VCOUNT = 150;
     if (gIntrTable[0] != NULL)
     {
         gIntrTable[0]();
     }
 
-    // 2. 模拟垂直消隐 VBLANK 中断，推动游戏核心逻辑 (m4aSoundMain 会在这里执行)
-    REG_VCOUNT = 161; 
+    // 2. 模拟触发垂直消隐 VBLANK 中断
+    REG_VCOUNT = 161;
     REG_DISPSTAT |= INTR_FLAG_VBLANK;
 
     RunDMAs(DMA_HBLANK);
 
+    // 3. 执行游戏 VBlank 主逻辑，这里会安全地调用我们刚改好的 m4aSoundMain
     if (gIntrTable[4] != NULL)
     {
-        gIntrTable[4](); // 执行原版逻辑，推进 MPlay 序列器
+        gIntrTable[4](); 
     }
     
-    // CAN FIX: VBlank 逻辑已经准备好了所有的音轨参数和波形寄存器。
-    // 现在，我们需要像真正的 GBA DMA 一样，抽取这一帧的声音缓冲区并投递给声卡！
+    // 4. CAN FIX: 游戏逻辑计算完毕，所有音轨状态处于稳定！
+    // 此时像真正的 GBA DMA 芯片一样，一次性抽取合成波形数据。
     extern void RunMixerFrame(void);
-    RunMixerFrame(); 
+    RunMixerFrame();
     
     REG_DISPSTAT &= ~INTR_FLAG_VBLANK;
 }
