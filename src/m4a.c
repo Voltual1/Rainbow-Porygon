@@ -107,32 +107,32 @@ void m4aSoundInit(void)
 
 void m4aSoundMain(void)
 {
-    struct SoundInfo *soundInfo = SOUND_INFO_PTR;
-    
-#ifdef PORTABLE
-    u32 preStatus = gMPlayInfo_BGM.status;
-#endif
-
 #ifndef PORTABLE
     SoundMain();
 #else
     extern void RunMixerFrame(void);
+    struct SoundInfo *soundInfo = SOUND_INFO_PTR;
     
-    // 显式驱动 MPlayMain 音频序列器，更新 MIDI 轨道
-    if (soundInfo && soundInfo->MPlayMainHead && soundInfo->musicPlayerHead)
+    // CAN FIX: 核心修复 - 使用 C 语言显式遍历音频播放器单向链表
+    // 确保 BGM, SE1, SE2, SE3 等所有播放器在每一帧都能获得 VBlank 心跳驱动
+    if (soundInfo)
     {
-        soundInfo->MPlayMainHead(soundInfo->musicPlayerHead);
+        struct MusicPlayerInfo *mplayInfo = soundInfo->musicPlayerHead;
+        MPlayMainFunc mplayMain = soundInfo->MPlayMainHead;
+        
+        while (mplayInfo != NULL)
+        {
+            if (mplayMain != NULL)
+            {
+                mplayMain(mplayInfo);
+            }
+            // 顺着链表向下寻找下一个播放器及对应的 MPlayMain 驱动函数
+            mplayMain = mplayInfo->MPlayMainNext;
+            mplayInfo = mplayInfo->musicPlayerNext;
+        }
     }
     
     RunMixerFrame();
-#endif
-
-#ifdef PORTABLE
-    // 监控 BGM 状态在每帧 VBlank 期间的改变情况
-    if (gMPlayInfo_BGM.status != preStatus)
-    {
-        SDL_Log("CAN DEBUG: [m4aSoundMain] BGM status changed: 0x%08X -> 0x%08X", preStatus, gMPlayInfo_BGM.status);
-    }
 #endif
 }
 
