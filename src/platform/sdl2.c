@@ -1098,40 +1098,35 @@ int DoMain(void *data)
     return 0;
 }
 
-// CAN FIX: 重构 VBlankIntrWait，让所有硬件中断模拟以及 m4a 混音计算全部合并到 GBA 主逻辑线程
-// 这能实现 100% 完美的单线程同步，彻底清除跨线程指令重排和缓存冲突
 void VBlankIntrWait(void)
 {
-    SDL_Log("CAN DEBUG: VBlankIntrWait - Setting frame available");
     SDL_AtomicSet(&isFrameAvailable, 1);
-    
-    SDL_Log("CAN DEBUG: VBlankIntrWait - Waiting on semaphore");
     SDL_SemWait(vBlankSemaphore);
-    
-    // GBA 线程被唤醒，此刻 SDL 线程已经完成了新帧渲染并释放了锁
-    // 我们在此处同步触发模拟中断，保证引擎所有的内存操作均按原版顺序安全执行
-    SDL_Log("CAN DEBUG: VBlankIntrWait - Semaphore released, executing safe interrupts");
 
-    // 1. 模拟触发 V-Count 中断 (第 150 行触发线)，更新 MPlay 状态机
+    // 1. 模拟触发 V-Count 中断，驱动部分音频组件心跳
     REG_VCOUNT = 150;
     if (gIntrTable[0] != NULL)
     {
         gIntrTable[0]();
     }
 
-    // 2. 模拟触发垂直消隐 VBLANK 中断
-    REG_VCOUNT = 161;
+    // 2. 模拟垂直消隐 VBLANK 中断，推动游戏核心逻辑 (m4aSoundMain 会在这里执行)
+    REG_VCOUNT = 161; 
     REG_DISPSTAT |= INTR_FLAG_VBLANK;
 
     RunDMAs(DMA_HBLANK);
 
     if (gIntrTable[4] != NULL)
     {
-        gIntrTable[4](); // 执行 VBlankIntr()，这会执行 m4aSoundMain 混音算法
+        gIntrTable[4](); // 执行原版逻辑，推进 MPlay 序列器
     }
     
+    // CAN FIX: VBlank 逻辑已经准备好了所有的音轨参数和波形寄存器。
+    // 现在，我们需要像真正的 GBA DMA 一样，抽取这一帧的声音缓冲区并投递给声卡！
+    extern void RunMixerFrame(void);
+    RunMixerFrame(); 
+    
     REG_DISPSTAT &= ~INTR_FLAG_VBLANK;
-    SDL_Log("CAN DEBUG: VBlankIntrWait - Safe interrupts executed successfully");
 }
 
 u8 BinToBcd(u8 bin)

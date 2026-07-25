@@ -131,7 +131,8 @@ void m4aSoundMain(void)
                 bgm ? (unsigned int)bgm->ident : 0);
     }
     
-    // 触发 musicPlayerHead
+    // CAN FIX: 只负责推进 MPlay 序列器状态，绝不能在这里触发真正的合成器。
+    // 去掉对 RunMixerFrame() 的直接调用，合成器将在专门的地方被调用
     if (soundInfo && soundInfo->MPlayMainHead && soundInfo->musicPlayerHead)
     {
         soundInfo->MPlayMainHead(soundInfo->musicPlayerHead);

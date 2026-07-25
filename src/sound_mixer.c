@@ -19,21 +19,10 @@ static inline bool32 TickEnvelope(struct MixerSource *chan, struct WaveData2 *wa
 void GeneratePokemonSampleAudio(struct SoundMixerState *mixer, struct MixerSource *chan, s8 *current, float *outBuffer, u16 samplesPerFrame, float sampleRateReciprocal, s32 samplesLeftInWav, signed envR, signed envL, s32 loopLen);
 static s8 sub_82DF758(struct MixerSource *chan, u32 current);
 
+// 在 sound_mixer.c 中
 void RunMixerFrame(void) {
     struct SoundMixerState *mixer = (struct SoundMixerState *)SOUND_INFO_PTR;
     
-#ifdef PORTABLE
-    // CAN DEBUG: 添加每 60 帧一次的锁状态诊断日志，确认是否因为状态锁未对齐而导致混音器提前退出
-    static u32 mixerLogCount = 0;
-    if (mixerLogCount++ % 60 == 0) {
-        SDL_Log("CAN DEBUG: [RunMixerFrame] mixer=%p, lockStatus=0x%08X, MIXER_UNLOCKED=0x%08X, MIXER_LOCKED=0x%08X",
-                (void*)mixer, 
-                mixer ? (unsigned int)mixer->lockStatus : 0, 
-                (unsigned int)MIXER_UNLOCKED, 
-                (unsigned int)MIXER_LOCKED);
-    }
-#endif
-
     if (mixer->lockStatus != MIXER_UNLOCKED) {
         return;
     }
@@ -48,9 +37,15 @@ void RunMixerFrame(void) {
         }
     }
     
+    // CAN FIX: 致命的双重 TICK！
+    // 移植版引擎中，MPlayMain 已经在 m4aSoundMain 里被 VBLANK 准时推动过了。
+    // 如果混音器再推动一次，会导致 MIDI 时序崩坏，音轨被瞬间吃干抹净并提前终止！
+    // 注释掉这里的 firstPlayerFunc 调用：
+    /*
     if (mixer->firstPlayerFunc != NULL) {
         mixer->firstPlayerFunc(mixer->firstPlayer);
     }
+    */
     
     mixer->cgbMixerFunc();
     
@@ -62,18 +57,16 @@ void RunMixerFrame(void) {
         outBuffer += samplesPerFrame * (mixer->framesPerDmaCycle - (dmaCounter - 1)) * 2;
     }
     
-    //MixerRamFunc mixerRamFunc = ((MixerRamFunc)MixerCodeBuffer);
     SampleMixer(mixer, maxScanlines, samplesPerFrame, outBuffer, dmaCounter, MIXED_AUDIO_BUFFER_SIZE);
+    
     #ifdef PORTABLE
         cgb_audio_generate(samplesPerFrame);
         
-        // 将 CGB PSG PSG方波与噪声混音通道的数据合并到 DirectSound 的 float 混合音频流
         float *cgbBuffer = cgb_get_buffer();
         for (int i = 0; i < samplesPerFrame * 2; i++) {
             outBuffer[i] += cgbBuffer[i];
         }
         
-        // 将混音后渲染结果队列投递至跨平台底层 SDL 驱动
         extern void Platform_QueueAudio(float *audioBuffer, s32 samplesPerFrame);
         Platform_QueueAudio(outBuffer, samplesPerFrame * 2 * (s32)sizeof(float));
     #endif
