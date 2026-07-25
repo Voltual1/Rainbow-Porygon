@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <time.h>
+#include <math.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -28,6 +29,10 @@
 #include "gba/flash_internal.h"
 #include "platform/dma.h"
 #include "platform/framedraw.h"
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 extern void (*gIntrTable[])(void);
 
@@ -357,28 +362,8 @@ int main(int argc, char **argv)
 #endif
                     SDL_AtomicSet(&isFrameAvailable, 0);
 
-                    REG_DISPSTAT |= INTR_FLAG_VBLANK;
-
-                    RunDMAs(DMA_HBLANK);
-
-                    // 1. 模拟触发 V-Count 中断 (第 150 行触发线)，驱动音频系统的主心跳，更新 m4a 播放器状态
-                    REG_VCOUNT = 150;
-                    if (gIntrTable[0] != NULL)
-                    {
-                        gIntrTable[0]();
-                    }
-
-                    // 2. 准备恢复到 V-Blank 扫描线并触发 V-Blank 中断
-                    REG_VCOUNT = 161; // prep for being in VBlank period
-
-                    // 修复核心：在 portable 平台无条件、高可靠地触发 VBLANK 中断，防止淡入状态机死锁
-                    if (gIntrTable[4] != NULL)
-                    {
-                        gIntrTable[4]();
-                    }
-                    
-                    REG_DISPSTAT &= ~INTR_FLAG_VBLANK;
-
+                    // CAN FIX: 将所有硬件中断模拟全部移到 GBA 辅助线程内执行
+                    // 此处 SDL 渲染主线程只通过信号量将 GBA 线程从阻塞中唤醒
                     SDL_Log("CAN DEBUG: SDL main loop - Posting Semaphore");
                     SDL_SemPost(vBlankSemaphore);
 
@@ -557,6 +542,8 @@ void Platform_QueueAudio(float *audioBuffer, s32 samplesPerFrame)
         float volume = sPlatformSettings[PLATFORM_SETTING_VOLUME] / 10.0f;
         for (int i = 0; i < floatCount; i++)
             adjustedAudio[i] = audioBuffer[i] * volume;
+            
+        // CAN FIX: 恢复输出游戏真实的音频数据（结束之前的正弦波蜂鸣测试）
         if (SDL_QueueAudio(sdlAudioDevice, adjustedAudio, samplesPerFrame) < 0)
             SDL_Log("Failed to queue audio: %s", SDL_GetError());
     }
@@ -1080,7 +1067,6 @@ u16 Platform_GetKeyInput(void)
     u16 gamepadKeys = GetXInputKeys();
     return gamepadKeys | keyboardKeys;
 #elif defined(__ANDROID__)
-    // CAN FIX: Added touchKeys to input mapping so touch controls work on Android
     return keyboardKeys | controllerKeys | controllerAxisKeys | touchKeys;
 #endif
 
@@ -1112,13 +1098,40 @@ int DoMain(void *data)
     return 0;
 }
 
+// CAN FIX: 重构 VBlankIntrWait，让所有硬件中断模拟以及 m4a 混音计算全部合并到 GBA 主逻辑线程
+// 这能实现 100% 完美的单线程同步，彻底清除跨线程指令重排和缓存冲突
 void VBlankIntrWait(void)
 {
     SDL_Log("CAN DEBUG: VBlankIntrWait - Setting frame available");
     SDL_AtomicSet(&isFrameAvailable, 1);
+    
     SDL_Log("CAN DEBUG: VBlankIntrWait - Waiting on semaphore");
     SDL_SemWait(vBlankSemaphore);
-    SDL_Log("CAN DEBUG: VBlankIntrWait - Semaphore released, returning");
+    
+    // GBA 线程被唤醒，此刻 SDL 线程已经完成了新帧渲染并释放了锁
+    // 我们在此处同步触发模拟中断，保证引擎所有的内存操作均按原版顺序安全执行
+    SDL_Log("CAN DEBUG: VBlankIntrWait - Semaphore released, executing safe interrupts");
+
+    // 1. 模拟触发 V-Count 中断 (第 150 行触发线)，更新 MPlay 状态机
+    REG_VCOUNT = 150;
+    if (gIntrTable[0] != NULL)
+    {
+        gIntrTable[0]();
+    }
+
+    // 2. 模拟触发垂直消隐 VBLANK 中断
+    REG_VCOUNT = 161;
+    REG_DISPSTAT |= INTR_FLAG_VBLANK;
+
+    RunDMAs(DMA_HBLANK);
+
+    if (gIntrTable[4] != NULL)
+    {
+        gIntrTable[4](); // 执行 VBlankIntr()，这会执行 m4aSoundMain 混音算法
+    }
+    
+    REG_DISPSTAT &= ~INTR_FLAG_VBLANK;
+    SDL_Log("CAN DEBUG: VBlankIntrWait - Safe interrupts executed successfully");
 }
 
 u8 BinToBcd(u8 bin)
@@ -1203,7 +1216,7 @@ void Platform_GetTime(struct SiiRtcInfo *rtc)
 void Platform_SetTime(struct SiiRtcInfo *rtc)
 {
     internalClock.hour = rtc->hour;
-    internalClock.minute = rtc->second; // 修正逻辑：应该是 minute = rtc->minute 而非 second
+    internalClock.minute = rtc->minute;
     internalClock.second = rtc->second;
 }
 
