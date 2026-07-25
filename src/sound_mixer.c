@@ -5,6 +5,8 @@
 
 #ifdef PORTABLE
     #include "cgb_audio.h"
+    // 引入 SDL_Log 声明，用于输出诊断日志
+    extern void SDL_Log(const char *fmt, ...);
 #endif
 
 #define VCOUNT_VBLANK 160
@@ -20,6 +22,18 @@ static s8 sub_82DF758(struct MixerSource *chan, u32 current);
 void RunMixerFrame(void) {
     struct SoundMixerState *mixer = (struct SoundMixerState *)SOUND_INFO_PTR;
     
+#ifdef PORTABLE
+    // CAN DEBUG: 添加每 60 帧一次的锁状态诊断日志，确认是否因为状态锁未对齐而导致混音器提前退出
+    static u32 mixerLogCount = 0;
+    if (mixerLogCount++ % 60 == 0) {
+        SDL_Log("CAN DEBUG: [RunMixerFrame] mixer=%p, lockStatus=0x%08X, MIXER_UNLOCKED=0x%08X, MIXER_LOCKED=0x%08X",
+                (void*)mixer, 
+                mixer ? (unsigned int)mixer->lockStatus : 0, 
+                (unsigned int)MIXER_UNLOCKED, 
+                (unsigned int)MIXER_LOCKED);
+    }
+#endif
+
     if (mixer->lockStatus != MIXER_UNLOCKED) {
         return;
     }
@@ -53,7 +67,7 @@ void RunMixerFrame(void) {
     #ifdef PORTABLE
         cgb_audio_generate(samplesPerFrame);
         
-        // CAN FIX: 将 CGB PSG PSG方波与噪声混音通道的数据合并到 DirectSound 的 float 混合音频流
+        // 将 CGB PSG PSG方波与噪声混音通道的数据合并到 DirectSound 的 float 混合音频流
         float *cgbBuffer = cgb_get_buffer();
         for (int i = 0; i < samplesPerFrame * 2; i++) {
             outBuffer[i] += cgbBuffer[i];

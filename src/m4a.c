@@ -4,7 +4,7 @@
 
 #ifdef PORTABLE
     #include "cgb_audio.h"
-    // 引用标准跳转表模板
+    // 引用由 m4a_tables.c 导出的标准 MIDI 指令跳转表模板
     extern const MPlayFunc gMPlayJumpTableTemplate[36];
     extern void SDL_Log(const char *fmt, ...);
 #endif
@@ -113,7 +113,19 @@ void m4aSoundMain(void)
     extern void RunMixerFrame(void);
     struct SoundInfo *soundInfo = SOUND_INFO_PTR;
     
-    // CAN FIX: 只需触发一次 musicPlayerHead，MPlayMain 会在内部顺着 MPlayMainNext 递归遍历整条链表，修复双重遍历导致的计数损坏
+    // CAN DEBUG: 每 60 帧打印一次 BGM 引擎的内存状况，检查是否因为 ident 锁损坏或地址为空导致 sequencer 被越过
+    static u32 soundMainLog = 0;
+    if (soundMainLog++ % 60 == 0) {
+        struct MusicPlayerInfo *bgm = soundInfo ? soundInfo->musicPlayerHead : NULL;
+        SDL_Log("CAN DEBUG: [m4aSoundMain] soundInfo=%p, MPlayMainHead=%p, musicPlayerHead=%p, bgm->status=0x%08X, bgm->ident=0x%08X",
+                (void*)soundInfo,
+                soundInfo ? (void*)soundInfo->MPlayMainHead : NULL,
+                (void*)bgm,
+                bgm ? (unsigned int)bgm->status : 0,
+                bgm ? (unsigned int)bgm->ident : 0);
+    }
+    
+    // 触发 musicPlayerHead
     if (soundInfo && soundInfo->MPlayMainHead && soundInfo->musicPlayerHead)
     {
         soundInfo->MPlayMainHead(soundInfo->musicPlayerHead);
@@ -534,7 +546,6 @@ void m4aSoundMode(u32 mode)
     if (temp)
         soundInfo->masterVolume = temp >> SOUND_MODE_MASVOL_SHIFT;
 
-    // CAN FIX: 恢复使用正确的宏 SOUND_MODE_DA_BIT
     temp = mode & SOUND_MODE_DA_BIT;
 
     if (temp)
@@ -659,10 +670,13 @@ void MPlayOpen(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *track
         tracks++;
     }
 
+    // append music player and MPlayMain to linked list
+
     if (soundInfo->MPlayMainHead != NULL)
     {
         mplayInfo->MPlayMainNext = soundInfo->MPlayMainHead;
         mplayInfo->musicPlayerNext = soundInfo->musicPlayerHead;
+        // NULL assignment semantically useless, but required for match
         soundInfo->MPlayMainHead = NULL;
     }
 
