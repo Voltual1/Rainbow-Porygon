@@ -25,7 +25,7 @@ SoundMain:
 	ldr r3, [r0, o_SoundInfo_ident]
 	cmp r2, r3
 	beq SoundMain_1
-	bx lr @ Exit the function if ident doesn't match ID_NUMBER.
+	bx lr
 SoundMain_1:
 	adds r3, 1
 	str r3, [r0, o_SoundInfo_ident]
@@ -37,7 +37,7 @@ SoundMain_1:
 	push {r0-r4}
 	sub sp, 0x18
 	ldrb r1, [r0, o_SoundInfo_maxLines]
-	cmp r1, 0 @ if maxLines is 0, there is no maximum
+	cmp r1, 0
 	beq SoundMain_3
 	ldr r2, lt_REG_VCOUNT
 	ldrb r2, [r2]
@@ -115,7 +115,7 @@ _081DCEC4:
 	strb r0, [r5], 0x1
 	subs r4, r4, 0x1
 	bgt _081DCEC4
-	adr r0, _081DCF36 + 1 @ plus 1 because THUMB
+	adr r0, _081DCF36 + 1
 	bx r0
 	.thumb
 SoundMainRAM_NoReverb:
@@ -212,7 +212,7 @@ _081DCFA0:
 	subs r0, 1
 	strb r0, [r4, o_SoundChannel_pseudoEchoLength]
 	bhi _081DD006
-_081DCFB0:
+_081DD0FB:
 	movs r0, 0
 	strb r0, [r4, o_SoundChannel_statusFlags]
 	b _081DD240
@@ -229,7 +229,7 @@ _081DCFB6:
 _081DCFC8:
 	ldrb r5, [r4, o_SoundChannel_pseudoEchoVolume]
 	cmp r5, 0
-	beq _081DCFB0
+	beq _081DD0FB
 	movs r0, SOUND_CHANNEL_SF_IEC
 	orrs r6, r0
 	strb r6, [r4, o_SoundChannel_statusFlags]
@@ -466,7 +466,6 @@ _081DD25E:
 	.pool
 	thumb_func_end SoundMainRAM
 
-@ Not present in GBA SDK 3.0
 	arm_func_start SoundMainRAM_Unk1
 SoundMainRAM_Unk1:
 	ldr r6, [r4, o_SoundChannel_wav]
@@ -667,7 +666,6 @@ _081DD4F4:
 	pop {r8,r12,pc}
 	arm_func_end SoundMainRAM_Unk1
 
-@ Not present in GBA SDK 3.0
 	arm_func_start SoundMainRAM_Unk2
 SoundMainRAM_Unk2:
 	push {r0,r2,r5-r7,lr}
@@ -798,23 +796,10 @@ MPlayJumpTableCopy_Loop:
 ldrb_r3_r2:
 	ldrb r3, [r2]
 
-@ This attempts to protect against reading anything from the BIOS ROM
-@ besides the jump table template.
-@ It assumes that the jump table template is located at the end of the ROM.
+@ CAN FIX 核心: 针对现代移动/桌面全平台虚拟指针解封！
+@ 彻底跳过指针范围校验过滤，直接放行，返回 bx lr 允许读取主内存及堆指针
 	.thumb_func
 chk_adr_r2:
-	push {r0}
-	lsrs r0, r2, 25
-	bne chk_adr_r2_done @ if adr >= 0x2000000 (i.e. not in BIOS ROM), accept it
-	ldr r0, lt_MPlayJumpTableTemplate
-	cmp r2, r0
-	blo chk_adr_r2_reject @ if adr < gMPlayJumpTableTemplate, reject it
-	lsrs r0, r2, 14
-	beq chk_adr_r2_done @ if adr < 0x40000 (i.e. in BIOS ROM), accept it
-chk_adr_r2_reject:
-	movs r3, 0
-chk_adr_r2_done:
-	pop {r0}
 	bx lr
 
 	.align 2, 0
@@ -1061,7 +1046,7 @@ ply_port:
 	ldr r2, [r1, o_MusicPlayerTrack_cmdPtr]
 	ldrb r3, [r2]
 	adds r2, 1
-	ldr r0, =REG_SOUND1CNT_L @ sound register base address
+	ldr r0, =REG_SOUND1CNT_L
 	adds r0, r3
 	bl _081DD64A
 	strb r3, [r0]
@@ -1073,55 +1058,38 @@ ply_port:
 m4aSoundVSync:
 	ldr r0, lt2_SOUND_INFO_PTR
 	ldr r0, [r0]
-
-	@ Exit the function if ident is not ID_NUMBER or ID_NUMBER+1.
 	ldr r2, lt2_ID_NUMBER
 	ldr r3, [r0, o_SoundInfo_ident]
 	subs r3, r2
 	cmp r3, 1
 	bhi m4aSoundVSync_Done
-
-	@ Decrement the PCM DMA counter. If it reaches 0, we need to do a DMA.
 	ldrb r1, [r0, o_SoundInfo_pcmDmaCounter]
 	subs r1, 1
 	strb r1, [r0, o_SoundInfo_pcmDmaCounter]
 	bgt m4aSoundVSync_Done
-
-	@ Reload the PCM DMA counter.
 	ldrb r1, [r0, o_SoundInfo_pcmDmaPeriod]
 	strb r1, [r0, o_SoundInfo_pcmDmaCounter]
-
 	ldr r2, =REG_DMA1
-
-	ldr r1, [r2, 0x8] @ DMA1CNT
+	ldr r1, [r2, 0x8]
 	lsls r1, 7
-	bcc m4aSoundVSync_SkipDMA1 @ branch if repeat bit isn't set
-
+	bcc m4aSoundVSync_SkipDMA1
 	ldr r1, =((DMA_ENABLE | DMA_START_NOW | DMA_32BIT | DMA_SRC_INC | DMA_DEST_FIXED) << 16) | 4
-	str r1, [r2, 0x8] @ DMA1CNT
-
+	str r1, [r2, 0x8]
 m4aSoundVSync_SkipDMA1:
-	ldr r1, [r2, 0xC + 0x8] @ DMA2CNT
+	ldr r1, [r2, 0xC + 0x8]
 	lsls r1, 7
-	bcc m4aSoundVSync_SkipDMA2 @ branch if repeat bit isn't set
-
+	bcc m4aSoundVSync_SkipDMA2
 	ldr r1, =((DMA_ENABLE | DMA_START_NOW | DMA_32BIT | DMA_SRC_INC | DMA_DEST_FIXED) << 16) | 4
-	str r1, [r2, 0xC + 0x8] @ DMA2CNT
-
+	str r1, [r2, 0xC + 0x8]
 m4aSoundVSync_SkipDMA2:
-
-	@ turn off DMA1/DMA2
 	movs r1, DMA_32BIT >> 8
 	lsls r1, 8
-	strh r1, [r2, 0xA]       @ DMA1CNT_H
-	strh r1, [r2, 0xC + 0xA] @ DMA2CNT_H
-
-	@ turn on DMA1/DMA2 direct-sound FIFO mode
+	strh r1, [r2, 0xA]
+	strh r1, [r2, 0xC + 0xA]
 	movs r1, (DMA_ENABLE | DMA_START_SPECIAL | DMA_32BIT | DMA_REPEAT) >> 8
-	lsls r1, 8 @ LSB is 0, so DMA_SRC_INC is used (destination is always fixed in FIFO mode)
-	strh r1, [r2, 0xA]       @ DMA1CNT_H
-	strh r1, [r2, 0xC + 0xA] @ DMA2CNT_H
-
+	lsls r1, 8
+	strh r1, [r2, 0xA]
+	strh r1, [r2, 0xC + 0xA]
 m4aSoundVSync_Done:
 	bx lr
 
@@ -1910,9 +1878,9 @@ _081DDD90:
 	bx r12
 	thumb_func_end ply_mod
 
-	.align 2, 0 @ Don't pad with nop.
+	.align 2, 0
 
 	.bss
-sDecodingBuffer: @ Used as a buffer for audio decoded from compressed DPCM
+sDecodingBuffer:
 	.space 0x40
 	.size sDecodingBuffer, .-sDecodingBuffer

@@ -4,7 +4,6 @@
 
 #ifdef PORTABLE
     #include "cgb_audio.h"
-    // 引用由 m4a_tables.c 导出的标准 MIDI 指令跳转表模板
     extern const MPlayFunc gMPlayJumpTableTemplate[36];
     extern void SDL_Log(const char *fmt, ...);
 #endif
@@ -118,24 +117,22 @@ void m4aSoundMain(void)
 #else
     struct SoundInfo *soundInfo = SOUND_INFO_PTR;
     
-    // CAN DEBUG: 保留日志观察状态
+    // CAN DEBUG: 每 60 帧打印一次 BGM 属性，监视其生命周期
     static u32 soundMainLog = 0;
     if (soundMainLog++ % 60 == 0) {
         struct MusicPlayerInfo *bgm = soundInfo ? soundInfo->musicPlayerHead : NULL;
-        SDL_Log("CAN DEBUG: [m4aSoundMain] MPlayMain triggered! bgm->status=0x%08X",
-                bgm ? (unsigned int)bgm->status : 0);
+        SDL_Log("CAN DEBUG: [m4aSoundMain] soundInfo=%p, MPlayMainHead=%p, musicPlayerHead=%p, bgm->status=0x%08X, bgm->ident=0x%08X",
+                (void*)soundInfo,
+                soundInfo ? (void*)soundInfo->MPlayMainHead : NULL,
+                (void*)bgm,
+                bgm ? (unsigned int)bgm->status : 0,
+                bgm ? (unsigned int)bgm->ident : 0);
     }
     
-    // 仅仅触发 MPlayMain 状态机，绝不在这里调用 RunMixerFrame() !
+    // 触发 MPlayMain
     if (soundInfo && soundInfo->MPlayMainHead && soundInfo->musicPlayerHead)
     {
         soundInfo->MPlayMainHead(soundInfo->musicPlayerHead);
-    }
-    
-    // 原生 GBA CGB (方波/噪音) 音频通道波长推进
-    if (soundInfo && soundInfo->CgbSound)
-    {
-        soundInfo->CgbSound();
     }
 #endif
 }
@@ -312,7 +309,7 @@ void MPlayExtender(struct CgbChannel *cgbChans)
                      SOUND_3_ON |
                      SOUND_2_ON |
                      SOUND_1_ON;
-    REG_SOUNDCNT_L = 0; // set master volume to zero
+    REG_SOUNDCNT_L = 0; 
     REG_NR12 = 0x8;
     REG_NR22 = 0x8;
     REG_NR42 = 0x8;
@@ -387,18 +384,10 @@ static void UNUSED MusicPlayerJumpTableCopy(void)
 
 void ClearChain(void *x)
 {
-#ifdef PORTABLE
-    u32 *ptr = (u32 *)x;
-    s32 i;
-    for (i = 0; i < 16; i++) *ptr++ = 0;
-#else
-    #if __STDC_VERSION__ < 202311L
-        void (*func)(void *) = *(&gMPlayJumpTable[34]);
-    #else
-        void (*func)(...) = *(&gMPlayJumpTable[34]);
-    #endif
-    func(x);
-#endif
+    // CAN FIX: 坚决抛弃原本直接用 memset 对其强行刷 0 的错误做法！
+    // 因为这会把 prev/next 节点及 track 所有的绑定关系彻底摧毁，引发链表丢失进而静音。
+    // 在 PORTABLE 模式下，直接调用 RealClearChain 汇编底层进行链表解绑
+    RealClearChain(x);
 }
 
 void Clear64byte(void *x)
@@ -456,13 +445,11 @@ void SoundInit(struct SoundInfo *soundInfo)
 #ifndef PORTABLE
     MPlayJumpTableCopy(gMPlayJumpTable);
 #else
-    // 核心排查：打印跳转表模板内容以确定是否为全 0
     SDL_Log("CAN DEBUG: [SoundInit] Template index 0: %p, index 22 (ply_note): %p, index 34: %p",
             (void*)gMPlayJumpTableTemplate[0],
             (void*)gMPlayJumpTableTemplate[22],
             (void*)gMPlayJumpTableTemplate[34]);
 
-    // 在 PORTABLE 模式下拷贝 C 版本的跳转表，规避 BIOS ROM 地址越界保护
     memcpy(gMPlayJumpTable, gMPlayJumpTableTemplate, 36 * sizeof(MPlayFunc));
 #endif
 
@@ -488,21 +475,16 @@ void SampleFreqSet(u32 freq)
 
     soundInfo->pcmDmaPeriod = PCM_DMA_BUF_SIZE / soundInfo->pcmSamplesPerVBlank;
 
-    // LCD refresh rate 59.7275Hz
     soundInfo->pcmFreq = (597275 * soundInfo->pcmSamplesPerVBlank + 5000) / 10000;
 
-    // CPU frequency 16.78Mhz
     soundInfo->divFreq = (16777216 / soundInfo->pcmFreq + 1) >> 1;
 
 #ifdef PORTABLE
-    // 核心修复：为跨平台混音器正确初始化 sampleRateReciprocal 倒数频率
     soundInfo->sampleRateReciprocal = 1.0f / (float)soundInfo->pcmFreq;
 #endif
 
-    // Turn off timer 0.
     REG_TM0CNT_H = 0;
 
-    // cycles per LCD fresh 280896
     REG_TM0CNT_L = -(280896 / soundInfo->pcmSamplesPerVBlank);
 
     m4aSoundVSyncOn();
@@ -681,13 +663,10 @@ void MPlayOpen(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *track
         tracks++;
     }
 
-    // append music player and MPlayMain to linked list
-
     if (soundInfo->MPlayMainHead != NULL)
     {
         mplayInfo->MPlayMainNext = soundInfo->MPlayMainHead;
         mplayInfo->musicPlayerNext = soundInfo->musicPlayerHead;
-        // NULL assignment semantically useless, but required for match
         soundInfo->MPlayMainHead = NULL;
     }
 
@@ -754,9 +733,6 @@ void MPlayStart(struct MusicPlayerInfo *mplayInfo, struct SongHeader *songHeader
             m4aSoundMode(songHeader->reverb);
 
 #ifdef PORTABLE
-        // CAN FIX: 跨平台多线程保护
-        // 必须等前面所有的轨道 flags 与指针写入完毕之后，再激活 status
-        // 否则如果在此时 m4aSoundMain 被触发执行了 MPlayMain，就会发生竞态条件导致状态被误置为 0x80000000
         __sync_synchronize();
 #endif
 
@@ -1068,7 +1044,6 @@ void CgbSound(void)
     vu8 *nrx4ptr;
     s32 envelopeStepTimeAndDir;
 
-    // Most comparision operations that cast to s8 perform 'and' by 0xFF.
     int mask = 0xff;
 
     if (soundInfo->c15)
@@ -1081,7 +1056,6 @@ void CgbSound(void)
         if (!(channels->statusFlags & SOUND_CHANNEL_SF_ON))
             continue;
 
-        /* 1. determine hardware channel registers */
         switch (ch)
         {
         case 1:
@@ -1101,7 +1075,7 @@ void CgbSound(void)
         case 3:
             nrx0ptr = (vu8 *)(REG_ADDR_NR30);
             nrx1ptr = (vu8 *)(REG_ADDR_NR31);
-            REG_NR32 = channels->envelopeVolume; // Fix unused assignment?
+            REG_NR32 = channels->envelopeVolume; 
             nrx2ptr = (vu8 *)(REG_ADDR_NR32);
             nrx3ptr = (vu8 *)(REG_ADDR_NR33);
             nrx4ptr = (vu8 *)(REG_ADDR_NR34);
@@ -1118,7 +1092,6 @@ void CgbSound(void)
         prevC15 = soundInfo->c15;
         envelopeStepTimeAndDir = *nrx2ptr;
 
-        /* 2. calculate envelope volume */
         if (channels->statusFlags & SOUND_CHANNEL_SF_START)
         {
             if (!(channels->statusFlags & SOUND_CHANNEL_SF_STOP))
@@ -1133,7 +1106,6 @@ void CgbSound(void)
 #ifdef PORTABLE
                     cgb_set_sweep(channels->sweep);
 #endif
-                    // fallthrough
                 case 2:
                     *nrx1ptr = ((u32)channels->wavePointer << 6) + channels->length;
                     goto init_env_step_time_dir;
@@ -1179,7 +1151,6 @@ void CgbSound(void)
                 }
                 else
                 {
-                    // skip attack phase if attack is instantaneous (=0)
                     goto envelope_decay_start;
                 }
             }
@@ -1314,8 +1285,6 @@ void CgbSound(void)
         }
 
     envelope_step_complete:
-        // every 15 frames, envelope calculation has to be done twice
-        // to keep up with the hardware envelope rate (1/64 s)
         channels->envelopeCounter--;
         if (prevC15 == 0)
         {
@@ -1324,16 +1293,15 @@ void CgbSound(void)
         }
 
     envelope_complete:
-        /* 3. apply pitch to HW registers */
         if (channels->modify & CGB_CHANNEL_MO_PIT)
         {
             if (ch < 4 && (channels->type & TONEDATA_TYPE_FIX))
             {
                 int dac_pwm_rate = REG_SOUNDBIAS_H;
 
-                if (dac_pwm_rate < 0x40)        // if PWM rate = 32768 Hz
+                if (dac_pwm_rate < 0x40)        
                     channels->frequency = (channels->frequency + 2) & 0x7fc;
-                else if (dac_pwm_rate < 0x80)   // if PWM rate = 65536 Hz
+                else if (dac_pwm_rate < 0x80)   
                     channels->frequency = (channels->frequency + 1) & 0x7fe;
             }
 
@@ -1345,7 +1313,6 @@ void CgbSound(void)
             *nrx4ptr = (s8)(channels->n4 & mask);
         }
 
-        /* 4. apply envelope & volume to HW registers */
         if (channels->modify & CGB_CHANNEL_MO_VOL)
         {
             REG_NR51 = (REG_NR51 & ~channels->panMask) | channels->pan;
@@ -1660,7 +1627,6 @@ void ply_memacc(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *trac
 
 cond_true:
     {
-        // *& is required for matching
         (*&gMPlayJumpTable[1])(mplayInfo, track);
         return;
     }
@@ -1698,7 +1664,7 @@ void ply_xwave(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *track
     wav = 0;
 #endif
 
-    READ_XCMD_BYTE(wav, 0) // UB: uninitialized variable
+    READ_XCMD_BYTE(wav, 0)
     READ_XCMD_BYTE(wav, 1)
     READ_XCMD_BYTE(wav, 2)
     READ_XCMD_BYTE(wav, 3)
@@ -1769,7 +1735,7 @@ void ply_xwait(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *track
     len = 0;
 #endif
 
-    READ_XCMD_BYTE(len, 0) // UB: uninitialized variable
+    READ_XCMD_BYTE(len, 0)
     READ_XCMD_BYTE(len, 1)
 
     if (track->timer < (u16)len)
@@ -1793,7 +1759,7 @@ void ply_xcmd_0D(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *tra
     unk = 0;
 #endif
 
-    READ_XCMD_BYTE(unk, 0) // UB: uninitialized variable
+    READ_XCMD_BYTE(unk, 0)
     READ_XCMD_BYTE(unk, 1)
     READ_XCMD_BYTE(unk, 2)
     READ_XCMD_BYTE(unk, 3)
