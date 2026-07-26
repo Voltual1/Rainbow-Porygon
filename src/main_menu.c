@@ -12,12 +12,14 @@
 #include "text.h"
 #include "text_window.h"
 #include "window.h"
+#include "load_save.h" // 恢复存档头文件
+#include "save.h"      // 恢复存档头文件
+#include "new_game.h"  // 恢复新游戏头文件
 
 #ifdef PORTABLE
 extern void SDL_Log(const char *fmt, ...);
 #endif
 
-// 占位符界面的最简窗口模板
 static const struct WindowTemplate sPlaceholderWindowTemplate[] =
 {
     {
@@ -48,7 +50,6 @@ static void Task_PlaceholderMenu(u8 taskId);
 static void VBlankCB_Placeholder(void);
 static void CB2_Placeholder(void);
 
-// 模拟基础调色板
 static const u16 sPlaceholderPal[] = {
     RGB_BLACK, RGB_WHITE, RGB(12, 12, 12), RGB(26, 26, 25), 
     [15] = RGB_WHITE 
@@ -57,19 +58,24 @@ static const u16 sPlaceholderPal[] = {
 void CB2_InitMainMenu(void)
 {
 #ifdef PORTABLE
-    SDL_Log("CAN DEBUG: [CB2_InitMainMenu] Entering Minimal Placeholder Menu.");
+    SDL_Log("CAN DEBUG: [CB2_InitMainMenu] Step 2: Testing Save System Initialization.");
 #endif
+
+    // --- 开始恢复存档系统初始化逻辑 ---
+    CheckForFlashMemory();
+    SetSaveBlocksPointers(0);
+    LoadGameSave(SAVE_NORMAL);
+    
+    if (gSaveFileStatus == SAVE_STATUS_EMPTY || gSaveFileStatus == SAVE_STATUS_CORRUPT)
+    {
+        Sav2_ClearSetDefault(); // 确保 gSaveBlock2Ptr 指向的不是全 0 区域
+    }
+    // --- 存档初始化结束 ---
 
     SetVBlankCallback(NULL);
 
     SetGpuReg(REG_OFFSET_DISPCNT, 0);
     SetGpuReg(REG_OFFSET_BG0CNT, 0);
-    SetGpuReg(REG_OFFSET_BG0HOFS, 0);
-    SetGpuReg(REG_OFFSET_BG0VOFS, 0);
-    SetGpuReg(REG_OFFSET_BLDCNT, 0);
-    SetGpuReg(REG_OFFSET_BLDALPHA, 0);
-    SetGpuReg(REG_OFFSET_BLDY, 0);
-
     DmaFill16(3, 0, (void *)VRAM, VRAM_SIZE);
     DmaFill32(3, 0, (void *)OAM, OAM_SIZE);
     DmaFill16(3, 0, (void *)(PLTT), PLTT_SIZE);
@@ -99,9 +105,10 @@ void CB2_InitMainMenu(void)
 
     FillWindowPixelBuffer(0, PIXEL_FILL(1)); 
     AddTextPrinterParameterized(0, FONT_NORMAL, (const u8[]) { 
-        CHAR_D, CHAR_E, CHAR_B, CHAR_U, CHAR_G, CHAR_SPACE, 
-        CHAR_P, CHAR_L, CHAR_A, CHAR_C, CHAR_E, CHAR_H, CHAR_O, CHAR_L, CHAR_D, CHAR_E, CHAR_R, 
-        CHAR_NEWLINE, CHAR_A, CHAR_SPACE, CHAR_B, CHAR_U, CHAR_T, CHAR_T, CHAR_O, CHAR_SPACE, CHAR_R, CHAR_E, CHAR_S, CHAR_E, CHAR_T,
+        CHAR_S, CHAR_A, CHAR_V, CHAR_E, CHAR_SPACE, 
+        CHAR_S, CHAR_Y, CHAR_S, CHAR_T, CHAR_E, CHAR_M, CHAR_SPACE, 
+        CHAR_I, CHAR_N, CHAR_I, CHAR_T, CHAR_SPACE, CHAR_O, CHAR_K,
+        CHAR_NEWLINE, CHAR_A, CHAR_SPACE, CHAR_B, CHAR_U, CHAR_T, CHAR_T, CHAR_O, CHAR_SPACE, CHAR_T, CHAR_O, CHAR_SPACE, CHAR_R, CHAR_E, CHAR_S, CHAR_E, CHAR_T,
         EOS 
     }, 0, 1, 0, 0);
     PutWindowTilemap(0);
@@ -132,15 +139,10 @@ static void Task_PlaceholderMenu(u8 taskId)
 {
     if (JOY_NEW(A_BUTTON))
     {
-#ifdef PORTABLE
-        SDL_Log("CAN DEBUG: [Task_PlaceholderMenu] A Pressed. Attempting Soft Reset.");
-#endif
         DoSoftReset();
     }
 }
 
-// --- CAN FIX: 必须保留的外部引用函数 ---
-// 因为 slot_machine.c 等文件引用了这个函数，精简版必须保留它的定义以防止 ld.lld 链接失败
 void CreateYesNoMenuParameterized(u8 x, u8 y, u16 baseTileNum, u16 baseBlock, u8 yesNoPalNum, u8 winPalNum)
 {
     struct WindowTemplate template = CreateWindowTemplate(0, x + 1, y + 1, 5, 4, winPalNum, baseBlock);
