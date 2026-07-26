@@ -52,6 +52,8 @@ extern void SDL_Log(const char *fmt, ...);
  * -----------------------
  */
 
+#define OPTION_MENU_FLAG (1 << 15)
+
 static EWRAM_DATA bool8 sStartedPokeBallTask = 0;
 static EWRAM_DATA u16 sCurrItemAndOptionMenuCheck = 0;
 
