@@ -47,6 +47,8 @@
 extern void SDL_Log(const char *fmt, ...);
 #endif
 
+#define OPTION_MENU_FLAG (1 << 15)
+
 /*
  * Main menu state machine
  * -----------------------
