@@ -47,6 +47,7 @@
 extern void SDL_Log(const char *fmt, ...);
 #endif
 
+// CAN FIX: 补齐缺失的 OPTION 菜单标志宏
 #define OPTION_MENU_FLAG (1 << 15)
 
 /*
@@ -2099,7 +2100,7 @@ static void MainMenu_FormatSavegamePlayer(void)
     AddTextPrinterParameterized3(2, FONT_NORMAL, 0, 17, sTextColor_MenuInfo, TEXT_SKIP_DRAW, gStringVar4);
     
     // 使用纯安全写死的 EOS 终结符
-    AddTextPrinterParameterized3(2, FONT_NORMAL, 70, 17, sTextColor_MenuInfo, TEXT_SKIP_DRAW, (const u8[]){CHAR_D, CHAR_U, CHAR_M, CHAR_M, CHAR_Y, EOS});
+    AddTextPrinterParameterized3(2, FONT_NORMAL, 70, 17, sTextColor_MenuInfo, TEXT_SKIP_DRAW, COMPOUND_STRING("DUMMY"));
 }
 
 static void MainMenu_FormatSavegameTime(void)
@@ -2107,7 +2108,7 @@ static void MainMenu_FormatSavegameTime(void)
     StringExpandPlaceholders(gStringVar4, gText_ContinueMenuTime);
     AddTextPrinterParameterized3(2, FONT_NORMAL, 0x6C, 17, sTextColor_MenuInfo, TEXT_SKIP_DRAW, gStringVar4);
     
-    AddTextPrinterParameterized3(2, FONT_NORMAL, 0xAC, 17, sTextColor_MenuInfo, TEXT_SKIP_DRAW, (const u8[]){CHAR_0, CHAR_colon, CHAR_0, CHAR_0, EOS});
+    AddTextPrinterParameterized3(2, FONT_NORMAL, 0xAC, 17, sTextColor_MenuInfo, TEXT_SKIP_DRAW, COMPOUND_STRING("0:00"));
 }
 
 static void MainMenu_FormatSavegamePokedex(void)
@@ -2115,7 +2116,7 @@ static void MainMenu_FormatSavegamePokedex(void)
     StringExpandPlaceholders(gStringVar4, gText_ContinueMenuPokedex);
     AddTextPrinterParameterized3(2, FONT_NORMAL, 0, 33, sTextColor_MenuInfo, TEXT_SKIP_DRAW, gStringVar4);
     
-    AddTextPrinterParameterized3(2, FONT_NORMAL, 70, 33, sTextColor_MenuInfo, TEXT_SKIP_DRAW, (const u8[]){CHAR_0, EOS});
+    AddTextPrinterParameterized3(2, FONT_NORMAL, 70, 33, sTextColor_MenuInfo, TEXT_SKIP_DRAW, COMPOUND_STRING("0"));
 }
 
 static void MainMenu_FormatSavegameBadges(void)
@@ -2123,11 +2124,12 @@ static void MainMenu_FormatSavegameBadges(void)
     StringExpandPlaceholders(gStringVar4, gText_ContinueMenuBadges);
     AddTextPrinterParameterized3(2, FONT_NORMAL, 0x6C, 33, sTextColor_MenuInfo, TEXT_SKIP_DRAW, gStringVar4);
     
-    AddTextPrinterParameterized3(2, FONT_NORMAL, 0xAC, 33, sTextColor_MenuInfo, TEXT_SKIP_DRAW, (const u8[]){CHAR_0, EOS});
+    AddTextPrinterParameterized3(2, FONT_NORMAL, 0xAC, 33, sTextColor_MenuInfo, TEXT_SKIP_DRAW, COMPOUND_STRING("0"));
 }
 
 static void LoadMainMenuWindowFrameTiles(u8 bgId, u16 tileOffset)
 {
+    // CAN FIX: 菜单窗口边框样式做边界安全控制
     u8 frameType = gSaveBlock2Ptr->optionsWindowFrameType;
     if (frameType >= WINDOW_FRAMES_COUNT)
         frameType = 0;
