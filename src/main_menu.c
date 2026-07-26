@@ -40,8 +40,8 @@
 #include "title_screen.h"
 #include "window.h"
 #include "mystery_gift_menu.h"
-#include "load_save.h"     // CAN FIX: 用于 SetSaveBlocksPointers 和 CheckForFlashMemory
-#include "new_game.h"      // CAN FIX: 用于 Sav2_ClearSetDefault
+#include "load_save.h"
+#include "new_game.h"
 
 #ifdef PORTABLE
 extern void SDL_Log(const char *fmt, ...);
@@ -51,8 +51,8 @@ extern void SDL_Log(const char *fmt, ...);
  * Main menu state machine
  * -----------------------
  */
-
-#define OPTION_MENU_FLAG (1 << 15)
+ 
+#define OPTION_MENU_FLAG (1 << 15) 
 
 static EWRAM_DATA bool8 sStartedPokeBallTask = 0;
 static EWRAM_DATA u16 sCurrItemAndOptionMenuCheck = 0;
@@ -457,19 +457,19 @@ static u32 InitMainMenu(bool8 returningFromOptionsMenu)
     SDL_Log("CAN DEBUG: [InitMainMenu] returningFromOptionsMenu=%d", returningFromOptionsMenu);
 #endif
 
-    // CAN FIX: 防止指针为空导致的瞬间崩溃闪退
-    // 在非原版启动流下，如果 gSaveBlock2Ptr 未被初始化，调用 LoadMainMenuWindowFrameTiles 会直接解引用空指针
+    // CAN FIX: 彻底保障 gSaveBlock2Ptr 的初始化
     if (gSaveBlock2Ptr == NULL)
     {
 #ifdef PORTABLE
         SDL_Log("CAN DEBUG: [InitMainMenu] gSaveBlock2Ptr is NULL! Safely initializing Save System...");
 #endif
-        CheckForFlashMemory();
+        CheckForFlashMemory(); // 现在这个函数底层屏蔽了硬件操作，非常安全
         SetSaveBlocksPointers(0);
         LoadGameSave(SAVE_NORMAL);
-        if (gSaveFileStatus == SAVE_STATUS_EMPTY || gSaveFileStatus == SAVE_STATUS_CORRUPT)
+        // 如果数据损坏或为空，则必须初始化默认数值
+        if (gSaveFileStatus != SAVE_STATUS_OK)
         {
-            Sav2_ClearSetDefault(); // 写入默认的参数（包括菜单窗口框架样式），防止使用错误数据
+            Sav2_ClearSetDefault(); 
         }
     }
 
@@ -509,8 +509,6 @@ static u32 InitMainMenu(bool8 returningFromOptionsMenu)
     ChangeBgY(1, 0, BG_COORD_SET);
     InitWindows(sWindowTemplates_MainMenu);
     DeactivateAllTextPrinters();
-    
-    // 如果没有上述的 NULL 指针保护，程序将在此处获取 Frame 类型时瞬间崩溃。
     LoadMainMenuWindowFrameTiles(0, MAIN_MENU_BORDER_TILE);
 
     SetGpuReg(REG_OFFSET_WIN0H, 0);
@@ -2094,9 +2092,16 @@ static void MainMenu_FormatSavegameText(void)
 
 static void MainMenu_FormatSavegamePlayer(void)
 {
+    // CAN FIX: 添加字符串安全截断屏障，避免名字长度越界造成死循环崩溃
+    u8 safeName[PLAYER_NAME_LENGTH + 1];
+    
     StringExpandPlaceholders(gStringVar4, gText_ContinueMenuPlayer);
     AddTextPrinterParameterized3(2, FONT_NORMAL, 0, 17, sTextColor_MenuInfo, TEXT_SKIP_DRAW, gStringVar4);
-    AddTextPrinterParameterized3(2, FONT_NORMAL, GetStringRightAlignXOffset(FONT_NORMAL, gSaveBlock2Ptr->playerName, 100), 17, sTextColor_MenuInfo, TEXT_SKIP_DRAW, gSaveBlock2Ptr->playerName);
+    
+    memcpy(safeName, gSaveBlock2Ptr->playerName, PLAYER_NAME_LENGTH);
+    safeName[PLAYER_NAME_LENGTH] = EOS;
+    
+    AddTextPrinterParameterized3(2, FONT_NORMAL, GetStringRightAlignXOffset(FONT_NORMAL, safeName, 100), 17, sTextColor_MenuInfo, TEXT_SKIP_DRAW, safeName);
 }
 
 static void MainMenu_FormatSavegameTime(void)
@@ -2149,8 +2154,14 @@ static void MainMenu_FormatSavegameBadges(void)
 
 static void LoadMainMenuWindowFrameTiles(u8 bgId, u16 tileOffset)
 {
-    LoadBgTiles(bgId, GetWindowFrameTilesPal(gSaveBlock2Ptr->optionsWindowFrameType)->tiles, 0x120, tileOffset);
-    LoadPalette(GetWindowFrameTilesPal(gSaveBlock2Ptr->optionsWindowFrameType)->pal, BG_PLTT_ID(2), PLTT_SIZE_4BPP);
+    // CAN FIX: 菜单窗口边框样式做边界安全控制
+    u8 frameType = gSaveBlock2Ptr->optionsWindowFrameType;
+    if (frameType >= WINDOW_FRAMES_COUNT)
+    {
+        frameType = 0;
+    }
+    LoadBgTiles(bgId, GetWindowFrameTilesPal(frameType)->tiles, 0x120, tileOffset);
+    LoadPalette(GetWindowFrameTilesPal(frameType)->pal, BG_PLTT_ID(2), PLTT_SIZE_4BPP);
 }
 
 static void DrawMainMenuWindowBorder(const struct WindowTemplate *template, u16 baseTileNum)
