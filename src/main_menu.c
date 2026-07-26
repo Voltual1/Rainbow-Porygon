@@ -40,143 +40,22 @@
 #include "title_screen.h"
 #include "window.h"
 #include "mystery_gift_menu.h"
+#include "load_save.h"     // CAN FIX: 用于 SetSaveBlocksPointers 和 CheckForFlashMemory
+#include "new_game.h"      // CAN FIX: 用于 Sav2_ClearSetDefault
+
+#ifdef PORTABLE
+extern void SDL_Log(const char *fmt, ...);
+#endif
 
 /*
  * Main menu state machine
  * -----------------------
- *
- * Entry point: CB2_InitMainMenu
- *
- * Note: States advance sequentially unless otherwise stated.
- *
- * CB2_InitMainMenu / CB2_ReinitMainMenu
- *  - Both of these states call InitMainMenu, which does all the work.
- *  - In the Reinit case, the init code will check if the user came from
- *    the options screen. If they did, then the options menu item is
- *    pre-selected.
- *
- * Task_MainMenuCheckSaveFile
- *  - Determines how many menu options to show based on whether
- *    the save file is Ok, empty, corrupted, etc.
- *  - If there was an error loading the save file, advance to
- *    Task_WaitForSaveFileErrorWindow.
- *  - If there were no errors, advance to Task_MainMenuCheckBattery.
- *  - Note that the check to enable Mystery Events would normally happen
- *    here, but this version of Emerald has them disabled.
- *
- * Task_WaitForSaveFileErrorWindow
- *  - Wait for the text to finish printing and then for the A button
- *    to be pressed.
- *
- * Task_MainMenuCheckBattery
- *  - If the battery is OK, advance to Task_DisplayMainMenu.
- *  - If the battery is dry, advance to Task_WaitForBatteryDryErrorWindow.
- *
- * Task_WaitForBatteryDryErrorWindow
- *  - Wait for the text to finish printing and then for the A button
- *    to be pressed.
- *
- * Task_DisplayMainWindow
- *  - Display the buttons to the user. If the menu is in HAS_MYSTERY_EVENTS
- *    mode, there are too many buttons for one screen and a scrollbar is added,
- *    and the scrollbar task is spawned (Task_ScrollIndicatorArrowPairOnMainMenu).
- *
- * Task_HighlightSelectedMainMenuItem
- *  - Update the UI to match the currently selected item.
- *
- * Task_HandleMainMenuInput
- *  - If A is pressed, advance to Task_HandleMainMenuAPressed.
- *  - If B is pressed, return to the title screen via CB2_InitTitleScreen.
- *  - If Up or Down is pressed, handle scrolling if there is a scroll bar, change
- *    the selection, then go back to Task_HighlightSelectedMainMenuItem.
- *
- * Task_HandleMainMenuAPressed
- *  - If the user selected New Game, advance to Task_NewGameBirchSpeech_Init.
- *  - If the user selected Continue, advance to CB2_ContinueSavedGame.
- *  - If the user selected the Options menu, advance to CB2_InitOptionMenu.
- *  - If the user selected Mystery Gift, advance to CB2_InitMysteryGift. However,
- *    if the wireless adapter was removed, instead advance to
- *    Task_DisplayMainMenuInvalidActionError.
- *  - Code to start a Mystery Event is present here, but is unreachable in this
- *    version.
- *
- * Task_HandleMainMenuBPressed
- *  - Clean up the main menu and go back to CB2_InitTitleScreen.
- *
- * Task_DisplayMainMenuInvalidActionError
- *  - Print one of three different error messages, wait for the text to stop
- *    printing, and then wait for A or B to be pressed.
- * - Then advance to Task_HandleMainMenuBPressed.
- *
- * Task_NewGameBirchSpeech_Init
- *  - Load the sprites for the intro speech, start playing music
- * Task_NewGameBirchSpeech_WaitToShowBirch
- *  - Spawn Task_NewGameBirchSpeech_FadeInTarget1OutTarget2
- *  - Spawn Task_NewGameBirchSpeech_FadePlatformOut
- *  - Both of these tasks destroy themselves when done.
- * Task_NewGameBirchSpeech_WaitForSpriteFadeInWelcome
- * Task_NewGameBirchSpeech_ThisIsAPokemon
- *  - When the text is done printing, spawns Task_NewGameBirchSpeechSub_InitPokeball
- * Task_NewGameBirchSpeech_MainSpeech
- * Task_NewGameBirchSpeech_AndYouAre
- * Task_NewGameBirchSpeech_StartBirchLotadPlatformFade
- * Task_NewGameBirchSpeech_StartBirchLotadPlatformFade
- * Task_NewGameBirchSpeech_SlidePlatformAway
- * Task_NewGameBirchSpeech_StartPlayerFadeIn
- * Task_NewGameBirchSpeech_WaitForPlayerFadeIn
- * Task_NewGameBirchSpeech_BoyOrGirl
- * Task_NewGameBirchSpeech_WaitToShowGenderMenu
- * Task_NewGameBirchSpeech_ChooseGender
- *  - Animates by advancing to Task_NewGameBirchSpeech_SlideOutOldGenderSprite
- *    whenever the player's selection changes.
- *  - Advances to Task_NewGameBirchSpeech_WhatsYourName when done.
- *
- * Task_NewGameBirchSpeech_SlideOutOldGenderSprite
- * Task_NewGameBirchSpeech_SlideInNewGenderSprite
- *  - Returns back to Task_NewGameBirchSpeech_ChooseGender.
- *
- * Task_NewGameBirchSpeech_WhatsYourName
- * Task_NewGameBirchSpeech_WaitForWhatsYourNameToPrint
- * Task_NewGameBirchSpeech_WaitPressBeforeNameChoice
- * Task_NewGameBirchSpeech_StartNamingScreen
- * C2_NamingScreen
- *  - Returns to CB2_NewGameBirchSpeech_ReturnFromNamingScreen when done
- * CB2_NewGameBirchSpeech_ReturnFromNamingScreen
- * Task_NewGameBirchSpeech_ReturnFromNamingScreenShowTextbox
- * Task_NewGameBirchSpeech_SoItsPlayerName
- * Task_NewGameBirchSpeech_CreateNameYesNo
- * Task_NewGameBirchSpeech_ProcessNameYesNoMenu
- *  - If confirmed, advance to Task_NewGameBirchSpeech_SlidePlatformAway2.
- *  - Otherwise, return to Task_NewGameBirchSpeech_BoyOrGirl.
- *
- * Task_NewGameBirchSpeech_SlidePlatformAway2
- * Task_NewGameBirchSpeech_ReshowBirchLotad
- * Task_NewGameBirchSpeech_WaitForSpriteFadeInAndTextPrinter
- * Task_NewGameBirchSpeech_AreYouReady
- * Task_NewGameBirchSpeech_ShrinkPlayer
- * Task_NewGameBirchSpeech_WaitForPlayerShrink
- * Task_NewGameBirchSpeech_FadePlayerToWhite
- * Task_NewGameBirchSpeech_Cleanup
- *  - Advances to CB2_NewGame.
- *
- * Task_NewGameBirchSpeechSub_InitPokeball
- *  - Advances to Task_NewGameBirchSpeechSub_WaitForLotad
- * Task_NewGameBirchSpeechSub_WaitForLotad
- *  - Destroys itself when done.
  */
-
-#define OPTION_MENU_FLAG (1 << 15)
-
-// Static type declarations
-
-// Static RAM declarations
 
 static EWRAM_DATA bool8 sStartedPokeBallTask = 0;
 static EWRAM_DATA u16 sCurrItemAndOptionMenuCheck = 0;
 
 static u8 sBirchSpeechMainTaskId;
-
-// Static ROM declarations
 
 static u32 InitMainMenu(bool8);
 static void Task_MainMenuCheckSaveFile(u8);
@@ -244,8 +123,6 @@ static void MainMenu_FormatSavegamePlayer(void);
 static void MainMenu_FormatSavegamePokedex(void);
 static void MainMenu_FormatSavegameTime(void);
 static void MainMenu_FormatSavegameBadges(void);
-
-// .rodata
 
 static const u16 sBirchSpeechBgPals[][16] = {
     INCGFX_U16("graphics/birch_speech/bg0.pal", ".gbapal"),
@@ -523,8 +400,6 @@ static const u8 *const sFemalePresetNames[] = {
     COMPOUND_STRING("HALIE")
 };
 
-// The number of male vs. female names is assumed to be the same.
-// If they aren't, the smaller of the two sizes will be used and any extra names will be ignored.
 #define NUM_PRESET_NAMES min(ARRAY_COUNT(sMalePresetNames), ARRAY_COUNT(sFemalePresetNames))
 
 enum
@@ -576,6 +451,26 @@ void CB2_ReinitMainMenu(void)
 
 static u32 InitMainMenu(bool8 returningFromOptionsMenu)
 {
+#ifdef PORTABLE
+    SDL_Log("CAN DEBUG: [InitMainMenu] returningFromOptionsMenu=%d", returningFromOptionsMenu);
+#endif
+
+    // CAN FIX: 防止指针为空导致的瞬间崩溃闪退
+    // 在非原版启动流下，如果 gSaveBlock2Ptr 未被初始化，调用 LoadMainMenuWindowFrameTiles 会直接解引用空指针
+    if (gSaveBlock2Ptr == NULL)
+    {
+#ifdef PORTABLE
+        SDL_Log("CAN DEBUG: [InitMainMenu] gSaveBlock2Ptr is NULL! Safely initializing Save System...");
+#endif
+        CheckForFlashMemory();
+        SetSaveBlocksPointers(0);
+        LoadGameSave(SAVE_NORMAL);
+        if (gSaveFileStatus == SAVE_STATUS_EMPTY || gSaveFileStatus == SAVE_STATUS_CORRUPT)
+        {
+            Sav2_ClearSetDefault(); // 写入默认的参数（包括菜单窗口框架样式），防止使用错误数据
+        }
+    }
+
     SetVBlankCallback(NULL);
 
     SetGpuReg(REG_OFFSET_DISPCNT, 0);
@@ -612,6 +507,8 @@ static u32 InitMainMenu(bool8 returningFromOptionsMenu)
     ChangeBgY(1, 0, BG_COORD_SET);
     InitWindows(sWindowTemplates_MainMenu);
     DeactivateAllTextPrinters();
+    
+    // 如果没有上述的 NULL 指针保护，程序将在此处获取 Frame 类型时瞬间崩溃。
     LoadMainMenuWindowFrameTiles(0, MAIN_MENU_BORDER_TILE);
 
     SetGpuReg(REG_OFFSET_WIN0H, 0);
@@ -658,6 +555,11 @@ static void Task_MainMenuCheckSaveFile(u8 taskId)
 
         if (IsWirelessAdapterConnected())
             tWirelessAdapterConnected = TRUE;
+
+#ifdef PORTABLE
+        SDL_Log("CAN DEBUG: [Task_MainMenuCheckSaveFile] gSaveFileStatus=%d, gFlashMemoryPresent=%d", gSaveFileStatus, gFlashMemoryPresent);
+#endif
+
         switch (gSaveFileStatus)
         {
         case SAVE_STATUS_OK:
@@ -734,6 +636,11 @@ static void Task_MainMenuCheckBattery(u8 taskId)
         SetGpuReg(REG_OFFSET_BLDALPHA, 0);
         SetGpuReg(REG_OFFSET_BLDY, 7);
 
+#ifdef PORTABLE
+        // PORTABLE 环境下无视 RTC dry 物理电池损坏，无条件完美直入
+        SDL_Log("CAN DEBUG: [Task_MainMenuCheckBattery] Portable platform, skipping RTC battery checks.");
+        gTasks[taskId].func = Task_DisplayMainMenu;
+#else
         if (!(RtcGetErrorStatus() & RTC_ERR_FLAG_MASK))
         {
             gTasks[taskId].func = Task_DisplayMainMenu;
@@ -743,6 +650,7 @@ static void Task_MainMenuCheckBattery(u8 taskId)
             CreateMainMenuErrorWindow(gText_BatteryRunDry);
             gTasks[taskId].func = Task_WaitForBatteryDryErrorWindow;
         }
+#endif
     }
 }
 
@@ -771,6 +679,10 @@ static void Task_DisplayMainMenu(u8 taskId)
         SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_EFFECT_DARKEN | BLDCNT_TGT1_BG0);
         SetGpuReg(REG_OFFSET_BLDALPHA, 0);
         SetGpuReg(REG_OFFSET_BLDY, 7);
+
+#ifdef PORTABLE
+        SDL_Log("CAN DEBUG: [Task_DisplayMainMenu] Rendering Menu slots. tMenuType=%d", gTasks[taskId].tMenuType);
+#endif
 
         palette = RGB_BLACK;
         LoadPalette(&palette, BG_PLTT_ID(15) + 14, PLTT_SIZEOF(1));
@@ -897,6 +809,9 @@ static void Task_DisplayMainMenu(u8 taskId)
 
 static void Task_HighlightSelectedMainMenuItem(u8 taskId)
 {
+#ifdef PORTABLE
+    SDL_Log("CAN DEBUG: [Task_HighlightSelectedMainMenuItem] Selection: MenuType=%d, CurrItem=%d", gTasks[taskId].tMenuType, gTasks[taskId].tCurrItem);
+#endif
     HighlightSelectedMainMenuItem(gTasks[taskId].tMenuType, gTasks[taskId].tCurrItem, gTasks[taskId].tIsScrolled);
     gTasks[taskId].func = Task_HandleMainMenuInput;
 }
@@ -1073,6 +988,11 @@ static void Task_HandleMainMenuAPressed(u8 taskId)
         }
         ChangeBgY(0, 0, BG_COORD_SET);
         ChangeBgY(1, 0, BG_COORD_SET);
+
+#ifdef PORTABLE
+        SDL_Log("CAN DEBUG: [Task_HandleMainMenuAPressed] Chosen action: %d", action);
+#endif
+
         switch (action)
         {
         case ACTION_NEW_GAME:
