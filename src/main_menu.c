@@ -47,7 +47,6 @@
 extern void SDL_Log(const char *fmt, ...);
 #endif
 
-// CAN FIX: 补齐缺失的 OPTION 菜单标志宏
 #define OPTION_MENU_FLAG (1 << 15)
 
 /*
@@ -455,14 +454,13 @@ void CB2_ReinitMainMenu(void)
 static u32 InitMainMenu(bool8 returningFromOptionsMenu)
 {
 #ifdef PORTABLE
-    SDL_Log("CAN DEBUG: [InitMainMenu] Step 3 returningFromOptionsMenu=%d", returningFromOptionsMenu);
+    SDL_Log("CAN DEBUG: [InitMainMenu] Entering InitMainMenu flow.");
 #endif
 
-    // CAN FIX: 保障 gSaveBlock2Ptr 的完全正确初始化
     if (gSaveBlock2Ptr == NULL)
     {
 #ifdef PORTABLE
-        SDL_Log("CAN DEBUG: [InitMainMenu] Initializing Save blocks pointers.");
+        SDL_Log("CAN DEBUG: [InitMainMenu] gSaveBlock2Ptr was NULL. Running Init.");
 #endif
         CheckForFlashMemory();
         SetSaveBlocksPointers(0);
@@ -498,9 +496,9 @@ static u32 InitMainMenu(bool8 returningFromOptionsMenu)
     ResetSpriteData();
     FreeAllSpritePalettes();
     if (returningFromOptionsMenu)
-        BeginNormalPaletteFade(PALETTES_ALL, 0, 0x10, 0, RGB_BLACK); // fade to black
+        BeginNormalPaletteFade(PALETTES_ALL, 0, 0x10, 0, RGB_BLACK); 
     else
-        BeginNormalPaletteFade(PALETTES_ALL, 0, 0x10, 0, RGB_WHITEALPHA); // fade to white
+        BeginNormalPaletteFade(PALETTES_ALL, 0, 0x10, 0, RGB_WHITEALPHA); 
     ResetBgsAndClearDma3BusyFlags(0);
     InitBgsFromTemplates(0, sMainMenuBgTemplates, ARRAY_COUNT(sMainMenuBgTemplates));
     ChangeBgX(0, 0, BG_COORD_SET);
@@ -509,6 +507,10 @@ static u32 InitMainMenu(bool8 returningFromOptionsMenu)
     ChangeBgY(1, 0, BG_COORD_SET);
     InitWindows(sWindowTemplates_MainMenu);
     DeactivateAllTextPrinters();
+
+#ifdef PORTABLE
+    SDL_Log("CAN DEBUG: [InitMainMenu] Loading window frame tiles...");
+#endif
     LoadMainMenuWindowFrameTiles(0, MAIN_MENU_BORDER_TILE);
 
     SetGpuReg(REG_OFFSET_WIN0H, 0);
@@ -525,6 +527,10 @@ static u32 InitMainMenu(bool8 returningFromOptionsMenu)
     SetGpuReg(REG_OFFSET_DISPCNT, DISPCNT_WIN0_ON | DISPCNT_OBJ_ON | DISPCNT_OBJ_1D_MAP);
     ShowBg(0);
     HideBg(1);
+    
+#ifdef PORTABLE
+    SDL_Log("CAN DEBUG: [InitMainMenu] Creating state machine Task...");
+#endif
     CreateTask(Task_MainMenuCheckSaveFile, 0);
 
     return 0;
@@ -537,7 +543,7 @@ static u32 InitMainMenu(bool8 returningFromOptionsMenu)
 #define tIsScrolled data[14]
 #define tWirelessAdapterConnected data[15]
 
-#define tArrowTaskIsScrolled data[15]   // For scroll indicator arrow task
+#define tArrowTaskIsScrolled data[15]
 
 static void Task_MainMenuCheckSaveFile(u8 taskId)
 {
@@ -545,6 +551,9 @@ static void Task_MainMenuCheckSaveFile(u8 taskId)
 
     if (!gPaletteFade.active)
     {
+#ifdef PORTABLE
+        SDL_Log("CAN DEBUG: [Task_MainMenuCheckSaveFile] Task running.");
+#endif
         SetGpuReg(REG_OFFSET_WIN0H, 0);
         SetGpuReg(REG_OFFSET_WIN0V, 0);
         SetGpuReg(REG_OFFSET_WININ, WININ_WIN0_BG0 | WININ_WIN0_OBJ);
@@ -553,12 +562,8 @@ static void Task_MainMenuCheckSaveFile(u8 taskId)
         SetGpuReg(REG_OFFSET_BLDALPHA, 0);
         SetGpuReg(REG_OFFSET_BLDY, 7);
 
-        if (IsWirelessAdapterConnected())
-            tWirelessAdapterConnected = TRUE;
-
-#ifdef PORTABLE
-        SDL_Log("CAN DEBUG: [Task_MainMenuCheckSaveFile] Check save file status: %d", gSaveFileStatus);
-#endif
+        // CAN FIX: 彻底注销硬件级的无线连接查询，防止其操作硬件I/O地址引发崩溃
+        tWirelessAdapterConnected = FALSE;
 
         switch (gSaveFileStatus)
         {
@@ -628,6 +633,9 @@ static void Task_MainMenuCheckBattery(u8 taskId)
 {
     if (!gPaletteFade.active)
     {
+#ifdef PORTABLE
+        SDL_Log("CAN DEBUG: [Task_MainMenuCheckBattery] Bypassing hardware battery test.");
+#endif
         SetGpuReg(REG_OFFSET_WIN0H, 0);
         SetGpuReg(REG_OFFSET_WIN0V, 0);
         SetGpuReg(REG_OFFSET_WININ, WININ_WIN0_BG0 | WININ_WIN0_OBJ);
@@ -636,21 +644,7 @@ static void Task_MainMenuCheckBattery(u8 taskId)
         SetGpuReg(REG_OFFSET_BLDALPHA, 0);
         SetGpuReg(REG_OFFSET_BLDY, 7);
 
-#ifdef PORTABLE
-        // PORTABLE 环境下无视 RTC dry 物理电池损坏，无条件完美直入
-        SDL_Log("CAN DEBUG: [Task_MainMenuCheckBattery] Portable platform, skipping RTC battery checks.");
         gTasks[taskId].func = Task_DisplayMainMenu;
-#else
-        if (!(RtcGetErrorStatus() & RTC_ERR_FLAG_MASK))
-        {
-            gTasks[taskId].func = Task_DisplayMainMenu;
-        }
-        else
-        {
-            CreateMainMenuErrorWindow(gText_BatteryRunDry);
-            gTasks[taskId].func = Task_WaitForBatteryDryErrorWindow;
-        }
-#endif
     }
 }
 
@@ -672,6 +666,9 @@ static void Task_DisplayMainMenu(u8 taskId)
 
     if (!gPaletteFade.active)
     {
+#ifdef PORTABLE
+        SDL_Log("CAN DEBUG: [Task_DisplayMainMenu] Rendering Options now. tMenuType=%d", gTasks[taskId].tMenuType);
+#endif
         SetGpuReg(REG_OFFSET_WIN0H, 0);
         SetGpuReg(REG_OFFSET_WIN0V, 0);
         SetGpuReg(REG_OFFSET_WININ, WININ_WIN0_BG0 | WININ_WIN0_OBJ);
@@ -679,10 +676,6 @@ static void Task_DisplayMainMenu(u8 taskId)
         SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_EFFECT_DARKEN | BLDCNT_TGT1_BG0);
         SetGpuReg(REG_OFFSET_BLDALPHA, 0);
         SetGpuReg(REG_OFFSET_BLDY, 7);
-
-#ifdef PORTABLE
-        SDL_Log("CAN DEBUG: [Task_DisplayMainMenu] Rendering Menu slots. tMenuType=%d", gTasks[taskId].tMenuType);
-#endif
 
         palette = RGB_BLACK;
         LoadPalette(&palette, BG_PLTT_ID(15) + 14, PLTT_SIZEOF(1));
@@ -696,8 +689,6 @@ static void Task_DisplayMainMenu(u8 taskId)
         palette = RGB(26, 26, 25);
         LoadPalette(&palette, BG_PLTT_ID(15) + 12, PLTT_SIZEOF(1));
 
-        // Note: If there is no save file, the save block is zeroed out,
-        // so the default gender is MALE.
         if (gSaveBlock2Ptr->playerGender == MALE)
         {
             palette = RGB(4, 16, 31);
@@ -792,17 +783,28 @@ static void Task_DisplayMainMenu(u8 taskId)
             DrawMainMenuWindowBorder(&sWindowTemplates_MainMenu[4], MAIN_MENU_BORDER_TILE);
             DrawMainMenuWindowBorder(&sWindowTemplates_MainMenu[5], MAIN_MENU_BORDER_TILE);
             DrawMainMenuWindowBorder(&sWindowTemplates_MainMenu[6], MAIN_MENU_BORDER_TILE);
+            
+            // CAN FIX: 为确保极度安全，临时在 PORTABLE 环境下关闭这个也可能调用 Link 底层的指示箭头
+#ifdef PORTABLE
+            tScrollArrowTaskId = 0;
+#else
             tScrollArrowTaskId = AddScrollIndicatorArrowPair(&sScrollArrowsTemplate_MainMenu, &sCurrItemAndOptionMenuCheck);
             gTasks[tScrollArrowTaskId].func = Task_ScrollIndicatorArrowPairOnMainMenu;
+#endif
             if (sCurrItemAndOptionMenuCheck == 4)
             {
                 ChangeBgY(0, 0x2000, BG_COORD_ADD);
                 ChangeBgY(1, 0x2000, BG_COORD_ADD);
                 tIsScrolled = TRUE;
+#ifndef PORTABLE
                 gTasks[tScrollArrowTaskId].tArrowTaskIsScrolled = TRUE;
+#endif
             }
             break;
         }
+#ifdef PORTABLE
+        SDL_Log("CAN DEBUG: [Task_DisplayMainMenu] Rendering Done. Transition to highlight.");
+#endif
         gTasks[taskId].func = Task_HighlightSelectedMainMenuItem;
     }
 }
@@ -823,7 +825,6 @@ static bool8 HandleMainMenuInput(u8 taskId)
     if (JOY_NEW(A_BUTTON))
     {
         PlaySE(SE_SELECT);
-        IsWirelessAdapterConnected();   // why bother calling this here? debug? Task_HandleMainMenuAPressed will check too
         BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 0x10, RGB_BLACK);
         gTasks[taskId].func = Task_HandleMainMenuAPressed;
     }
@@ -841,7 +842,11 @@ static bool8 HandleMainMenuInput(u8 taskId)
         {
             ChangeBgY(0, 0x2000, BG_COORD_SUB);
             ChangeBgY(1, 0x2000, BG_COORD_SUB);
+#ifndef PORTABLE
             gTasks[tScrollArrowTaskId].tArrowTaskIsScrolled = tIsScrolled = FALSE;
+#else
+            tIsScrolled = FALSE;
+#endif
         }
         tCurrItem--;
         sCurrItemAndOptionMenuCheck = tCurrItem;
@@ -853,7 +858,11 @@ static bool8 HandleMainMenuInput(u8 taskId)
         {
             ChangeBgY(0, 0x2000, BG_COORD_ADD);
             ChangeBgY(1, 0x2000, BG_COORD_ADD);
+#ifndef PORTABLE
             gTasks[tScrollArrowTaskId].tArrowTaskIsScrolled = tIsScrolled = TRUE;
+#else
+            tIsScrolled = TRUE;
+#endif
         }
         tCurrItem++;
         sCurrItemAndOptionMenuCheck = tCurrItem;
@@ -870,13 +879,15 @@ static void Task_HandleMainMenuInput(u8 taskId)
 
 static void Task_HandleMainMenuAPressed(u8 taskId)
 {
-    bool8 wirelessAdapterConnected;
+    bool8 wirelessAdapterConnected = FALSE; // 强行写死，不调用可能导致崩溃的接口
     u8 action;
 
     if (!gPaletteFade.active)
     {
+#ifndef PORTABLE
         if (gTasks[taskId].tMenuType == HAS_MYSTERY_EVENTS)
             RemoveScrollIndicatorArrowPair(gTasks[taskId].tScrollArrowTaskId);
+#endif
         ClearStdWindowAndFrame(0, TRUE);
         ClearStdWindowAndFrame(1, TRUE);
         ClearStdWindowAndFrame(2, TRUE);
@@ -885,7 +896,7 @@ static void Task_HandleMainMenuAPressed(u8 taskId)
         ClearStdWindowAndFrame(5, TRUE);
         ClearStdWindowAndFrame(6, TRUE);
         ClearStdWindowAndFrame(7, TRUE);
-        wirelessAdapterConnected = IsWirelessAdapterConnected();
+        
         switch (gTasks[taskId].tMenuType)
         {
         case HAS_NO_SAVED_GAME:
@@ -1004,7 +1015,7 @@ static void Task_HandleMainMenuAPressed(u8 taskId)
                 if (action != ACTION_OPTION)
                     sCurrItemAndOptionMenuCheck = 0;
                 else
-                    sCurrItemAndOptionMenuCheck |= OPTION_MENU_FLAG;  // entering the options menu
+                    sCurrItemAndOptionMenuCheck |= OPTION_MENU_FLAG; 
                 StartNewGameSceneFrlg();
                 return;
             }
@@ -1054,7 +1065,7 @@ static void Task_HandleMainMenuAPressed(u8 taskId)
         if (action != ACTION_OPTION)
             sCurrItemAndOptionMenuCheck = 0;
         else
-            sCurrItemAndOptionMenuCheck |= OPTION_MENU_FLAG;  // entering the options menu
+            sCurrItemAndOptionMenuCheck |= OPTION_MENU_FLAG; 
     }
 }
 
@@ -1062,8 +1073,10 @@ static void Task_HandleMainMenuBPressed(u8 taskId)
 {
     if (!gPaletteFade.active)
     {
+#ifndef PORTABLE
         if (gTasks[taskId].tMenuType == HAS_MYSTERY_EVENTS)
             RemoveScrollIndicatorArrowPair(gTasks[taskId].tScrollArrowTaskId);
+#endif
         sCurrItemAndOptionMenuCheck = 0;
         FreeAllWindowBuffers();
         SetMainCallback2(CB2_InitTitleScreen);
@@ -2082,10 +2095,6 @@ static void CreateMainMenuErrorWindow(const u8 *str)
     SetGpuReg(REG_OFFSET_WIN0V, WIN_RANGE(113, DISPLAY_HEIGHT - 1));
 }
 
-// CAN FIX: 在调试的 Step 3 中，我们简化格式化文本。
-// 因为 `MainMenu_FormatSavegamePlayer()`、`Pokedex` 等方法在加载了无数据的/全FF的脏存档时，
-// 极易因未设置 `EOS` 字符或宽度计算函数（`GetStringRightAlignXOffset`）的算法而进入死循环或段错误。
-// 我们在这一步暂时使用安全的 "DUMMY" 字符串模拟输出，如果渲染通过，说明窗口与光标没有问题！
 static void MainMenu_FormatSavegameText(void)
 {
     MainMenu_FormatSavegamePlayer();
@@ -2099,7 +2108,6 @@ static void MainMenu_FormatSavegamePlayer(void)
     StringExpandPlaceholders(gStringVar4, gText_ContinueMenuPlayer);
     AddTextPrinterParameterized3(2, FONT_NORMAL, 0, 17, sTextColor_MenuInfo, TEXT_SKIP_DRAW, gStringVar4);
     
-    // 使用纯安全写死的 EOS 终结符
     AddTextPrinterParameterized3(2, FONT_NORMAL, 70, 17, sTextColor_MenuInfo, TEXT_SKIP_DRAW, COMPOUND_STRING("DUMMY"));
 }
 
@@ -2129,7 +2137,6 @@ static void MainMenu_FormatSavegameBadges(void)
 
 static void LoadMainMenuWindowFrameTiles(u8 bgId, u16 tileOffset)
 {
-    // CAN FIX: 菜单窗口边框样式做边界安全控制
     u8 frameType = gSaveBlock2Ptr->optionsWindowFrameType;
     if (frameType >= WINDOW_FRAMES_COUNT)
         frameType = 0;
