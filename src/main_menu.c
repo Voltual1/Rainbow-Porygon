@@ -48,10 +48,10 @@ static void Task_PlaceholderMenu(u8 taskId);
 static void VBlankCB_Placeholder(void);
 static void CB2_Placeholder(void);
 
-// 模拟原版颜色
+// 模拟基础调色板
 static const u16 sPlaceholderPal[] = {
     RGB_BLACK, RGB_WHITE, RGB(12, 12, 12), RGB(26, 26, 25), 
-    [15] = RGB_WHITE // 文本窗口调色板基础
+    [15] = RGB_WHITE 
 };
 
 void CB2_InitMainMenu(void)
@@ -62,7 +62,6 @@ void CB2_InitMainMenu(void)
 
     SetVBlankCallback(NULL);
 
-    // 1. 彻底复位图形寄存器
     SetGpuReg(REG_OFFSET_DISPCNT, 0);
     SetGpuReg(REG_OFFSET_BG0CNT, 0);
     SetGpuReg(REG_OFFSET_BG0HOFS, 0);
@@ -71,52 +70,44 @@ void CB2_InitMainMenu(void)
     SetGpuReg(REG_OFFSET_BLDALPHA, 0);
     SetGpuReg(REG_OFFSET_BLDY, 0);
 
-    // 2. 清理内存空间
     DmaFill16(3, 0, (void *)VRAM, VRAM_SIZE);
     DmaFill32(3, 0, (void *)OAM, OAM_SIZE);
     DmaFill16(3, 0, (void *)(PLTT), PLTT_SIZE);
 
-    // 3. 重置系统状态
     ResetPaletteFade();
     ScanlineEffect_Stop();
     ResetTasks();
     ResetSpriteData();
     FreeAllSpritePalettes();
 
-    // 4. 初始化基础显示
     ResetBgsAndClearDma3BusyFlags(0);
     InitBgsFromTemplates(0, sPlaceholderBgTemplates, ARRAY_COUNT(sPlaceholderBgTemplates));
     InitWindows(sPlaceholderWindowTemplate);
     DeactivateAllTextPrinters();
 
-    // 加载极简调色板
     LoadPalette(sPlaceholderPal, BG_PLTT_ID(0), 16 * 2);
     LoadPalette(sPlaceholderPal, BG_PLTT_ID(15), 16 * 2);
 
-    // 5. 设置回调
     EnableInterrupts(1);
     SetVBlankCallback(VBlankCB_Placeholder);
     SetMainCallback2(CB2_Placeholder);
 
-    // 6. 显示画面并开启任务
     ShowBg(0);
     SetGpuReg(REG_OFFSET_DISPCNT, DISPCNT_OBJ_ON | DISPCNT_BG0_ON | DISPCNT_OBJ_1D_MAP);
     
     CreateTask(Task_PlaceholderMenu, 0);
 
-    // 立即在窗口画点东西
-    FillWindowPixelBuffer(0, PIXEL_FILL(1)); // 白色背景（对应索引1）
+    FillWindowPixelBuffer(0, PIXEL_FILL(1)); 
     AddTextPrinterParameterized(0, FONT_NORMAL, (const u8[]) { 
         CHAR_D, CHAR_E, CHAR_B, CHAR_U, CHAR_G, CHAR_SPACE, 
         CHAR_P, CHAR_L, CHAR_A, CHAR_C, CHAR_E, CHAR_H, CHAR_O, CHAR_L, CHAR_D, CHAR_E, CHAR_R, 
-        CHAR_NEWLINE, CHAR_A, CHAR_SPACE, CHAR_B, CHAR_U, CHAR_T, CHAR_T, CHAR_O, CHAR_N, CHAR_SPACE, CHAR_T, CHAR_O, CHAR_SPACE, CHAR_R, CHAR_E, CHAR_S, CHAR_E, CHAR_T,
+        CHAR_NEWLINE, CHAR_A, CHAR_SPACE, CHAR_B, CHAR_U, CHAR_T, CHAR_T, CHAR_O, CHAR_SPACE, CHAR_R, CHAR_E, CHAR_S, CHAR_E, CHAR_T,
         EOS 
     }, 0, 1, 0, 0);
     PutWindowTilemap(0);
     CopyWindowToVram(0, COPYWIN_FULL);
 }
 
-// 对应原版 Reinit
 void CB2_ReinitMainMenu(void)
 {
     CB2_InitMainMenu();
@@ -146,4 +137,12 @@ static void Task_PlaceholderMenu(u8 taskId)
 #endif
         DoSoftReset();
     }
+}
+
+// --- CAN FIX: 必须保留的外部引用函数 ---
+// 因为 slot_machine.c 等文件引用了这个函数，精简版必须保留它的定义以防止 ld.lld 链接失败
+void CreateYesNoMenuParameterized(u8 x, u8 y, u16 baseTileNum, u16 baseBlock, u8 yesNoPalNum, u8 winPalNum)
+{
+    struct WindowTemplate template = CreateWindowTemplate(0, x + 1, y + 1, 5, 4, winPalNum, baseBlock);
+    CreateYesNoMenu(&template, baseTileNum, yesNoPalNum, 0);
 }
