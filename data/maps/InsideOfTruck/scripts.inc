@@ -1,6 +1,7 @@
 InsideOfTruck_MapScripts::
 	map_script MAP_SCRIPT_ON_LOAD, InsideOfTruck_OnLoad
 	map_script MAP_SCRIPT_ON_RESUME, InsideOfTruck_OnResume
+	map_script MAP_SCRIPT_ON_TRANSITION, InsideOfTruck_EventScript_SetIntroFlags
 	.byte 0
 
 InsideOfTruck_OnLoad:
