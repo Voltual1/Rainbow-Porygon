@@ -2115,12 +2115,15 @@ static void VBlankCB_NamingScreen(void)
     LoadOam();
     ProcessSpriteCopyRequests();
     TransferPlttBuffer();
-    SetGpuReg(REG_OFFSET_BG1VOFS, sNamingScreen->bg1vOffset);
-    SetGpuReg(REG_OFFSET_BG2VOFS, sNamingScreen->bg2vOffset);
-    SetGpuReg(REG_OFFSET_BG1CNT, GetGpuReg(REG_OFFSET_BG1CNT) & 0xFFFC);
-    SetGpuRegBits(REG_OFFSET_BG1CNT, sNamingScreen->bg1Priority);
-    SetGpuReg(REG_OFFSET_BG2CNT, GetGpuReg(REG_OFFSET_BG2CNT) & 0xFFFC);
-    SetGpuRegBits(REG_OFFSET_BG2CNT, sNamingScreen->bg2Priority);
+    if (sNamingScreen != NULL)
+    {
+        SetGpuReg(REG_OFFSET_BG1VOFS, sNamingScreen->bg1vOffset);
+        SetGpuReg(REG_OFFSET_BG2VOFS, sNamingScreen->bg2vOffset);
+        SetGpuReg(REG_OFFSET_BG1CNT, GetGpuReg(REG_OFFSET_BG1CNT) & 0xFFFC);
+        SetGpuRegBits(REG_OFFSET_BG1CNT, sNamingScreen->bg1Priority);
+        SetGpuReg(REG_OFFSET_BG2CNT, GetGpuReg(REG_OFFSET_BG2CNT) & 0xFFFC);
+        SetGpuRegBits(REG_OFFSET_BG2CNT, sNamingScreen->bg2Priority);
+    }
 }
 
 static void NamingScreen_ShowBgs(void)
