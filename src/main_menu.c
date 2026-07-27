@@ -591,7 +591,7 @@ static void Task_MainMenuCheckSaveFile(u8 taskId)
             gTasks[taskId].func = Task_MainMenuCheckBattery;
             break;
         case SAVE_STATUS_NO_FLASH:
-            CreateMainMenuErrorWindow(gJPText_No1MSubCircuit);
+//            CreateMainMenuErrorWindow(gJPText_No1MSubCircuit);
             gTasks[taskId].tMenuType = HAS_NO_SAVED_GAME;
             gTasks[taskId].func = Task_WaitForSaveFileErrorWindow;
             break;
