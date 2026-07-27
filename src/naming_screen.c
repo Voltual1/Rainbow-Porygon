@@ -1022,6 +1022,12 @@ static void StartButtonFlash(struct Task *task, u8 button, bool8 keepFlashing)
 
 static void SpriteCB_Cursor(struct Sprite *sprite)
 {
+    if (sNamingScreen == NULL)
+    {
+        DestroySprite(sprite);
+        return;
+    }
+
     if (sprite->animEnded)
         StartSpriteAnim(sprite, 0);
 
@@ -1031,9 +1037,9 @@ static void SpriteCB_Cursor(struct Sprite *sprite)
         sprite->invisible = TRUE;
 
     if (sprite->invisible
-       || !(sprite->sFlashing)
-       || sprite->sX != sprite->sPrevX
-       || sprite->sY != sprite->sPrevY)
+| !(sprite->sFlashing)
+| sprite->sX != sprite->sPrevX
+| sprite->sY != sprite->sPrevY)
     {
         sprite->sColor = 0;
         sprite->sColorIncr = 2;
@@ -1064,6 +1070,12 @@ static void SpriteCB_Cursor(struct Sprite *sprite)
 
 static void SpriteCB_InputArrow(struct Sprite *sprite)
 {
+    if (sNamingScreen == NULL)
+    {
+        DestroySprite(sprite);
+        return;
+    }
+
     const s16 x[] = {0, -4, -2, -1};
 
     if (sprite->sDelay == 0 || --sprite->sDelay == 0)
@@ -1083,6 +1095,12 @@ static void SpriteCB_InputArrow(struct Sprite *sprite)
 
 static void SpriteCB_Underscore(struct Sprite *sprite)
 {
+    if (sNamingScreen == NULL)
+    {
+        DestroySprite(sprite);
+        return;
+    }
+
     const s16 y[] = {2, 3, 2, 1};
     u8 pos;
 
@@ -1261,6 +1279,11 @@ static u8 (*const sPageSwapSpriteFuncs[])(struct Sprite *) =
 
 static void SpriteCB_PageSwap(struct Sprite *sprite)
 {
+    if (sNamingScreen == NULL)
+    {
+        DestroySprite(sprite);
+        return;
+    }
     while (sPageSwapSpriteFuncs[sprite->sState](sprite));
 }
 
