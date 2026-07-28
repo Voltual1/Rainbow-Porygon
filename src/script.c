@@ -15,6 +15,8 @@
 
 #include "dexnav.h"
 
+extern void SDL_Log(const char *fmt, ...);
+
 #define RAM_SCRIPT_MAGIC 51
 
 enum {
@@ -93,6 +95,7 @@ bool8 RunScriptCommand(struct ScriptContext *ctx)
         if (ctx->nativePtr)
         {
             bool8 (*nativeFunc)(void) = (bool8 (*)(void))STRIP_DOMIRROR_TAG(ctx->nativePtr);
+            SDL_Log("CAN SCRIPT: Calling Native Func at %p", (void*)nativeFunc);
             if (nativeFunc() == TRUE)
                 ctx->mode = SCRIPT_MODE_BYTECODE;
             return TRUE;
@@ -121,8 +124,8 @@ bool8 RunScriptCommand(struct ScriptContext *ctx)
                 return FALSE;
             }
 
-            // Android平台上，gScriptCmdTable里的命令函数指针也带有0x02000000标签，需要在此剥离
             ScrCmdFunc cmdFunc = (ScrCmdFunc)STRIP_DOMIRROR_TAG(*func);
+            SDL_Log("CAN SCRIPT: Executing CmdCode 0x%02X (func: %p) at ScriptPtr: %p", cmdCode, (void*)cmdFunc, (void*)ctx->scriptPtr);
             if (cmdFunc(ctx) == TRUE)
                 return TRUE;
         }
@@ -312,9 +315,11 @@ void ScriptContext_Enable(void)
 // scripts (except the frame table scripts).
 void RunScriptImmediately(const u8 *ptr)
 {
+    SDL_Log("CAN SCRIPT: RunScriptImmediately called with script: %p", (void*)ptr);
     InitScriptContext(&sImmediateScriptContext, gScriptCmdTable, gScriptCmdTableEnd);
     SetupBytecodeScript(&sImmediateScriptContext, ptr);
     while (RunScriptCommand(&sImmediateScriptContext) == TRUE);
+    SDL_Log("CAN SCRIPT: RunScriptImmediately finished for script: %p", (void*)ptr);
 }
 
 const u8 *MapHeaderGetScriptTable(u8 tag)

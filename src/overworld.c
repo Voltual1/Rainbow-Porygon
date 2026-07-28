@@ -84,6 +84,8 @@
 #include "constants/trainer_hill.h"
 #include "constants/weather.h"
 
+extern void SDL_Log(const char *fmt, ...);
+
 STATIC_ASSERT((B_FLAG_FOLLOWERS_DISABLED == 0 || OW_FOLLOWERS_ENABLED), FollowersFlagAssignedWithoutEnablingThem);
 
 struct CableClubPlayer
@@ -624,7 +626,7 @@ void ApplyCurrentWarp(void)
     sFixedHoleWarp = sDummyWarpData;
 }
 
-static void ClearDiveAndHoleWarps(void)
+static void ResetWarpDestination(void)
 {
     sFixedDiveWarp = sDummyWarpData;
     sFixedHoleWarp = sDummyWarpData;
@@ -847,7 +849,7 @@ const struct MapConnection *GetMapConnection(u8 dir)
     return NULL;
 }
 
-static bool8 SetDiveWarp(enum Connection dir, u16 x, u16 y)
+static bool32 SetDiveWarp(enum Connection dir, u16 x, u16 y)
 {
     const struct MapConnection *connection = GetMapConnection(dir);
 
@@ -925,7 +927,7 @@ void LoadMapFromCameraTransition(u8 mapGroup, u8 mapNum)
     else
     {
         if (gMapHeader.regionMapSectionId != MAPSEC_BATTLE_FRONTIER
-         || gMapHeader.regionMapSectionId != sLastMapSectionId)
+| gMapHeader.regionMapSectionId != sLastMapSectionId)
             ShowMapNamePopup();
     }
     SetMinimumOWESpawnTimer();
@@ -1052,7 +1054,7 @@ bool8 MetatileBehavior_IsSurfableInSeafoamIslands(u16 metatileBehavior)
         return FALSE;
     if ((gSaveBlock1Ptr->location.mapGroup == MAP_GROUP(MAP_SEAFOAM_ISLANDS_B3F)
           && gSaveBlock1Ptr->location.mapNum == MAP_NUM(MAP_SEAFOAM_ISLANDS_B3F))
-     || (gSaveBlock1Ptr->location.mapGroup == MAP_GROUP(MAP_SEAFOAM_ISLANDS_B4F)
+| (gSaveBlock1Ptr->location.mapGroup == MAP_GROUP(MAP_SEAFOAM_ISLANDS_B4F)
           && gSaveBlock1Ptr->location.mapNum == MAP_NUM(MAP_SEAFOAM_ISLANDS_B4F)))
     {
         return TRUE;
@@ -1082,7 +1084,7 @@ static enum Direction GetAdjustedInitialDirection(struct InitialPlayerAvatarStat
     else if (MetatileBehavior_IsDirectionalUpLeftStairWarp(metatileBehavior) == TRUE || MetatileBehavior_IsDirectionalDownLeftStairWarp(metatileBehavior) == TRUE)
         return DIR_EAST;
     else if ((playerStruct->transitionFlags == PLAYER_AVATAR_FLAG_UNDERWATER  && transitionFlags == PLAYER_AVATAR_FLAG_SURFING)
-          || (playerStruct->transitionFlags == PLAYER_AVATAR_FLAG_SURFING && transitionFlags == PLAYER_AVATAR_FLAG_UNDERWATER))
+| (playerStruct->transitionFlags == PLAYER_AVATAR_FLAG_SURFING && transitionFlags == PLAYER_AVATAR_FLAG_UNDERWATER))
         return playerStruct->direction;
     else if (MetatileBehavior_IsLadder(metatileBehavior) == TRUE)
         return playerStruct->direction;
@@ -1146,7 +1148,7 @@ static u8 UNUSED GetObjectEventLoadFlag(void)
     return sObjectEventLoadFlag;
 }
 
-static bool16 ShouldLegendaryMusicPlayAtLocation(struct WarpData *warp)
+static bool8 ShouldLegendaryMusicPlayAtLocation(struct WarpData *warp)
 {
     if (!FlagGet(FLAG_SYS_WEATHER_CTRL))
         return FALSE;
@@ -1198,7 +1200,7 @@ static bool16 IsInfiltratedWeatherInstitute(struct WarpData *warp)
     else if (warp->mapGroup != MAP_GROUP(MAP_ROUTE119_WEATHER_INSTITUTE_1F))
         return FALSE;
     else if (warp->mapNum == MAP_NUM(MAP_ROUTE119_WEATHER_INSTITUTE_1F)
-     || warp->mapNum == MAP_NUM(MAP_ROUTE119_WEATHER_INSTITUTE_2F))
+| warp->mapNum == MAP_NUM(MAP_ROUTE119_WEATHER_INSTITUTE_2F))
         return TRUE;
     else
         return FALSE;
@@ -1213,7 +1215,7 @@ static bool16 IsInfiltratedSpaceCenter(struct WarpData *warp)
     else if (warp->mapGroup != MAP_GROUP(MAP_MOSSDEEP_CITY_SPACE_CENTER_1F))
         return FALSE;
     else if (warp->mapNum == MAP_NUM(MAP_MOSSDEEP_CITY_SPACE_CENTER_1F)
-     || warp->mapNum == MAP_NUM(MAP_MOSSDEEP_CITY_SPACE_CENTER_2F))
+| warp->mapNum == MAP_NUM(MAP_MOSSDEEP_CITY_SPACE_CENTER_2F))
         return TRUE;
     return FALSE;
 }
@@ -1543,10 +1545,10 @@ mapsec_u8_t GetLastUsedWarpMapSectionId(void)
 bool8 IsMapTypeOutdoors(enum MapType mapType)
 {
     if (mapType == MAP_TYPE_ROUTE
-     || mapType == MAP_TYPE_TOWN
-     || mapType == MAP_TYPE_UNDERWATER
-     || mapType == MAP_TYPE_CITY
-     || mapType == MAP_TYPE_OCEAN_ROUTE)
+| mapType == MAP_TYPE_TOWN
+| mapType == MAP_TYPE_UNDERWATER
+| mapType == MAP_TYPE_CITY
+| mapType == MAP_TYPE_OCEAN_ROUTE)
         return TRUE;
     else
         return FALSE;
@@ -1555,9 +1557,9 @@ bool8 IsMapTypeOutdoors(enum MapType mapType)
 bool8 Overworld_MapTypeAllowsTeleportAndFly(enum MapType mapType)
 {
     if (mapType == MAP_TYPE_ROUTE
-     || mapType == MAP_TYPE_TOWN
-     || mapType == MAP_TYPE_OCEAN_ROUTE
-     || mapType == MAP_TYPE_CITY)
+| mapType == MAP_TYPE_TOWN
+| mapType == MAP_TYPE_OCEAN_ROUTE
+| mapType == MAP_TYPE_CITY)
         return TRUE;
     else
         return FALSE;
@@ -1566,7 +1568,7 @@ bool8 Overworld_MapTypeAllowsTeleportAndFly(enum MapType mapType)
 bool8 IsMapTypeIndoors(enum MapType mapType)
 {
     if (mapType == MAP_TYPE_INDOOR
-     || mapType == MAP_TYPE_SECRET_BASE)
+| mapType == MAP_TYPE_SECRET_BASE)
         return TRUE;
     else
         return FALSE;
@@ -1769,9 +1771,9 @@ bool32 MapHasNaturalLight(enum MapType mapType)
 {
     return (OW_ENABLE_DNS
          && (mapType == MAP_TYPE_TOWN
-          || mapType == MAP_TYPE_CITY
-          || mapType == MAP_TYPE_ROUTE
-          || mapType == MAP_TYPE_OCEAN_ROUTE));
+| mapType == MAP_TYPE_CITY
+| mapType == MAP_TYPE_ROUTE
+| mapType == MAP_TYPE_OCEAN_ROUTE));
 }
 
 bool32 CurrentMapHasShadows(void)
@@ -1858,8 +1860,8 @@ static void OverworldBasic(void)
         FormChangeTimeUpdate();
         if (MapHasNaturalLight(gMapHeader.mapType) &&
            (bld0[0] != bld1[0]
-         || bld0[1] != bld1[1]
-         || bld0[2] != bld1[2]))
+| bld0[1] != bld1[1]
+| bld0[2] != bld1[2]))
         {
             ApplyWeatherColorMapIfIdle(gWeatherPtr->colorMapIndex);
         }
@@ -1899,6 +1901,7 @@ void SetUnusedCallback(void *func)
 
 static bool8 RunFieldCallback(void)
 {
+    SDL_Log("CAN FIELDCB: RunFieldCallback entering. callback=%p, callback2=%p", (void*)gFieldCallback, (void*)gFieldCallback2);
     if (gFieldCallback2)
     {
         if (!gFieldCallback2())
@@ -1926,6 +1929,7 @@ static bool8 RunFieldCallback(void)
 
 void CB2_NewGame(void)
 {
+    SDL_Log("CAN DEBUG: CB2_NewGame Booting up...");
     FieldClearVBlankHBlankCallbacks();
     StopMapMusic();
     ResetSafariZoneFlag_();
@@ -1947,6 +1951,7 @@ void CB2_NewGame(void)
     // Wall clock now track local time so we set it to 10AM to match initial wall clock time
     RtcCalcLocalTimeOffset(0, 10, 0, 0);
 #endif
+    SDL_Log("CAN DEBUG: CB2_NewGame Boot completed successfully!");
 }
 
 void CB2_WhiteOut(void)
@@ -2119,7 +2124,7 @@ void CB2_ContinueSavedGame(void)
         ResetWinStreaks();
 
     LoadSaveblockMapHeader();
-    ClearDiveAndHoleWarps();
+    ResetWarpDestination();
     trainerHillMapId = GetCurrentTrainerHillMapId();
     if (gMapHeader.mapLayoutId == LAYOUT_BATTLE_FRONTIER_BATTLE_PYRAMID_FLOOR)
         LoadBattlePyramidFloorObjectEventScripts();
@@ -2296,6 +2301,7 @@ static bool32 LoadMapInStepsLink(u8 *state)
 
 static bool32 LoadMapInStepsLocal(u8 *state, bool32 a2)
 {
+    SDL_Log("CAN MAPLOAD: LoadMapInStepsLocal - Step: %d", (int)*state);
     switch (*state)
     {
     case 0:
@@ -2365,6 +2371,7 @@ static bool32 LoadMapInStepsLocal(u8 *state, bool32 a2)
             (*state)++;
         break;
     case 13:
+        SDL_Log("CAN MAPLOAD: LoadMapInStepsLocal - Step finished!");
         return TRUE;
     }
 
@@ -2484,7 +2491,9 @@ static bool32 ReturnToFieldLink(u8 *state)
 
 static void DoMapLoadLoop(u8 *state)
 {
+    SDL_Log("CAN MAPLOAD: Entering DoMapLoadLoop");
     while (!LoadMapInStepsLocal(state, FALSE));
+    SDL_Log("CAN MAPLOAD: Exiting DoMapLoadLoop");
 }
 
 static void ResetMirageTowerAndSaveBlockPtrs(void)
@@ -2524,7 +2533,7 @@ static void InitOverworldGraphicsRegisters(void)
     SetGpuReg(REG_OFFSET_WIN1H, 0xFFFF);
     SetGpuReg(REG_OFFSET_WIN1V, 0xFFFF);
     SetGpuReg(REG_OFFSET_BLDCNT, gOverworldBackgroundLayerFlags[1] | gOverworldBackgroundLayerFlags[2] | gOverworldBackgroundLayerFlags[3]
-                               | BLDCNT_TGT2_OBJ | BLDCNT_EFFECT_BLEND);
+ BLDCNT_TGT2_OBJ | BLDCNT_EFFECT_BLEND);
     SetGpuReg(REG_OFFSET_BLDALPHA, BLDALPHA_BLEND(13, 7));
     InitOverworldBgs();
     ScheduleBgCopyTilemapToVram(1);
@@ -2539,7 +2548,7 @@ static void InitOverworldGraphicsRegisters(void)
     ChangeBgX(3, 0, BG_COORD_SET);
     ChangeBgY(3, 0, BG_COORD_SET);
     SetGpuReg(REG_OFFSET_DISPCNT, DISPCNT_OBJ_ON | DISPCNT_WIN0_ON | DISPCNT_WIN1_ON
-                                | DISPCNT_OBJ_1D_MAP | DISPCNT_HBLANK_INTERVAL);
+ DISPCNT_OBJ_1D_MAP | DISPCNT_HBLANK_INTERVAL);
     ShowBg(0);
     ShowBg(1);
     ShowBg(2);
@@ -2559,7 +2568,7 @@ static void InitOverworldGraphicsRegistersCreditsFrlg(void)
     SetGpuReg(REG_OFFSET_WIN1H, WIN_RANGE(255, 255));
     SetGpuReg(REG_OFFSET_WIN1V, WIN_RANGE(255, 255));
     SetGpuReg(REG_OFFSET_BLDCNT, gOverworldBackgroundLayerFlags[1] | gOverworldBackgroundLayerFlags[2] | gOverworldBackgroundLayerFlags[3]
-                                 | BLDCNT_TGT2_OBJ | BLDCNT_EFFECT_BLEND);
+ BLDCNT_TGT2_OBJ | BLDCNT_EFFECT_BLEND);
     SetGpuReg(REG_OFFSET_BLDALPHA, BLDALPHA_BLEND(13, 7));
     ScheduleBgCopyTilemapToVram(1);
     ScheduleBgCopyTilemapToVram(2);
@@ -3613,7 +3622,7 @@ static u8 LinkPlayerGetCollision(u8 selfObjEventId, enum Direction direction, s1
         if (i != selfObjEventId)
         {
             if ((gObjectEvents[i].currentCoords.x == x && gObjectEvents[i].currentCoords.y == y)
-             || (gObjectEvents[i].previousCoords.x == x && gObjectEvents[i].previousCoords.y == y))
+| (gObjectEvents[i].previousCoords.x == x && gObjectEvents[i].previousCoords.y == y))
             {
                 return 1;
             }
@@ -3891,7 +3900,7 @@ static bool8 FieldCB2_Credits_WaitFade(void)
         return FALSE;
 }
 
-bool32 Overworld_DoScrollSceneForCredits(u8 *state_p, const struct CreditsOverworldCmd * script)
+bool8 Overworld_DoScrollSceneForCredits(u8 *state_p, const struct CreditsOverworldCmd * script)
 {
     sCreditsOverworld_Script = script;
     return SetUpScrollSceneForCredits(state_p, 0);
