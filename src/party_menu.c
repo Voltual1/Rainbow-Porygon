@@ -1015,6 +1015,7 @@ static void PartyPaletteBufferCopy(u8 palNum)
 
 static void FreePartyPointers(void)
 {
+    DeactivateAllTextPrinters();
     if (sPartyMenuInternal)
     {
         Free(sPartyMenuInternal);
@@ -1541,6 +1542,11 @@ u8 GetPartyMenuType(void)
 
 void Task_HandleChooseMonInput(u8 taskId)
 {
+    if (sPartyMenuInternal == NULL)
+    {
+        DestroyTask(taskId);
+        return;
+    }
     if (!gPaletteFade.active && MenuHelpers_ShouldWaitForLinkRecv() != TRUE)
     {
         s8 *slotPtr = GetCurrentPartySlotPtr();
@@ -2081,6 +2087,11 @@ u8 DisplayPartyMenuMessage(const u8 *str, bool8 keepOpen)
 
 static void Task_PrintAndWaitForText(u8 taskId)
 {
+    if (sPartyMenuInternal == NULL)
+    {
+        DestroyTask(taskId);
+        return;
+    }
     if (RunTextPrintersRetIsActive(WIN_MSG) != TRUE)
     {
         if (gTasks[taskId].tKeepOpen == FALSE)
@@ -2101,6 +2112,11 @@ bool8 IsPartyMenuTextPrinterActive(void)
 
 static void Task_WaitForLinkAndReturnToChooseMon(u8 taskId)
 {
+    if (sPartyMenuInternal == NULL)
+    {
+        DestroyTask(taskId);
+        return;
+    }
     if (MenuHelpers_ShouldWaitForLinkRecv() != TRUE)
     {
         DisplayPartyMenuStdMessage(PARTY_MSG_CHOOSE_MON);
@@ -2110,6 +2126,11 @@ static void Task_WaitForLinkAndReturnToChooseMon(u8 taskId)
 
 static void Task_ReturnToChooseMonAfterText(u8 taskId)
 {
+    if (sPartyMenuInternal == NULL)
+    {
+        DestroyTask(taskId);
+        return;
+    }
     if (IsPartyMenuTextPrinterActive() != TRUE)
     {
         ClearStdWindowAndFrameToTransparent(WIN_MSG, FALSE);
@@ -3763,6 +3784,11 @@ static void Task_TossHeldItem(u8 taskId)
 {
     struct Pokemon *mon = &gParties[B_TRAINER_PLAYER][gPartyMenu.slotId];
 
+    if (sPartyMenuInternal == NULL)
+    {
+        DestroyTask(taskId);
+        return;
+    }
     if (IsPartyMenuTextPrinterActive() != TRUE)
     {
         enum Item item = ITEM_NONE;
@@ -5257,6 +5283,11 @@ static void Task_DisplayHPRestoredMessage(u8 taskId)
 
 static void Task_ClosePartyMenuAfterText(u8 taskId)
 {
+    if (sPartyMenuInternal == NULL)
+    {
+        DestroyTask(taskId);
+        return;
+    }
     if (IsPartyMenuTextPrinterActive() != TRUE)
     {
         if (gPartyMenuUseExitCallback == FALSE)
@@ -7129,6 +7160,11 @@ static void Task_UpdateHeldItemSpriteAndClosePartyMenu(u8 taskId)
 {
     s8 slot = gPartyMenu.slotId;
 
+    if (sPartyMenuInternal == NULL)
+    {
+        DestroyTask(taskId);
+        return;
+    }
     if (IsPartyMenuTextPrinterActive() != TRUE)
     {
         UpdatePartyMonHeldItemSprite(&gParties[B_TRAINER_PLAYER][slot], &sPartyMenuBoxes[slot]);
