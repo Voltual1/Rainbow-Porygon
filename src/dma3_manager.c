@@ -48,48 +48,46 @@ void ProcessDma3Requests(void)
 
     bytesTransferred = 0;
 
-    // as long as there are DMA requests to process (unless size or vblank is an issue), do not exit
     while (sDma3Requests[sDma3RequestCursor].size != 0)
     {
         bytesTransferred += sDma3Requests[sDma3RequestCursor].size;
 
         if (bytesTransferred > 40 * 1024)
-            return; // don't transfer more than 40 KiB
+            return;
         if (*(u8 *)REG_ADDR_VCOUNT > 224)
-            return; // we're about to leave vblank, stop
+            return;
 
         switch (sDma3Requests[sDma3RequestCursor].mode)
         {
-        case DMA_REQUEST_COPY32: // regular 32-bit copy
+        case DMA_REQUEST_COPY32:
             Dma3CopyLarge32_(sDma3Requests[sDma3RequestCursor].src,
                              sDma3Requests[sDma3RequestCursor].dest,
                              sDma3Requests[sDma3RequestCursor].size);
             break;
-        case DMA_REQUEST_FILL32: // repeat a single 32-bit value across RAM
+        case DMA_REQUEST_FILL32:
             Dma3FillLarge32_(sDma3Requests[sDma3RequestCursor].value,
                              sDma3Requests[sDma3RequestCursor].dest,
                              sDma3Requests[sDma3RequestCursor].size);
             break;
-        case DMA_REQUEST_COPY16:    // regular 16-bit copy
+        case DMA_REQUEST_COPY16:
             Dma3CopyLarge16_(sDma3Requests[sDma3RequestCursor].src,
                              sDma3Requests[sDma3RequestCursor].dest,
                              sDma3Requests[sDma3RequestCursor].size);
             break;
-        case DMA_REQUEST_FILL16: // repeat a single 16-bit value across RAM
+        case DMA_REQUEST_FILL16:
             Dma3FillLarge16_(sDma3Requests[sDma3RequestCursor].value,
                              sDma3Requests[sDma3RequestCursor].dest,
                              sDma3Requests[sDma3RequestCursor].size);
             break;
         }
 
-        // Free the request
         sDma3Requests[sDma3RequestCursor].src = NULL;
         sDma3Requests[sDma3RequestCursor].dest = NULL;
         sDma3Requests[sDma3RequestCursor].size = 0;
         sDma3Requests[sDma3RequestCursor].mode = 0;
         sDma3Requests[sDma3RequestCursor].value = 0;
 
-        sDma3RequestCursor = INCREMENT_OR_WRAP(sDma3RequestCursor, MAX_DMA_REQUESTS); // loop back to the first DMA request
+        sDma3RequestCursor = INCREMENT_OR_WRAP(sDma3RequestCursor, MAX_DMA_REQUESTS);
     }
 }
 
@@ -103,7 +101,7 @@ s16 RequestDma3Copy(const void *src, void *dest, u16 size, u32 mode)
 
     while (i < MAX_DMA_REQUESTS)
     {
-        if (sDma3Requests[cursor].size == 0) // an empty request was found.
+        if (sDma3Requests[cursor].size == 0)
         {
             sDma3Requests[cursor].src = src;
             sDma3Requests[cursor].dest = dest;
@@ -118,11 +116,11 @@ s16 RequestDma3Copy(const void *src, void *dest, u16 size, u32 mode)
             return cursor;
         }
 
-        cursor = INCREMENT_OR_WRAP(cursor, MAX_DMA_REQUESTS); // loop back to start.
+        cursor = INCREMENT_OR_WRAP(cursor, MAX_DMA_REQUESTS);
         i++;
     }
     sDma3ManagerLocked = FALSE;
-    return -1;  // no free DMA request was found
+    return -1;
 }
 
 s16 RequestDma3Fill(s32 value, void *dest, u16 size, u32 mode)
@@ -135,7 +133,7 @@ s16 RequestDma3Fill(s32 value, void *dest, u16 size, u32 mode)
 
     while (i < MAX_DMA_REQUESTS)
     {
-        if (sDma3Requests[cursor].size == 0) // an empty request was found.
+        if (sDma3Requests[cursor].size == 0)
         {
             sDma3Requests[cursor].dest = dest;
             sDma3Requests[cursor].size = size;
@@ -151,18 +149,22 @@ s16 RequestDma3Fill(s32 value, void *dest, u16 size, u32 mode)
             return cursor;
         }
 
-        cursor = INCREMENT_OR_WRAP(cursor, MAX_DMA_REQUESTS); // loop back to start.
+        cursor = INCREMENT_OR_WRAP(cursor, MAX_DMA_REQUESTS);
         i++;
     }
     sDma3ManagerLocked = FALSE;
-    return -1;  // no free DMA request was found
+    return -1;
 }
 
 s16 CheckForSpaceForDma3Request(s16 index)
 {
+#ifdef PORTABLE
+    ProcessDma3Requests();
+#endif
+
     int i = 0;
 
-    if (index == -1)  // check if all requests are free
+    if (index == -1)
     {
         while (i < MAX_DMA_REQUESTS)
         {
@@ -172,7 +174,7 @@ s16 CheckForSpaceForDma3Request(s16 index)
         }
         return 0;
     }
-    else  // check the specified request
+    else
     {
         if (sDma3Requests[index].size != 0)
             return -1;
