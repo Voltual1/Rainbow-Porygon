@@ -1208,6 +1208,8 @@ static bool8 Swirl_End(struct Task *task)
 
 static void VBlankCB_Swirl(void)
 {
+    if (sTransitionData == NULL)
+        return;
     VBlankCB_BattleTransition();
     if (sTransitionData->VBlank_DMA)
         DmaCopy16(3, gScanlineEffectRegBuffers[0], gScanlineEffectRegBuffers[1], DISPLAY_HEIGHT * 2);
@@ -1215,7 +1217,10 @@ static void VBlankCB_Swirl(void)
 
 static void HBlankCB_Swirl(void)
 {
-    u16 var = gScanlineEffectRegBuffers[1][REG_VCOUNT];
+    u16 var;
+    if (sTransitionData == NULL)
+        return;
+    var = gScanlineEffectRegBuffers[1][REG_VCOUNT];
     REG_BG1HOFS = var;
     REG_BG2HOFS = var;
     REG_BG3HOFS = var;
@@ -1279,6 +1284,8 @@ static bool8 Shuffle_End(struct Task *task)
 
 static void VBlankCB_Shuffle(void)
 {
+    if (sTransitionData == NULL)
+        return;
     VBlankCB_BattleTransition();
     if (sTransitionData->VBlank_DMA)
         DmaCopy16(3, gScanlineEffectRegBuffers[0], gScanlineEffectRegBuffers[1], DISPLAY_HEIGHT * 2);
@@ -1286,7 +1293,10 @@ static void VBlankCB_Shuffle(void)
 
 static void HBlankCB_Shuffle(void)
 {
-    u16 var = gScanlineEffectRegBuffers[1][REG_VCOUNT];
+    u16 var;
+    if (sTransitionData == NULL)
+        return;
+    var = gScanlineEffectRegBuffers[1][REG_VCOUNT];
     REG_BG1VOFS = var;
     REG_BG2VOFS = var;
     REG_BG3VOFS = var;
@@ -1706,6 +1716,8 @@ static bool8 PatternWeave_CircularMask(struct Task *task)
 
 static void VBlankCB_SetWinAndBlend(void)
 {
+    if (sTransitionData == NULL)
+        return;
     DmaStop(0);
     VBlankCB_BattleTransition();
     if (sTransitionData->VBlank_DMA)
@@ -1719,12 +1731,16 @@ static void VBlankCB_SetWinAndBlend(void)
 
 static void VBlankCB_PatternWeave(void)
 {
+    if (sTransitionData == NULL)
+        return;
     VBlankCB_SetWinAndBlend();
     DmaSet(0, gScanlineEffectRegBuffers[1], &REG_BG0HOFS, B_TRANS_DMA_FLAGS);
 }
 
 static void VBlankCB_CircularMask(void)
 {
+    if (sTransitionData == NULL)
+        return;
     VBlankCB_SetWinAndBlend();
     DmaSet(0, gScanlineEffectRegBuffers[1], &REG_WIN0H, B_TRANS_DMA_FLAGS);
 }
@@ -2037,6 +2053,8 @@ static bool8 ClockwiseWipe_End(struct Task *task)
 
 static void VBlankCB_ClockwiseWipe(void)
 {
+    if (sTransitionData == NULL)
+        return;
     DmaStop(0);
     VBlankCB_BattleTransition();
     if (sTransitionData->VBlank_DMA != 0)
@@ -2117,6 +2135,8 @@ static bool8 Ripple_Main(struct Task *task)
 
 static void VBlankCB_Ripple(void)
 {
+    if (sTransitionData == NULL)
+        return;
     VBlankCB_BattleTransition();
     if (sTransitionData->VBlank_DMA)
         DmaCopy16(3, gScanlineEffectRegBuffers[0], gScanlineEffectRegBuffers[1], DISPLAY_HEIGHT * 2);
@@ -2124,7 +2144,10 @@ static void VBlankCB_Ripple(void)
 
 static void HBlankCB_Ripple(void)
 {
-    u16 var = gScanlineEffectRegBuffers[1][REG_VCOUNT];
+    u16 var;
+    if (sTransitionData == NULL)
+        return;
+    var = gScanlineEffectRegBuffers[1][REG_VCOUNT];
     REG_BG1VOFS = var;
     REG_BG2VOFS = var;
     REG_BG3VOFS = var;
@@ -2208,6 +2231,8 @@ static bool8 Wave_End(struct Task *task)
 
 static void VBlankCB_Wave(void)
 {
+    if (sTransitionData == NULL)
+        return;
     DmaStop(0);
     VBlankCB_BattleTransition();
     if (sTransitionData->VBlank_DMA != 0)
@@ -2550,6 +2575,8 @@ static bool8 Mugshot_End(struct Task *task)
 
 static void VBlankCB_Mugshots(void)
 {
+    if (sTransitionData == NULL)
+        return;
     DmaStop(0);
     VBlankCB_BattleTransition();
     if (sTransitionData->VBlank_DMA != 0)
@@ -2563,6 +2590,8 @@ static void VBlankCB_Mugshots(void)
 
 static void VBlankCB_MugshotsFadeOut(void)
 {
+    if (sTransitionData == NULL)
+        return;
     DmaStop(0);
     VBlankCB_BattleTransition();
     if (sTransitionData->VBlank_DMA != 0)
@@ -2573,6 +2602,8 @@ static void VBlankCB_MugshotsFadeOut(void)
 
 static void HBlankCB_Mugshots(void)
 {
+    if (sTransitionData == NULL)
+        return;
     if (REG_VCOUNT < DISPLAY_HEIGHT / 2)
         REG_BG0HOFS = sTransitionData->BG0HOFS_Lower;
     else
@@ -2665,12 +2696,12 @@ static void Mugshots_CreateTrainerPics(struct Task *task)
 
 static void SpriteCB_MugshotTrainerPic(struct Sprite *sprite)
 {
-    while (sMugshotTrainerPicFuncs[sprite->sState](sprite));
+    while (sprite->sState < (int)ARRAY_COUNT(sMugshotTrainerPicFuncs) && sMugshotTrainerPicFuncs[sprite->sState](sprite));
 }
 
 static void SpriteCB_MugshotTrainerPicPartner(struct Sprite *sprite)
 {
-    while (sMugshotTrainerPicFuncsPartner[sprite->sState](sprite));
+    while (sprite->sState < (int)ARRAY_COUNT(sMugshotTrainerPicFuncsPartner) && sMugshotTrainerPicFuncsPartner[sprite->sState](sprite));
 }
 
 
@@ -2869,6 +2900,8 @@ static bool8 Slice_End(struct Task *task)
 
 static void VBlankCB_Slice(void)
 {
+    if (sTransitionData == NULL)
+        return;
     DmaStop(0);
     VBlankCB_BattleTransition();
     REG_WININ = sTransitionData->WININ;
@@ -2881,6 +2914,8 @@ static void VBlankCB_Slice(void)
 
 static void HBlankCB_Slice(void)
 {
+    if (sTransitionData == NULL)
+        return;
     if (REG_VCOUNT < DISPLAY_HEIGHT)
     {
         u16 var = gScanlineEffectRegBuffers[1][REG_VCOUNT];
@@ -3597,6 +3632,9 @@ static void VBlankCB_Rayquaza(void)
 {
     void *dmaSrc;
 
+    if (sTransitionData == NULL)
+        return;
+
     DmaStop(0);
     VBlankCB_BattleTransition();
 
@@ -3723,6 +3761,8 @@ static bool8 WhiteBarsFade_End(struct Task *task)
 
 static void VBlankCB_WhiteBarsFade(void)
 {
+    if (sTransitionData == NULL)
+        return;
     DmaStop(0);
     VBlankCB_BattleTransition();
     REG_BLDCNT = sTransitionData->BLDCNT;
@@ -3736,6 +3776,8 @@ static void VBlankCB_WhiteBarsFade(void)
 
 static void VBlankCB_WhiteBarsFade_Blend(void)
 {
+    if (sTransitionData == NULL)
+        return;
     VBlankCB_BattleTransition();
     REG_BLDY = sTransitionData->BLDY;
     REG_BLDCNT = sTransitionData->BLDCNT;
@@ -3747,6 +3789,8 @@ static void VBlankCB_WhiteBarsFade_Blend(void)
 
 static void HBlankCB_WhiteBarsFade(void)
 {
+    if (sTransitionData == NULL)
+        return;
     REG_BLDY = gScanlineEffectRegBuffers[1][REG_VCOUNT];
 }
 
@@ -3755,7 +3799,7 @@ static void SpriteCB_WhiteBarFade(struct Sprite *sprite)
     if (sprite->sDelay)
     {
         sprite->sDelay--;
-        if (sprite->sIsMainSprite)
+        if (sprite->sIsMainSprite && sTransitionData != NULL)
             sTransitionData->VBlank_DMA = 1;
     }
     else
@@ -3779,16 +3823,17 @@ static void SpriteCB_WhiteBarFade(struct Sprite *sprite)
         if (sprite->sFade > FADE_TARGET)
             sprite->sFade = FADE_TARGET;
 
-        if (sprite->sIsMainSprite)
+        if (sprite->sIsMainSprite && sTransitionData != NULL)
             sTransitionData->VBlank_DMA = 1;
 
         if (sprite->sFinished)
         {
             // If not the main sprite, destroy self. Otherwise, wait until the
             // others have destroyed themselves, or until enough time has elapsed.
-            if (!sprite->sIsMainSprite || (sTransitionData->counter >= NUM_WHITE_BARS - 1 && sprite->sDestroyAttempts++ > 7))
+            if (!sprite->sIsMainSprite || (sTransitionData != NULL && sTransitionData->counter >= NUM_WHITE_BARS - 1 && sprite->sDestroyAttempts++ > 7))
             {
-                sTransitionData->counter++;
+                if (sTransitionData != NULL)
+                    sTransitionData->counter++;
                 DestroySprite(sprite);
             }
         }
@@ -3980,6 +4025,8 @@ static bool8 AngledWipes_StartNext(struct Task *task)
 
 static void VBlankCB_AngledWipes(void)
 {
+    if (sTransitionData == NULL)
+        return;
     DmaStop(0);
     VBlankCB_BattleTransition();
     if (sTransitionData->VBlank_DMA)
@@ -4270,7 +4317,7 @@ static bool8 UpdateBlackWipe(s16 *data, bool8 xExact, bool8 yExact)
 
     // Has X coord reached end?
     if ((tWipeXMove > 0 && tWipeCurrX >= tWipeEndX)
-     || (tWipeXMove < 0 && tWipeCurrX <= tWipeEndX))
+        || (tWipeXMove < 0 && tWipeCurrX <= tWipeEndX))
     {
         numFinished++;
         if (xExact)
@@ -4279,7 +4326,7 @@ static bool8 UpdateBlackWipe(s16 *data, bool8 xExact, bool8 yExact)
 
     // Has Y coord reached end?
     if ((tWipeYMove > 0 && tWipeCurrY >= tWipeEndY)
-     || (tWipeYMove < 0 && tWipeCurrY <= tWipeEndY))
+        || (tWipeYMove < 0 && tWipeCurrY <= tWipeEndY))
     {
         numFinished++;
         if (yExact)
@@ -4393,6 +4440,9 @@ static bool8 FrontierLogoWave_InitScanline(struct Task *task)
 {
     u8 i;
 
+    if (sTransitionData == NULL)
+        return FALSE;
+
     for (i = 0; i < DISPLAY_HEIGHT; i++)
         gScanlineEffectRegBuffers[1][i] = sTransitionData->cameraY;
 
@@ -4408,6 +4458,9 @@ static bool8 FrontierLogoWave_Main(struct Task *task)
 {
     u8 i;
     u16 sinVal, amplitude, sinSpread;
+
+    if (sTransitionData == NULL)
+        return FALSE;
 
     sTransitionData->VBlank_DMA = FALSE;
 
@@ -4461,6 +4514,8 @@ static bool8 FrontierLogoWave_Main(struct Task *task)
 
 static void VBlankCB_FrontierLogoWave(void)
 {
+    if (sTransitionData == NULL)
+        return;
     VBlankCB_BattleTransition();
     REG_BLDCNT = sTransitionData->BLDCNT;
     REG_BLDALPHA = sTransitionData->BLDALPHA;
@@ -4471,7 +4526,10 @@ static void VBlankCB_FrontierLogoWave(void)
 
 static void HBlankCB_FrontierLogoWave(void)
 {
-    u16 var = gScanlineEffectRegBuffers[1][REG_VCOUNT];
+    u16 var;
+    if (sTransitionData == NULL)
+        return;
+    var = gScanlineEffectRegBuffers[1][REG_VCOUNT];
     REG_BG0VOFS = var;
 }
 
