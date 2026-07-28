@@ -3744,6 +3744,89 @@ static void PrintSkillsPageText(void)
     PrintExpPointsNextLevel();
 }
 
+static void UpdateRelearnPrompt(void)
+{
+    FillWindowPixelBuffer(PSS_LABEL_WINDOW_PROMPT_RELEARN, PIXEL_FILL(0));
+    if (!sMonSummaryScreen->hasRelearnableMoves)
+        return;
+
+    const u8 *relearnText;
+    if (P_ENABLE_MOVE_RELEARNERS || P_TM_MOVES_RELEARNER || FlagGet(P_FLAG_EGG_MOVES) || FlagGet(P_FLAG_TUTOR_MOVES))
+        relearnText = sRelearnTexts[gMoveRelearnerState];
+    else
+        relearnText = sText_Relearn;
+
+    s32 relearnTextXPos = GetStringRightAlignXOffset(FONT_SMALL, relearnText, TILE_WIDTH * sSummaryTemplate[PSS_LABEL_WINDOW_PROMPT_RELEARN].width);
+    PrintTextOnWindowWithFont(PSS_LABEL_WINDOW_PROMPT_RELEARN, relearnText, relearnTextXPos, 4, 0, 0, FONT_SMALL);
+}
+
+static inline void ShowUtilityPrompt(s16 mode)
+{
+    const u8* promptText = NULL;
+    const u8* gText_SkillPageIvs = COMPOUND_STRING("IVs");
+    const u8* gText_SkillPageEvs = COMPOUND_STRING("EVs");
+    const u8* gText_SkillPageStats = COMPOUND_STRING("STATS");
+    const u8* gText_Rename = COMPOUND_STRING("RENAME");
+
+    if (sMonSummaryScreen->currPageIndex == PSS_PAGE_INFO)
+    {
+        if (ShouldShowRename())
+            promptText = gText_Rename;
+        else
+            promptText = gText_Cancel2;
+    }
+    else if (sMonSummaryScreen->currPageIndex == PSS_PAGE_SKILLS)
+    {
+        if (ShouldShowIvEvPrompt())
+        {
+            if (mode == SUMMARY_SKILLS_MODE_STATS)
+            {
+                if (P_SUMMARY_SCREEN_EV_ONLY)
+                    promptText = gText_SkillPageEvs;
+                else
+                    promptText = gText_SkillPageIvs;
+            }
+            else if (mode == SUMMARY_SKILLS_MODE_IVS)
+            {
+                if (P_SUMMARY_SCREEN_IV_ONLY)
+                    promptText = gText_SkillPageStats;
+                else
+                    promptText = gText_SkillPageEvs;
+            }
+            else if (mode == SUMMARY_SKILLS_MODE_EVS)
+            {
+                promptText = gText_SkillPageStats;
+            }
+        }
+    }
+    else if (sMonSummaryScreen->currPageIndex == PSS_PAGE_BATTLE_MOVES
+             || sMonSummaryScreen->currPageIndex == PSS_PAGE_CONTEST_MOVES)
+    {
+        if (mode == SUMMARY_MODE_SELECT_MOVE && !sMonSummaryScreen->lockMovesFlag)
+            promptText = gText_Switch;
+        else
+            promptText = gText_Info;
+    }
+
+    if (promptText == NULL)
+    {
+        ClearWindowTilemap(PSS_LABEL_WINDOW_PROMPT_UTILITY);
+        FillWindowPixelBuffer(PSS_LABEL_WINDOW_PROMPT_UTILITY, PIXEL_FILL(0));
+        return;
+    }
+
+    FillWindowPixelBuffer(PSS_LABEL_WINDOW_PROMPT_UTILITY, PIXEL_FILL(0));
+    PutWindowTilemap(PSS_LABEL_WINDOW_PROMPT_UTILITY);
+
+    int stringXPos = GetStringRightAlignXOffset(FONT_NORMAL, promptText, 62);
+    int iconXPos = stringXPos - 16;
+    if (iconXPos < 0)
+        iconXPos = 0;
+
+    PrintAOrBButtonIcon(PSS_LABEL_WINDOW_PROMPT_UTILITY, FALSE, iconXPos);
+    PrintTextOnWindow(PSS_LABEL_WINDOW_PROMPT_UTILITY, promptText, stringXPos, 1, 0, 0);
+}
+
 static void Task_PrintSkillsPage(u8 taskId)
 {
     s16 *data = gTasks[taskId].data;
@@ -3779,6 +3862,41 @@ static void Task_PrintSkillsPage(u8 taskId)
         return;
     }
     data[0]++;
+}
+
+static inline bool32 ShouldShowMoveRelearner(void)
+{
+    return (P_SUMMARY_SCREEN_MOVE_RELEARNER
+         && !sMonSummaryScreen->lockMovesFlag
+         && sMonSummaryScreen->mode != SUMMARY_MODE_BOX_CURSOR
+         && sMonSummaryScreen->hasRelearnableMoves
+         && !InBattleFactory()
+         && !InSlateportBattleTent());
+}
+
+static inline bool32 ShouldShowIvEvPrompt(void)
+{
+    if (P_SUMMARY_SCREEN_IV_EV_BOX_ONLY)
+    {
+        return (P_SUMMARY_SCREEN_IV_EV_INFO || FlagGet(P_FLAG_SUMMARY_SCREEN_IV_EV_INFO))
+            && (sMonSummaryScreen->mode == SUMMARY_MODE_BOX || sMonSummaryScreen->mode == SUMMARY_MODE_BOX_CURSOR);
+    }
+    else if (!P_SUMMARY_SCREEN_IV_EV_BOX_ONLY)
+    {
+        return (P_SUMMARY_SCREEN_IV_EV_INFO || FlagGet(P_FLAG_SUMMARY_SCREEN_IV_EV_INFO));
+    }
+    return FALSE;
+}
+
+static inline bool32 ShouldShowRename(void)
+{
+    return (P_SUMMARY_SCREEN_RENAME
+         && !sMonSummaryScreen->lockMovesFlag
+         && !sMonSummaryScreen->summary.isEgg
+         && sMonSummaryScreen->mode != SUMMARY_MODE_BOX_CURSOR
+         && !InBattleFactory()
+         && !InSlateportBattleTent()
+         && GetPlayerIDAsU32() == sMonSummaryScreen->summary.OTID);
 }
 
 static void PrintHeldItemName(void)
