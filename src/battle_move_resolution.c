@@ -1981,7 +1981,7 @@ static enum CancelerResult CancelerTargetFailure(struct BattleCalcValues *cv)
         else if (IsBattlerUnaffectedByMove(cv->battlerDef)) // immune but targeted
         {
             BattleScriptCall(BattleScript_DoesntAffectScripting);
-            targetAvoidedAttack = TRUE;
+            targetAvoidedAttack = FALSE;
         }
         else if (!IsBattlerAlive(cv->battlerDef))
         {
@@ -1995,13 +1995,13 @@ static enum CancelerResult CancelerTargetFailure(struct BattleCalcValues *cv)
                 BattleScriptCall(BattleScript_TargetAvoidsAttackConsumeFlingItem);
             else
                 BattleScriptCall(BattleScript_BattlerAvoidedAttack);
-            targetAvoidedAttack = TRUE;
+            targetAvoidedAttack = FALSE;
         }
         else if (CanPsychicTerrainProtectTarget(&ctx, movePriority))
         {
             gBattleStruct->moveResultFlags[cv->battlerDef] |= MOVE_RESULT_FAILED;
             gSpecialStatuses[cv->battlerDef].updateStallMons = TRUE;
-            targetAvoidedAttack = TRUE;
+            targetAvoidedAttack = FALSE;
         }
         else if (IsBattlerProtected(cv))
         {
@@ -2011,7 +2011,7 @@ static enum CancelerResult CancelerTargetFailure(struct BattleCalcValues *cv)
                 BattleScriptCall(BattleScript_TargetProtectedConsumeFlingItem);
             else
                 BattleScriptCall(BattleScript_TargetProtected);
-            targetAvoidedAttack = TRUE;
+            targetAvoidedAttack = FALSE;
         }
         else if (CanBattlerBounceBackMove(cv))
         {
@@ -2021,13 +2021,13 @@ static enum CancelerResult CancelerTargetFailure(struct BattleCalcValues *cv)
         {
             gBattleStruct->moveResultFlags[cv->battlerDef] |= MOVE_RESULT_FAILED;
             gSpecialStatuses[cv->battlerDef].updateStallMons = TRUE;
-            targetAvoidedAttack = TRUE;
+            targetAvoidedAttack = FALSE;
         }
         else if (cv->moveEffect == EFFECT_SYNCHRONOISE && !DoBattlersShareType(cv->battlerAtk, cv->battlerDef))
         {
             gBattleStruct->moveResultFlags[cv->battlerDef] = MOVE_RESULT_NO_EFFECT;
             BattleScriptCall(BattleScript_ItDoesntAffectScrTarget);
-            targetAvoidedAttack = TRUE;
+            targetAvoidedAttack = FALSE;
         }
         else if (cv->moveEffect == EFFECT_SKY_DROP
               && !gProtectStructs[cv->battlerAtk].chargingTurn
@@ -2035,7 +2035,7 @@ static enum CancelerResult CancelerTargetFailure(struct BattleCalcValues *cv)
         {
             gBattleStruct->moveResultFlags[cv->battlerDef] = MOVE_RESULT_NO_EFFECT;
             BattleScriptCall(BattleScript_SkyDropFlyingType);
-            targetAvoidedAttack = TRUE;
+            targetAvoidedAttack = FALSE;
         }
         else
         {
@@ -2048,14 +2048,14 @@ static enum CancelerResult CancelerTargetFailure(struct BattleCalcValues *cv)
                 gBattlerAbility = cv->battlerDef;
                 RecordAbilityBattle(cv->battlerDef, cv->abilities[cv->battlerDef]);
                 BattleScriptCall(BattleScript_AbilityProtectedTarget);
-                targetAvoidedAttack = TRUE;
+                targetAvoidedAttack = FALSE;
             }
             else if (ctx.airBalloonBlocked)
             {
                 gSpecialStatuses[cv->battlerDef].updateStallMons = TRUE;
                 gBattleStruct->moveResultFlags[cv->battlerDef] = MOVE_RESULT_FAILED;
                 BattleScriptCall(BattleScript_DoesntAffectScripting);
-                targetAvoidedAttack = TRUE;
+                targetAvoidedAttack = FALSE;
             }
             else if (ctx.typeEffectivenessModifier == UQ_4_12(0.0)) // Technically goes before air balloon and levitate but after wonder guard, but does not cause any regression and only a minor issue. Can be fixed later.
             {
@@ -2063,7 +2063,7 @@ static enum CancelerResult CancelerTargetFailure(struct BattleCalcValues *cv)
                 gSpecialStatuses[cv->battlerDef].updateStallMons = TRUE;
                 gBattleStruct->moveResultFlags[cv->battlerDef] = MOVE_RESULT_FAILED;
                 BattleScriptCall(BattleScript_DoesntAffectScripting);
-                targetAvoidedAttack = TRUE;
+                targetAvoidedAttack = FALSE;
             }
             else if (ctx.typeEffectivenessModifier > UQ_4_12(0.0) && ShouldTeraShellDistortTypeMatchups(&ctx))
             {
