@@ -1167,11 +1167,7 @@ static const struct SpriteTemplate sSpriteTemplate_StatusCondition =
     .anims = sSpriteAnimTable_StatusCondition,
 };
 static const u16 sMarkings_Pal[] = INCGFX_U16("graphics/summary_screen/markings.pal", ".gbapal");
-```
 
-下面继续为您提供 `src/pokemon_summary_screen.c` 的第二部分（即文件的剩余部分，确保全部代码完整输出）：
-
-```c
 static u8 ShowCategoryIcon(enum DamageCategory category)
 {
     if (sMonSummaryScreen->categoryIconSpriteId == 0xFF)
