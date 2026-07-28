@@ -17,6 +17,9 @@
 
 #define RAM_SCRIPT_MAGIC 51
 
+#define STRIP_DOMIRROR_TAG(ptr) \
+    ((((uintptr_t)(ptr)) & 0xE000000) == 0xA000000 ? (((uintptr_t)(ptr)) & ~0x02000000) : ((uintptr_t)(ptr)))
+
 enum {
     SCRIPT_MODE_STOPPED,
     SCRIPT_MODE_BYTECODE,
@@ -92,7 +95,8 @@ bool8 RunScriptCommand(struct ScriptContext *ctx)
         // Continue to bytecode if no function or it returns TRUE
         if (ctx->nativePtr)
         {
-            if (ctx->nativePtr() == TRUE)
+            bool8 (*nativeFunc)(void) = (bool8 (*)(void))STRIP_DOMIRROR_TAG(ctx->nativePtr);
+            if (nativeFunc() == TRUE)
                 ctx->mode = SCRIPT_MODE_BYTECODE;
             return TRUE;
         }
@@ -120,7 +124,8 @@ bool8 RunScriptCommand(struct ScriptContext *ctx)
                 return FALSE;
             }
 
-            if ((*func)(ctx) == TRUE)
+            ScrCmdFunc cmdFunc = (ScrCmdFunc)STRIP_DOMIRROR_TAG(*func);
+            if (cmdFunc(ctx) == TRUE)
                 return TRUE;
         }
     }
@@ -591,8 +596,9 @@ static bool32 RunScriptImmediatelyUntilEffect_InternalLoop(struct ScriptContext 
             if (!Script_IsEffectInstrumentedCommand(*func))
                 return TRUE;
 
+            ScrCmdFunc cmdFunc = (ScrCmdFunc)STRIP_DOMIRROR_TAG(*func);
             // Command which waits for a frame.
-            if ((*func)(ctx))
+            if (cmdFunc(ctx))
             {
                 gScriptEffectContext->nextCmd = ctx->scriptPtr;
                 return TRUE;

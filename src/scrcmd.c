@@ -45,7 +45,7 @@
 #include "pokemon_storage_system.h"
 #include "random.h"
 #include "overworld.h"
-#include "rotating_tile_puzzle.h"
+#include "rotating_gate.h"
 #include "rtc.h"
 #include "script.h"
 #include "script_menu.h"
@@ -67,6 +67,9 @@
 #include "constants/event_objects.h"
 #include "constants/map_types.h"
 #include "constants/party_menu.h"
+
+#define STRIP_DOMIRROR_TAG(ptr) \
+    ((((uintptr_t)(ptr)) & 0xE000000) == 0xA000000 ? (((uintptr_t)(ptr)) & ~0x02000000) : ((uintptr_t)(ptr)))
 
 typedef u16 (*SpecialFunc)(void);
 typedef void (*NativeFunc)(struct ScriptContext *ctx);
@@ -148,7 +151,8 @@ bool8 ScrCmd_special(struct ScriptContext *ctx)
     Script_RequestEffects(SCREFF_V1);
     Script_CheckEffectInstrumentedSpecial(index);
 
-    gSpecials[index]();
+    SpecialFunc func = (SpecialFunc)STRIP_DOMIRROR_TAG(gSpecials[index]);
+    func();
     return FALSE;
 }
 
@@ -162,7 +166,8 @@ bool8 ScrCmd_specialvar(struct ScriptContext *ctx)
     Script_RequestWriteVar(varId);
     Script_CheckEffectInstrumentedSpecial(index);
 
-    *ptr = gSpecials[index]();
+    SpecialFunc func = (SpecialFunc)STRIP_DOMIRROR_TAG(gSpecials[index]);
+    *ptr = func();
     return FALSE;
 }
 
@@ -174,7 +179,8 @@ bool8 ScrCmd_callnative(struct ScriptContext *ctx)
     Script_CheckEffectInstrumentedCallNative(func);
 
     ctx->waitAfterCallNative = FALSE;
-    func(ctx);
+    NativeFunc strippedFunc = (NativeFunc)STRIP_DOMIRROR_TAG(func);
+    strippedFunc(ctx);
     return ctx->waitAfterCallNative;
 }
 
@@ -1297,7 +1303,7 @@ bool8 ScrCmd_applymovement(struct ScriptContext *ctx)
 
     // When applying script movements to follower, it may have frozen animation that must be cleared
     if ((localId == OBJ_EVENT_ID_FOLLOWER && (objEvent = GetFollowerObject()) && objEvent->frozen)
-            || ((objEvent = &gObjectEvents[GetObjectEventIdByLocalId(localId)]) && IS_OW_MON_OBJ(objEvent)))
+| ((objEvent = &gObjectEvents[GetObjectEventIdByLocalId(localId)]) && IS_OW_MON_OBJ(objEvent)))
     {
         ClearObjectEventMovement(objEvent, &gSprites[objEvent->spriteId]);
         gSprites[objEvent->spriteId].animCmdIndex = 0; // Reset start frame of animation
