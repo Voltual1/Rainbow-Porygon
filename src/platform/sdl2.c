@@ -96,7 +96,6 @@ static void DrawTouchControls(void);
 
 int main(int argc, char **argv)
 {
-    // Open an output console on Windows
 #ifdef _WIN32
     AllocConsole() ;
     AttachConsole( GetCurrentProcessId() ) ;
@@ -110,7 +109,7 @@ int main(int argc, char **argv)
 #endif
     if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO
 #ifdef __ANDROID__
- | SDL_INIT_GAMECONTROLLER
+| SDL_INIT_GAMECONTROLLER
 #endif
                 ) < 0)
     {
@@ -261,7 +260,7 @@ int main(int argc, char **argv)
 
     SDL_AudioSpec want;
 
-    SDL_memset(&want, 0, sizeof(want)); /* or SDL_zero(want) */
+    SDL_memset(&want, 0, sizeof(want));
     want.freq = 42060;
     want.format = AUDIO_F32;
     want.channels = 2;
@@ -274,7 +273,7 @@ int main(int argc, char **argv)
         SDL_Log("Failed to open audio: %s", SDL_GetError());
     else
     {
-        if (want.format != AUDIO_F32) /* we let this one thing change. */
+        if (want.format != AUDIO_F32)
             SDL_Log("We didn't get Float32 audio format.");
         SDL_PauseAudioDevice(sdlAudioDevice, 0);
     }
@@ -297,7 +296,7 @@ int main(int argc, char **argv)
 
         if (!paused)
         {
-            double dt = fixedTimestep / timeScale; // TODO: Fix speedup
+            double dt = fixedTimestep / timeScale;
 
             curGameTime = SDL_GetPerformanceCounter();
             double deltaTime = (double)((curGameTime - lastGameTime) / (double)SDL_GetPerformanceFrequency());
@@ -365,8 +364,6 @@ int main(int argc, char **argv)
 #endif
                     SDL_AtomicSet(&isFrameAvailable, 0);
 
-                    // CAN FIX: 将所有硬件中断模拟全部移到 GBA 辅助线程内执行
-                    // 此处 SDL 渲染主线程只通过信号量将 GBA 线程从阻塞中唤醒
                     SDL_Log("CAN DEBUG: SDL main loop - Posting Semaphore");
                     SDL_SemPost(vBlankSemaphore);
 
@@ -386,7 +383,6 @@ int main(int argc, char **argv)
 #endif
     }
 
-    //StoreSaveFile();
     CloseSaveFile();
 
 #if defined(NATIVE_LINUX) || defined(_WIN32)
@@ -414,12 +410,10 @@ static void ReadSaveFile(const char *path)
     u32 magic = 0;
     if (fread(&magic, sizeof(magic), 1, f) == 1 && magic == MODERN_SAVE_MAGIC)
     {
-        // 这是一个现代格式存档，不写入 128KB GBA 物理 Flash 缓冲区中
         fclose(f);
         return;
     }
 
-    // 这是一个 legacy (128KB Flash) 格式存档
     fseek(f, 0, SEEK_END);
     int fileSize = ftell(f);
     fseek(f, 0, SEEK_SET);
@@ -501,7 +495,6 @@ static void ApplyPlatformSettings(void)
 
 static void StoreSaveFile()
 {
-    // 保护现代存档免被旧 128KB Flash 缓冲区覆写
     FILE *fCheck = fopen(gSavePath, "rb");
     if (fCheck != NULL)
     {
@@ -635,7 +628,6 @@ static void CloseSaveFile()
     }
 }
 
-// Key mappings
 #define KEY_A_BUTTON      SDLK_z
 #define KEY_B_BUTTON      SDLK_x
 #define KEY_START_BUTTON  SDLK_RETURN
@@ -1053,7 +1045,6 @@ u16 GetXInputKeys()
 
 
         /* Speedup */
-        // Note: 'speedup' variable is only (un)set on keyboard input
         double oldTimeScale = timeScale;
         timeScale = (state.Gamepad.bRightTrigger > 0x80 || speedUp) ? 5.0 : 1.0;
 
@@ -1073,7 +1064,7 @@ u16 GetXInputKeys()
 
     return xinputKeys;
 }
-#endif // _WIN32
+#endif
 
 u16 Platform_GetKeyInput(void)
 {
@@ -1103,7 +1094,7 @@ void VDraw(SDL_Texture *texture)
         image[i] = 0xFF000000 | (r << 16) | (g << 8) | b;
     }
     SDL_UpdateTexture(texture, NULL, image, DISPLAY_WIDTH * sizeof(Uint32));
-    REG_VCOUNT = 161; // prep for being in VBlank period
+    REG_VCOUNT = 161;
 }
 
 int DoMain(void *data)
@@ -1115,29 +1106,29 @@ int DoMain(void *data)
 void VBlankIntrWait(void)
 {
     SDL_AtomicSet(&isFrameAvailable, 1);
+    
+    SDL_Log("CAN DEBUG: [VBlankIntrWait] Waiting for Semaphore...");
     SDL_SemWait(vBlankSemaphore);
+    SDL_Log("CAN DEBUG: [VBlankIntrWait] Semaphore Acquired!");
 
-    // 1. 模拟触发 V-Count 中断 (如需要，驱动音频等外设心跳)
     REG_VCOUNT = 150;
     if (gIntrTable[0] != NULL)
     {
+        SDL_Log("CAN DEBUG: [VBlankIntrWait] Calling gIntrTable[0] (VCountIntr) -> %p", (void*)gIntrTable[0]);
         gIntrTable[0]();
     }
 
-    // 2. 模拟触发垂直消隐 VBLANK 中断
     REG_VCOUNT = 161;
     REG_DISPSTAT |= INTR_FLAG_VBLANK;
 
     RunDMAs(DMA_HBLANK);
 
-    // 3. 执行游戏 VBlank 主逻辑，这里会安全地调用我们刚改好的 m4aSoundMain
     if (gIntrTable[4] != NULL)
     {
+        SDL_Log("CAN DEBUG: [VBlankIntrWait] Calling gIntrTable[4] (VBlankIntr) -> %p", (void*)gIntrTable[4]);
         gIntrTable[4](); 
     }
     
-    // 4. CAN FIX: 游戏逻辑计算完毕，所有音轨状态处于稳定！
-    // 此时像真正的 GBA DMA 芯片一样，一次性抽取合成波形数据。
     extern void RunMixerFrame(void);
     RunMixerFrame();
     
@@ -1232,7 +1223,6 @@ void Platform_SetTime(struct SiiRtcInfo *rtc)
 
 void Platform_SetAlarm(u8 *alarmData)
 {
-    // TODO
 }
 
 void SoftReset(u32 resetFlags)
