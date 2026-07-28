@@ -83,6 +83,7 @@
 #include "constants/songs.h"
 #include "constants/trainer_hill.h"
 #include "constants/weather.h"
+#include "dma3.h"
 
 extern void SDL_Log(const char *fmt, ...);
 
@@ -927,7 +928,7 @@ void LoadMapFromCameraTransition(u8 mapGroup, u8 mapNum)
     else
     {
         if (gMapHeader.regionMapSectionId != MAPSEC_BATTLE_FRONTIER
-| gMapHeader.regionMapSectionId != sLastMapSectionId)
+ || gMapHeader.regionMapSectionId != sLastMapSectionId)
             ShowMapNamePopup();
     }
     SetMinimumOWESpawnTimer();
@@ -1054,7 +1055,7 @@ bool8 MetatileBehavior_IsSurfableInSeafoamIslands(u16 metatileBehavior)
         return FALSE;
     if ((gSaveBlock1Ptr->location.mapGroup == MAP_GROUP(MAP_SEAFOAM_ISLANDS_B3F)
           && gSaveBlock1Ptr->location.mapNum == MAP_NUM(MAP_SEAFOAM_ISLANDS_B3F))
-| (gSaveBlock1Ptr->location.mapGroup == MAP_GROUP(MAP_SEAFOAM_ISLANDS_B4F)
+     || (gSaveBlock1Ptr->location.mapGroup == MAP_GROUP(MAP_SEAFOAM_ISLANDS_B4F)
           && gSaveBlock1Ptr->location.mapNum == MAP_NUM(MAP_SEAFOAM_ISLANDS_B4F)))
     {
         return TRUE;
@@ -1084,7 +1085,7 @@ static enum Direction GetAdjustedInitialDirection(struct InitialPlayerAvatarStat
     else if (MetatileBehavior_IsDirectionalUpLeftStairWarp(metatileBehavior) == TRUE || MetatileBehavior_IsDirectionalDownLeftStairWarp(metatileBehavior) == TRUE)
         return DIR_EAST;
     else if ((playerStruct->transitionFlags == PLAYER_AVATAR_FLAG_UNDERWATER  && transitionFlags == PLAYER_AVATAR_FLAG_SURFING)
-| (playerStruct->transitionFlags == PLAYER_AVATAR_FLAG_SURFING && transitionFlags == PLAYER_AVATAR_FLAG_UNDERWATER))
+          || (playerStruct->transitionFlags == PLAYER_AVATAR_FLAG_SURFING && transitionFlags == PLAYER_AVATAR_FLAG_UNDERWATER))
         return playerStruct->direction;
     else if (MetatileBehavior_IsLadder(metatileBehavior) == TRUE)
         return playerStruct->direction;
@@ -1200,7 +1201,7 @@ static bool16 IsInfiltratedWeatherInstitute(struct WarpData *warp)
     else if (warp->mapGroup != MAP_GROUP(MAP_ROUTE119_WEATHER_INSTITUTE_1F))
         return FALSE;
     else if (warp->mapNum == MAP_NUM(MAP_ROUTE119_WEATHER_INSTITUTE_1F)
-| warp->mapNum == MAP_NUM(MAP_ROUTE119_WEATHER_INSTITUTE_2F))
+          || warp->mapNum == MAP_NUM(MAP_ROUTE119_WEATHER_INSTITUTE_2F))
         return TRUE;
     else
         return FALSE;
@@ -1215,7 +1216,7 @@ static bool16 IsInfiltratedSpaceCenter(struct WarpData *warp)
     else if (warp->mapGroup != MAP_GROUP(MAP_MOSSDEEP_CITY_SPACE_CENTER_1F))
         return FALSE;
     else if (warp->mapNum == MAP_NUM(MAP_MOSSDEEP_CITY_SPACE_CENTER_1F)
-| warp->mapNum == MAP_NUM(MAP_MOSSDEEP_CITY_SPACE_CENTER_2F))
+          || warp->mapNum == MAP_NUM(MAP_MOSSDEEP_CITY_SPACE_CENTER_2F))
         return TRUE;
     return FALSE;
 }
@@ -1545,10 +1546,10 @@ mapsec_u8_t GetLastUsedWarpMapSectionId(void)
 bool8 IsMapTypeOutdoors(enum MapType mapType)
 {
     if (mapType == MAP_TYPE_ROUTE
-| mapType == MAP_TYPE_TOWN
-| mapType == MAP_TYPE_UNDERWATER
-| mapType == MAP_TYPE_CITY
-| mapType == MAP_TYPE_OCEAN_ROUTE)
+     || mapType == MAP_TYPE_TOWN
+     || mapType == MAP_TYPE_UNDERWATER
+     || mapType == MAP_TYPE_CITY
+     || mapType == MAP_TYPE_OCEAN_ROUTE)
         return TRUE;
     else
         return FALSE;
@@ -1557,9 +1558,9 @@ bool8 IsMapTypeOutdoors(enum MapType mapType)
 bool8 Overworld_MapTypeAllowsTeleportAndFly(enum MapType mapType)
 {
     if (mapType == MAP_TYPE_ROUTE
-| mapType == MAP_TYPE_TOWN
-| mapType == MAP_TYPE_OCEAN_ROUTE
-| mapType == MAP_TYPE_CITY)
+     || mapType == MAP_TYPE_TOWN
+     || mapType == MAP_TYPE_OCEAN_ROUTE
+     || mapType == MAP_TYPE_CITY)
         return TRUE;
     else
         return FALSE;
@@ -1568,7 +1569,7 @@ bool8 Overworld_MapTypeAllowsTeleportAndFly(enum MapType mapType)
 bool8 IsMapTypeIndoors(enum MapType mapType)
 {
     if (mapType == MAP_TYPE_INDOOR
-| mapType == MAP_TYPE_SECRET_BASE)
+     || mapType == MAP_TYPE_SECRET_BASE)
         return TRUE;
     else
         return FALSE;
@@ -1771,9 +1772,9 @@ bool32 MapHasNaturalLight(enum MapType mapType)
 {
     return (OW_ENABLE_DNS
          && (mapType == MAP_TYPE_TOWN
-| mapType == MAP_TYPE_CITY
-| mapType == MAP_TYPE_ROUTE
-| mapType == MAP_TYPE_OCEAN_ROUTE));
+          || mapType == MAP_TYPE_CITY
+          || mapType == MAP_TYPE_ROUTE
+          || mapType == MAP_TYPE_OCEAN_ROUTE));
 }
 
 bool32 CurrentMapHasShadows(void)
@@ -1860,8 +1861,8 @@ static void OverworldBasic(void)
         FormChangeTimeUpdate();
         if (MapHasNaturalLight(gMapHeader.mapType) &&
            (bld0[0] != bld1[0]
-| bld0[1] != bld1[1]
-| bld0[2] != bld1[2]))
+         || bld0[1] != bld1[1]
+         || bld0[2] != bld1[2]))
         {
             ApplyWeatherColorMapIfIdle(gWeatherPtr->colorMapIndex);
         }
@@ -2492,7 +2493,14 @@ static bool32 ReturnToFieldLink(u8 *state)
 static void DoMapLoadLoop(u8 *state)
 {
     SDL_Log("CAN MAPLOAD: Entering DoMapLoadLoop");
-    while (!LoadMapInStepsLocal(state, FALSE));
+    while (!LoadMapInStepsLocal(state, FALSE))
+    {
+#if defined(__ANDROID__) || defined(__linux__) || defined(__APPLE__) || defined(_WIN32)
+        // Pump DMA3 requests so that FreeTempTileDataBuffersIfPossible does not deadlock
+        // waiting for DMA3 completion in environments without hardware preemption.
+        ProcessDma3Requests();
+#endif
+    }
     SDL_Log("CAN MAPLOAD: Exiting DoMapLoadLoop");
 }
 
@@ -2532,8 +2540,7 @@ static void InitOverworldGraphicsRegisters(void)
     SetGpuReg(REG_OFFSET_WIN0V, 0xFF);
     SetGpuReg(REG_OFFSET_WIN1H, 0xFFFF);
     SetGpuReg(REG_OFFSET_WIN1V, 0xFFFF);
-    SetGpuReg(REG_OFFSET_BLDCNT, gOverworldBackgroundLayerFlags[1] | gOverworldBackgroundLayerFlags[2] | gOverworldBackgroundLayerFlags[3]
-                               | BLDCNT_TGT2_OBJ | BLDCNT_EFFECT_BLEND);
+    SetGpuReg(REG_OFFSET_BLDCNT, gOverworldBackgroundLayerFlags[1] | gOverworldBackgroundLayerFlags[2] | gOverworldBackgroundLayerFlags[3] | BLDCNT_TGT2_OBJ | BLDCNT_EFFECT_BLEND);
     SetGpuReg(REG_OFFSET_BLDALPHA, BLDALPHA_BLEND(13, 7));
     InitOverworldBgs();
     ScheduleBgCopyTilemapToVram(1);
@@ -2547,8 +2554,7 @@ static void InitOverworldGraphicsRegisters(void)
     ChangeBgY(2, 0, BG_COORD_SET);
     ChangeBgX(3, 0, BG_COORD_SET);
     ChangeBgY(3, 0, BG_COORD_SET);
-    SetGpuReg(REG_OFFSET_DISPCNT, DISPCNT_OBJ_ON | DISPCNT_WIN0_ON | DISPCNT_WIN1_ON
-                                | DISPCNT_OBJ_1D_MAP | DISPCNT_HBLANK_INTERVAL);
+    SetGpuReg(REG_OFFSET_DISPCNT, DISPCNT_OBJ_ON | DISPCNT_WIN0_ON | DISPCNT_WIN1_ON | DISPCNT_OBJ_1D_MAP | DISPCNT_HBLANK_INTERVAL);
     ShowBg(0);
     ShowBg(1);
     ShowBg(2);
@@ -2567,8 +2573,7 @@ static void InitOverworldGraphicsRegistersCreditsFrlg(void)
     SetGpuReg(REG_OFFSET_WIN0V, WIN_RANGE(0, 255));
     SetGpuReg(REG_OFFSET_WIN1H, WIN_RANGE(255, 255));
     SetGpuReg(REG_OFFSET_WIN1V, WIN_RANGE(255, 255));
-    SetGpuReg(REG_OFFSET_BLDCNT, gOverworldBackgroundLayerFlags[1] | gOverworldBackgroundLayerFlags[2] | gOverworldBackgroundLayerFlags[3]
-                                 | BLDCNT_TGT2_OBJ | BLDCNT_EFFECT_BLEND);
+    SetGpuReg(REG_OFFSET_BLDCNT, gOverworldBackgroundLayerFlags[1] | gOverworldBackgroundLayerFlags[2] | gOverworldBackgroundLayerFlags[3] | BLDCNT_TGT2_OBJ | BLDCNT_EFFECT_BLEND);
     SetGpuReg(REG_OFFSET_BLDALPHA, BLDALPHA_BLEND(13, 7));
     ScheduleBgCopyTilemapToVram(1);
     ScheduleBgCopyTilemapToVram(2);
@@ -3622,7 +3627,7 @@ static u8 LinkPlayerGetCollision(u8 selfObjEventId, enum Direction direction, s1
         if (i != selfObjEventId)
         {
             if ((gObjectEvents[i].currentCoords.x == x && gObjectEvents[i].currentCoords.y == y)
-| (gObjectEvents[i].previousCoords.x == x && gObjectEvents[i].previousCoords.y == y))
+             || (gObjectEvents[i].previousCoords.x == x && gObjectEvents[i].previousCoords.y == y))
             {
                 return 1;
             }
@@ -3900,7 +3905,7 @@ static bool8 FieldCB2_Credits_WaitFade(void)
         return FALSE;
 }
 
-bool32 Overworld_DoScrollSceneForCredits(u8 *state_p, const struct CreditsOverworldCmd * script)
+boot32 Overworld_DoScrollSceneForCredits(u8 *state_p, const struct CreditsOverworldCmd * script)
 {
     sCreditsOverworld_Script = script;
     return SetUpScrollSceneForCredits(state_p, 0);
