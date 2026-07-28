@@ -17,9 +17,6 @@
 
 #define RAM_SCRIPT_MAGIC 51
 
-#define STRIP_DOMIRROR_TAG(ptr) \
-    ((((uintptr_t)(ptr)) & 0xE000000) == 0xA000000 ? (((uintptr_t)(ptr)) & ~0x02000000) : ((uintptr_t)(ptr)))
-
 enum {
     SCRIPT_MODE_STOPPED,
     SCRIPT_MODE_BYTECODE,
@@ -95,6 +92,7 @@ bool8 RunScriptCommand(struct ScriptContext *ctx)
         // Continue to bytecode if no function or it returns TRUE
         if (ctx->nativePtr)
         {
+            // nativePtr might have been tagged by Script_CheckEffectInstrumentedGotoNative
             bool8 (*nativeFunc)(void) = (bool8 (*)(void))STRIP_DOMIRROR_TAG(ctx->nativePtr);
             if (nativeFunc() == TRUE)
                 ctx->mode = SCRIPT_MODE_BYTECODE;
@@ -124,8 +122,8 @@ bool8 RunScriptCommand(struct ScriptContext *ctx)
                 return FALSE;
             }
 
-            ScrCmdFunc cmdFunc = (ScrCmdFunc)STRIP_DOMIRROR_TAG(*func);
-            if (cmdFunc(ctx) == TRUE)
+            // Command table is clean, no STRIP_DOMIRROR_TAG needed here!
+            if ((*func)(ctx) == TRUE)
                 return TRUE;
         }
     }
@@ -564,8 +562,7 @@ struct ScriptEffectContext *gScriptEffectContext = NULL;
 
 static bool32 Script_IsEffectInstrumentedCommand(ScrCmdFunc func)
 {
-    // In ROM mirror 1.
-    return (((uintptr_t)func) & 0xE000000) == 0xA000000;
+    return IsEffectInstrumented((void*)func);
 }
 
 /* 'setjmp' and 'longjmp' cause link errors, so we use
@@ -668,8 +665,13 @@ bool32 Script_MatchesCallNative(const u8 *script, void *funcPtr, bool32 requestE
         return FALSE;
     u32 callnativeFunc = (((((script[4] << 8) + script[3]) << 8) + script[2]) << 8) + script[1];
     u32 targetFunc = (u32)funcPtr;
-    if (requestEffects)
+    if (requestEffects) {
+#if defined(__ANDROID__) || defined(__linux__) || defined(__APPLE__) || defined(_WIN32)
+        targetFunc += 0x02000000;
+#else
         targetFunc |= 0xA000000;
+#endif
+    }
     if (callnativeFunc == targetFunc)
         return TRUE;
     return FALSE;

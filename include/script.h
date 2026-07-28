@@ -130,6 +130,40 @@ static inline bool32 Script_IsAnalyzingEffects(void)
     return gScriptEffectContext != NULL;
 }
 
+static inline bool32 IsEffectInstrumented(void *ptr) {
+    if (!ptr) return FALSE;
+#if defined(__ANDROID__) || defined(__linux__) || defined(__APPLE__) || defined(_WIN32)
+    uintptr_t p = (uintptr_t)ptr;
+    // We use a known code symbol as a reference point.
+    // All valid function pointers must reside in the .text segment (a few MBs max distance).
+    uintptr_t ref = (uintptr_t)&Script_IsAnalyzingEffects;
+    
+    // The build system adds 0x02000000 to some function pointers for effect analysis.
+    uintptr_t stripped = p - 0x02000000;
+    
+    uintptr_t dist_raw = (p > ref) ? (p - ref) : (ref - p);
+    uintptr_t dist_stripped = (stripped > ref) ? (stripped - ref) : (ref - stripped);
+    
+    // If subtracting 0x02000000 brings the pointer significantly closer to our .text segment,
+    // it was undoubtedly a tagged pointer.
+    return dist_stripped < dist_raw;
+#else
+    // For original GBA target
+    return (((uintptr_t)ptr) & 0xE000000) == 0xA000000;
+#endif
+}
+
+static inline void* StripMirrorTag(void *ptr) {
+    if (!ptr) return ptr;
+#if defined(__ANDROID__) || defined(__linux__) || defined(__APPLE__) || defined(_WIN32)
+    return IsEffectInstrumented(ptr) ? (void*)((uintptr_t)ptr - 0x02000000) : ptr;
+#else
+    return (void*)((((uintptr_t)(ptr)) & 0xE000000) == 0xA000000 ? (((uintptr_t)(ptr)) & ~0x02000000) : ((uintptr_t)(ptr)));
+#endif
+}
+
+#define STRIP_DOMIRROR_TAG(ptr) StripMirrorTag((void*)(ptr))
+
 #define RunScriptImmediatelyUntilEffect(effects, ptr, ctx) \
     ({ \
         _Static_assert((effects) & 0x80000000, "RunScriptImmediatelyUntilEffect requires an effects version"); \
@@ -160,22 +194,19 @@ static inline void Script_CheckEffectInstrumentedSpecial(u32 specialId)
 {
     typedef u16 (*SpecialFunc)(void);
     extern const SpecialFunc gSpecials[];
-    // In ROM mirror 1.
-    if (Script_IsAnalyzingEffects() && (((uintptr_t)gSpecials[specialId]) & 0xE000000) != 0xA000000)
+    if (Script_IsAnalyzingEffects() && !IsEffectInstrumented((void*)gSpecials[specialId]))
         Script_GotoBreak_Internal();
 }
 
 static inline void Script_CheckEffectInstrumentedGotoNative(bool8 (*func)(void))
 {
-    // In ROM mirror 1.
-    if (Script_IsAnalyzingEffects() && (((uintptr_t)func) & 0xE000000) != 0xA000000)
+    if (Script_IsAnalyzingEffects() && !IsEffectInstrumented((void*)func))
         Script_GotoBreak_Internal();
 }
 
 static inline void Script_CheckEffectInstrumentedCallNative(void (*func)(struct ScriptContext *))
 {
-    // In ROM mirror 1.
-    if (Script_IsAnalyzingEffects() && (((uintptr_t)func) & 0xE000000) != 0xA000000)
+    if (Script_IsAnalyzingEffects() && !IsEffectInstrumented((void*)func))
         Script_GotoBreak_Internal();
 }
 

@@ -68,9 +68,6 @@
 #include "constants/map_types.h"
 #include "constants/party_menu.h"
 
-#define STRIP_DOMIRROR_TAG(ptr) \
-    ((((uintptr_t)(ptr)) & 0xE000000) == 0xA000000 ? (((uintptr_t)(ptr)) & ~0x02000000) : ((uintptr_t)(ptr)))
-
 typedef u16 (*SpecialFunc)(void);
 typedef void (*NativeFunc)(struct ScriptContext *ctx);
 
@@ -1303,7 +1300,7 @@ bool8 ScrCmd_applymovement(struct ScriptContext *ctx)
 
     // When applying script movements to follower, it may have frozen animation that must be cleared
     if ((localId == OBJ_EVENT_ID_FOLLOWER && (objEvent = GetFollowerObject()) && objEvent->frozen)
-| ((objEvent = &gObjectEvents[GetObjectEventIdByLocalId(localId)]) && IS_OW_MON_OBJ(objEvent)))
+|| ((objEvent = &gObjectEvents[GetObjectEventIdByLocalId(localId)]) && IS_OW_MON_OBJ(objEvent)))
     {
         ClearObjectEventMovement(objEvent, &gSprites[objEvent->spriteId]);
         gSprites[objEvent->spriteId].animCmdIndex = 0; // Reset start frame of animation
