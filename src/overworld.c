@@ -3905,7 +3905,7 @@ static bool8 FieldCB2_Credits_WaitFade(void)
         return FALSE;
 }
 
-boot32 Overworld_DoScrollSceneForCredits(u8 *state_p, const struct CreditsOverworldCmd * script)
+bool32 Overworld_DoScrollSceneForCredits(u8 *state_p, const struct CreditsOverworldCmd * script)
 {
     sCreditsOverworld_Script = script;
     return SetUpScrollSceneForCredits(state_p, 0);
