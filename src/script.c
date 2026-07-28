@@ -92,7 +92,6 @@ bool8 RunScriptCommand(struct ScriptContext *ctx)
         // Continue to bytecode if no function or it returns TRUE
         if (ctx->nativePtr)
         {
-            // nativePtr might have been tagged by Script_CheckEffectInstrumentedGotoNative
             bool8 (*nativeFunc)(void) = (bool8 (*)(void))STRIP_DOMIRROR_TAG(ctx->nativePtr);
             if (nativeFunc() == TRUE)
                 ctx->mode = SCRIPT_MODE_BYTECODE;
@@ -122,8 +121,9 @@ bool8 RunScriptCommand(struct ScriptContext *ctx)
                 return FALSE;
             }
 
-            // Command table is clean, no STRIP_DOMIRROR_TAG needed here!
-            if ((*func)(ctx) == TRUE)
+            // Android平台上，gScriptCmdTable里的命令函数指针也带有0x02000000标签，需要在此剥离
+            ScrCmdFunc cmdFunc = (ScrCmdFunc)STRIP_DOMIRROR_TAG(*func);
+            if (cmdFunc(ctx) == TRUE)
                 return TRUE;
         }
     }

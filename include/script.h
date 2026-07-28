@@ -134,21 +134,13 @@ static inline bool32 IsEffectInstrumented(void *ptr) {
     if (!ptr) return FALSE;
 #if defined(__ANDROID__) || defined(__linux__) || defined(__APPLE__) || defined(_WIN32)
     uintptr_t p = (uintptr_t)ptr;
-    // We use a known code symbol as a reference point.
-    // All valid function pointers must reside in the .text segment (a few MBs max distance).
-    uintptr_t ref = (uintptr_t)&Script_IsAnalyzingEffects;
-    
-    // The build system adds 0x02000000 to some function pointers for effect analysis.
+    // 使用全局不可 inline 且必然驻留在代码段的 InitScriptContext 取得稳定的基准地址。
+    uintptr_t ref = (uintptr_t)&InitScriptContext;
     uintptr_t stripped = p - 0x02000000;
-    
     uintptr_t dist_raw = (p > ref) ? (p - ref) : (ref - p);
     uintptr_t dist_stripped = (stripped > ref) ? (stripped - ref) : (ref - stripped);
-    
-    // If subtracting 0x02000000 brings the pointer significantly closer to our .text segment,
-    // it was undoubtedly a tagged pointer.
     return dist_stripped < dist_raw;
 #else
-    // For original GBA target
     return (((uintptr_t)ptr) & 0xE000000) == 0xA000000;
 #endif
 }
