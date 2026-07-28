@@ -430,11 +430,15 @@ void ClearSaveData(void)
     remove(gSavePath);
 
     memset(gFlashBaseBuffer, 0xFF, sizeof(gFlashBaseBuffer));
-    u16 i;
-    for (i = 0; i < SECTORS_COUNT / 2; i++)
+    
+    if (gFlashMemoryPresent == TRUE)
     {
-        EraseFlashSector(i);
-        EraseFlashSector(i + SECTORS_COUNT / 2);
+        u16 i;
+        for (i = 0; i < SECTORS_COUNT / 2; i++)
+        {
+            EraseFlashSector(i);
+            EraseFlashSector(i + SECTORS_COUNT / 2);
+        }
     }
 }
 
@@ -1098,7 +1102,10 @@ u8 LoadGameSave(u8 saveType)
         status = LoadModernSave(saveType);
         if (status == SAVE_STATUS_CORRUPT || status == SAVE_STATUS_EMPTY)
         {
-            status = TryLoadSaveSlot(FULL_SAVE_SLOT, gRamSaveSectorLocations);
+            if (gFlashMemoryPresent == TRUE)
+                status = TryLoadSaveSlot(FULL_SAVE_SLOT, gRamSaveSectorLocations);
+            else
+                status = SAVE_STATUS_EMPTY;
         }
         CopyPartyAndObjectsFromSave();
         gSaveFileStatus = status;
@@ -1108,7 +1115,7 @@ u8 LoadGameSave(u8 saveType)
         status = LoadModernSave(saveType);
         if (status == SAVE_STATUS_CORRUPT || status == SAVE_STATUS_EMPTY)
         {
-            if (gHoFSaveBuffer != NULL)
+            if (gFlashMemoryPresent == TRUE && gHoFSaveBuffer != NULL)
             {
                 u8 *hofData = (u8 *) gHoFSaveBuffer;
                 status = TryLoadSaveSector(SECTOR_ID_HOF_1, hofData, SECTOR_DATA_SIZE);
@@ -1136,6 +1143,8 @@ u16 GetSaveBlocksPointersBaseOffset(void)
     if (fread(&header, sizeof(header), 1, f) != 1 || header.magic != MODERN_SAVE_MAGIC)
     {
         fclose(f);
+        if (gFlashMemoryPresent != TRUE)
+            return 0;
         u16 i, slotOffset;
         struct SaveSector *sector = gReadWriteSector = &gSaveDataBuffer;
         UpdateSaveAddresses();
