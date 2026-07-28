@@ -34,6 +34,8 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+#define MODERN_SAVE_MAGIC 0x4d454b50 // 'PKEM'
+
 extern void (*gIntrTable[])(void);
 
 SDL_Thread *mainLoopThread;
@@ -61,7 +63,7 @@ double timeScale = 1.0;
 struct SiiRtcInfo internalClock;
 
 static FILE *sSaveFile = NULL;
-static char sSavePath[1024] = "pokeemerald.sav";
+char gSavePath[1024] = "pokeemerald.sav";
 static char sConfigPath[1024] = "pokeemerald.cfg";
 static u8 sBorderBackground;
 static bool sHasBorderBackgroundConfig;
@@ -108,7 +110,7 @@ int main(int argc, char **argv)
 #endif
     if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO
 #ifdef __ANDROID__
- | SDL_INIT_GAMECONTROLLER
+ SDL_INIT_GAMECONTROLLER
 #endif
                 ) < 0)
     {
@@ -128,12 +130,12 @@ int main(int argc, char **argv)
     char *prefPath = SDL_GetPrefPath("pokeemerald", "pokeemerald");
     if (prefPath != NULL)
     {
-        SDL_snprintf(sSavePath, sizeof(sSavePath), "%spokeemerald.sav", prefPath);
+        SDL_snprintf(gSavePath, sizeof(gSavePath), "%spokeemerald.sav", prefPath);
         SDL_snprintf(sConfigPath, sizeof(sConfigPath), "%spokeemerald.cfg", prefPath);
         SDL_free(prefPath);
     }
 #endif
-    ReadSaveFile(sSavePath);
+    ReadSaveFile(gSavePath);
     ReadConfigFile();
 
 #ifdef __ANDROID__
@@ -340,7 +342,8 @@ int main(int argc, char **argv)
                     SDL_Rect gameViewport = {(outputWidth - gameWidth) / 2,
                                              (outputHeight - gameHeight) / 2,
                                              gameWidth, gameHeight};
-                    SDL_RenderCopy(sdlRenderer, sdlTexture, NULL, &gameViewport);
+                    SDL_Rect gameViewportSrc = {0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT};
+                    SDL_RenderCopy(sdlRenderer, sdlTexture, &gameViewportSrc, &gameViewport);
                     if (sPlatformSettings[PLATFORM_SETTING_BORDER] && sdlBorderTexture != NULL)
                     {
                         SDL_Rect borderSource = {141, 18, 1000, 683};
@@ -401,34 +404,33 @@ int main(int argc, char **argv)
 
 static void ReadSaveFile(const char *path)
 {
-    // Check whether the saveFile exists, and create it if not
-    sSaveFile = fopen(path, "r+b");
-    if (sSaveFile == NULL)
+    FILE *f = fopen(path, "rb");
+    if (f == NULL)
     {
-        sSaveFile = fopen(path, "w+b");
-    }
-
-    if (sSaveFile == NULL)
-    {
-        memset(FLASH_BASE, 0xFF, sizeof(gFlashBaseBuffer));
-        SDL_Log("Unable to open save file: %s", path);
+        memset(gFlashBaseBuffer, 0xFF, sizeof(gFlashBaseBuffer));
         return;
     }
 
-    fseek(sSaveFile, 0, SEEK_END);
-    int fileSize = ftell(sSaveFile);
-    fseek(sSaveFile, 0, SEEK_SET);
+    u32 magic = 0;
+    if (fread(&magic, sizeof(magic), 1, f) == 1 && magic == MODERN_SAVE_MAGIC)
+    {
+        // 这是一个现代格式存档，不写入 128KB GBA 物理 Flash 缓冲区中
+        fclose(f);
+        return;
+    }
 
-    // Only read as many bytes as fit inside the buffer
-    // or as many bytes as are in the file
+    // 这是一个 legacy (128KB Flash) 格式存档
+    fseek(f, 0, SEEK_END);
+    int fileSize = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
     int bytesToRead = (fileSize < sizeof(gFlashBaseBuffer)) ? fileSize : sizeof(gFlashBaseBuffer);
+    int bytesRead = fread(gFlashBaseBuffer, 1, bytesToRead, f);
+    fclose(f);
 
-    int bytesRead = fread(FLASH_BASE, 1, bytesToRead, sSaveFile);
-
-    // Fill the buffer if the savefile was just created or smaller than the buffer itself
     for (int i = bytesRead; i < sizeof(gFlashBaseBuffer); i++)
     {
-        FLASH_BASE[i] = 0xFF;
+        gFlashBaseBuffer[i] = 0xFF;
     }
 }
 
@@ -499,10 +501,23 @@ static void ApplyPlatformSettings(void)
 
 static void StoreSaveFile()
 {
+    // 保护现代存档免被旧 128KB Flash 缓冲区覆写
+    FILE *fCheck = fopen(gSavePath, "rb");
+    if (fCheck != NULL)
+    {
+        u32 magic = 0;
+        if (fread(&magic, sizeof(magic), 1, fCheck) == 1 && magic == MODERN_SAVE_MAGIC)
+        {
+            fclose(fCheck);
+            return;
+        }
+        fclose(fCheck);
+    }
+
     if (sSaveFile != NULL)
     {
         fseek(sSaveFile, 0, SEEK_SET);
-        fwrite(FLASH_BASE, 1, sizeof(gFlashBaseBuffer), sSaveFile);
+        fwrite(gFlashBaseBuffer, 1, sizeof(gFlashBaseBuffer), sSaveFile);
     }
 }
 
@@ -514,7 +529,7 @@ void Platform_StoreSaveFile(void)
 void Platform_ReadFlash(u16 sectorNum, u32 offset, u8 *dest, u32 size)
 {
     DBGPRINTF("ReadFlash(sectorNum=0x%04X,offset=0x%08X,size=0x%02X)\n",sectorNum,offset,size);
-    FILE * savefile = fopen(sSavePath, "r+b");
+    FILE * savefile = fopen(gSavePath, "r+b");
     if (savefile == NULL)
     {
         puts("Error opening save file.");
@@ -543,7 +558,6 @@ void Platform_QueueAudio(float *audioBuffer, s32 samplesPerFrame)
         for (int i = 0; i < floatCount; i++)
             adjustedAudio[i] = audioBuffer[i] * volume;
             
-        // CAN FIX: 恢复输出游戏真实的音频数据（结束之前的正弦波蜂鸣测试）
         if (SDL_QueueAudio(sdlAudioDevice, adjustedAudio, samplesPerFrame) < 0)
             SDL_Log("Failed to queue audio: %s", SDL_GetError());
     }
