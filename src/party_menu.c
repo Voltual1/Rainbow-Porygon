@@ -1016,13 +1016,25 @@ static void PartyPaletteBufferCopy(u8 palNum)
 static void FreePartyPointers(void)
 {
     if (sPartyMenuInternal)
+    {
         Free(sPartyMenuInternal);
+        sPartyMenuInternal = NULL;
+    }
     if (sPartyBgTilemapBuffer)
+    {
         Free(sPartyBgTilemapBuffer);
+        sPartyBgTilemapBuffer = NULL;
+    }
     if (sPartyBgGfxTilemap)
+    {
         Free(sPartyBgGfxTilemap);
+        sPartyBgGfxTilemap = NULL;
+    }
     if (sPartyMenuBoxes)
+    {
         Free(sPartyMenuBoxes);
+        sPartyMenuBoxes = NULL;
+    }
     FreeAllWindowBuffers();
 }
 

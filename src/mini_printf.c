@@ -381,35 +381,50 @@ s32 mini_vpprintf(void *buf, const char *fmt, va_list va)
                 break;
 
             case 's' :
-                ptr = va_arg(va, char*);
-                len = mini_strlen(ptr);
-                if (pad_to > 0)
-                {
-                    len = mini_pad(ptr, len, pad_char, pad_to, bf);
-                    len = _putsAscii(bf, len, buf);
-                }
-                else
-                {
-                    len = _putsAscii(ptr, len, buf);
-                }
-                break;
-            case 'S' : // preproc encoded string handler
-                ptr = va_arg(va, char*);
-                len = StringLength((u8*)ptr);
-                if (pad_to > 0)
-                {
-                    len = mini_pad(ptr, len, pad_char, pad_to, bf);
-                    len = _putsEncoded(bf, len, buf);
-                }
-                else
-                {
-                    len = _putsEncoded(ptr, len, buf);
-                }
-                break;
-            default:
-                len = 1;
-                len = _putsAscii(&ch, len, buf);
-                break;
+    ptr = va_arg(va, char*);
+    if (ptr == NULL)
+        ptr = "(null)";
+    len = mini_strlen(ptr);
+    if (pad_to > 0)
+    {
+        len = mini_pad(ptr, len, pad_char, pad_to, bf);
+        len = _putsAscii(bf, len, buf);
+    }
+    else
+    {
+        len = _putsAscii(ptr, len, buf);
+    }
+    break;
+case 'S' : // preproc encoded string handler
+    ptr = va_arg(va, char*);
+    if (ptr == NULL)
+    {
+        ptr = "(null)";
+        len = mini_strlen(ptr);
+        if (pad_to > 0)
+        {
+            len = mini_pad(ptr, len, pad_char, pad_to, bf);
+            len = _putsAscii(bf, len, buf);
+        }
+        else
+        {
+            len = _putsAscii(ptr, len, buf);
+        }
+    }
+    else
+    {
+        len = StringLength((u8*)ptr);
+        if (pad_to > 0)
+        {
+            len = mini_pad(ptr, len, pad_char, pad_to, bf);
+            len = _putsEncoded(bf, len, buf);
+        }
+        else
+        {
+            len = _putsEncoded(ptr, len, buf);
+        }
+    }
+    break;
             }
         }
         n = n + len;
