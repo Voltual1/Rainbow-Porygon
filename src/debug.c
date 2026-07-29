@@ -508,7 +508,7 @@ static const s32 sPowersOfTen[] =
     1000000000,
 };
 
-// 修复 1：修正函数指针数组类型，修饰符从 const u32 (*) 改为 u32 (*const [])
+// 修饰符从 const u32 (*) 改为 u32 (*const [])
 static u32 (*const generateListFunctions[])(const struct DebugMenuOption *) =
 {
     [DEBUG_BASIC_MENU] = Debug_GenerateListBasicMenu,
@@ -518,7 +518,7 @@ static u32 (*const generateListFunctions[])(const struct DebugMenuOption *) =
 
 // *******************************
 // Menu Actions. Make sure that submenus are defined before the menus that call them.
-// 修复 2：在结构体静态初始化中直接使用 COMPOUND_STRING，避免 C 语言不允许非编译期常量的报错
+// 在结构体静态初始化中直接使用 COMPOUND_STRING，避免 C 语言不允许非编译期常量的报错
 static const struct DebugMenuOption sDebugMenu_Actions_TimeMenu_TimesOfDay[] =
 {
     [TIME_MORNING] = { COMPOUND_STRING("Morning"), DebugAction_TimeMenu_ChangeTimeOfDay },
