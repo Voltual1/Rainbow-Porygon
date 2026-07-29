@@ -80,8 +80,6 @@
 #include "constants/rgb.h"
 #include "constants/songs.h"
 
-extern void SDL_Log(const char *fmt, ...);
-
 enum {
     MENU_SUMMARY,
     MENU_SWITCH,
@@ -517,13 +515,11 @@ static const u8 sText_CannotSendMonToBoxPartner[] = _("Cannot send a mon that do
 static void InitPartyMenu(enum PartyMenuType menuType, enum PartyMenuLayout layout, u8 partyAction, bool8 keepCursorPos, u8 messageId, TaskFunc task, MainCallback callback)
 {
     u16 i;
-    SDL_Log("CAN DEBUG: [InitPartyMenu] Type=%d, Layout=%d, Action=%d, MsgId=%d", menuType, layout, partyAction, messageId);
 
     ResetPartyMenu();
     sPartyMenuInternal = Alloc(sizeof(struct PartyMenuInternal));
     if (sPartyMenuInternal == NULL)
     {
-        SDL_Log("CAN DEBUG: [InitPartyMenu] Alloc internal failed, calling callback directly");
         SetMainCallback2(callback);
     }
     else
@@ -587,7 +583,6 @@ static void LoadBattlePartyCurrentOrderForLayout(void)
 static void RefreshPartyMenu(void) //Refreshes the party menu without restarting tasks
 {
     u16 i;
-    SDL_Log("CAN DEBUG: [RefreshPartyMenu] Refreshing");
     for (i = 0; i < ARRAY_COUNT(sPartyMenuInternal->data); i++)
         sPartyMenuInternal->data[i] = 0;
     for (i = 0; i < ARRAY_COUNT(sPartyMenuInternal->windowId); i++)
@@ -600,95 +595,77 @@ static void RefreshPartyMenu(void) //Refreshes the party menu without restarting
 
 static void CB2_UpdatePartyMenu(void)
 {
-    SDL_Log("CAN DEBUG: [CB2_UpdatePartyMenu] Frame Start");
     RunTasks();
     AnimateSprites();
     BuildOamBuffer();
     DoScheduledBgTilemapCopiesToVram();
     UpdatePaletteFade();
-    SDL_Log("CAN DEBUG: [CB2_UpdatePartyMenu] Frame End");
 }
 
 static void VBlankCB_PartyMenu(void)
 {
-    SDL_Log("CAN DEBUG: [VBlankCB_PartyMenu] Start");
     LoadOam();
     ProcessSpriteCopyRequests();
     TransferPlttBuffer();
-    SDL_Log("CAN DEBUG: [VBlankCB_PartyMenu] End");
 }
 
 static void CB2_InitPartyMenu(void)
 {
-    SDL_Log("CAN DEBUG: [CB2_InitPartyMenu] Loop Started");
     while (TRUE)
     {
         if (MenuHelpers_ShouldWaitForLinkRecv() == TRUE || ShowPartyMenu() == TRUE || MenuHelpers_IsLinkActive() == TRUE)
             break;
     }
-    SDL_Log("CAN DEBUG: [CB2_InitPartyMenu] Loop Ended");
 }
 
 static void CB2_ReloadPartyMenu(void)
 {
-    SDL_Log("CAN DEBUG: [CB2_ReloadPartyMenu] Loop Started");
     while (TRUE)
     {
         if (MenuHelpers_ShouldWaitForLinkRecv() == TRUE || ReloadPartyMenu() == TRUE || MenuHelpers_IsLinkActive() == TRUE)
             break;
     }
-    SDL_Log("CAN DEBUG: [CB2_ReloadPartyMenu] Loop Ended");
 }
 
 static bool8 ShowPartyMenu(void)
 {
-    SDL_Log("CAN DEBUG: [ShowPartyMenu] State: %d", gMain.state);
     switch (gMain.state)
     {
     case 0:
-        SDL_Log("CAN DEBUG: [ShowPartyMenu] State 0 - Reset regs");
         SetVBlankHBlankCallbacksToNull();
         ResetVramOamAndBgCntRegs();
         ClearScheduledBgCopiesToVram();
         gMain.state++;
         break;
     case 1:
-        SDL_Log("CAN DEBUG: [ShowPartyMenu] State 1 - Stop scanline");
         ScanlineEffect_Stop();
         gMain.state++;
         break;
     case 2:
-        SDL_Log("CAN DEBUG: [ShowPartyMenu] State 2 - Reset fade");
         ResetPaletteFade();
         gPaletteFade.bufferTransferDisabled = TRUE;
         gMain.state++;
         break;
     case 3:
-        SDL_Log("CAN DEBUG: [ShowPartyMenu] State 3 - Reset sprite");
         ResetSpriteData();
         gMain.state++;
         break;
     case 4:
-        SDL_Log("CAN DEBUG: [ShowPartyMenu] State 4 - Free sprite pal");
         FreeAllSpritePalettes();
         gMain.state++;
         break;
     case 5:
-        SDL_Log("CAN DEBUG: [ShowPartyMenu] State 5 - Reset tasks");
         if (!MenuHelpers_IsLinkActive())
             ResetTasks();
         gMain.state++;
         break;
     case 6:
-        SDL_Log("CAN DEBUG: [ShowPartyMenu] State 6 - Allowed in minigame");
         SetPartyMonsAllowedInMinigame();
         gMain.state++;
         break;
     case 7:
-        SDL_Log("CAN DEBUG: [ShowPartyMenu] State 7 - Alloc party bg");
         if (!AllocPartyMenuBg())
         {
-            SDL_Log("CAN DEBUG: [ShowPartyMenu] AllocPartyMenuBg failed, exiting");
             ExitPartyMenu();
             return TRUE;
         }
@@ -699,43 +676,35 @@ static bool8 ShowPartyMenu(void)
         }
         break;
     case 8:
-        SDL_Log("CAN DEBUG: [ShowPartyMenu] State 8 - Alloc bg gfx");
         if (AllocPartyMenuBgGfx())
             gMain.state++;
         break;
     case 9:
-        SDL_Log("CAN DEBUG: [ShowPartyMenu] State 9 - Init windows");
         InitPartyMenuWindows(gPartyMenu.layout);
         gMain.state++;
         break;
     case 10:
-        SDL_Log("CAN DEBUG: [ShowPartyMenu] State 10 - Init boxes");
         InitPartyMenuBoxes(gPartyMenu.layout);
         sPartyMenuInternal->data[0] = 0;
         gMain.state++;
         break;
     case 11:
-        SDL_Log("CAN DEBUG: [ShowPartyMenu] State 11 - Load item icons");
         LoadHeldItemIcons();
         gMain.state++;
         break;
     case 12:
-        SDL_Log("CAN DEBUG: [ShowPartyMenu] State 12 - Load pokeball gfx");
         LoadPartyMenuPokeballGfx();
         gMain.state++;
         break;
     case 13:
-        SDL_Log("CAN DEBUG: [ShowPartyMenu] State 13 - Load ailment gfx");
         LoadPartyMenuAilmentGfx();
         gMain.state++;
         break;
     case 14:
-        SDL_Log("CAN DEBUG: [ShowPartyMenu] State 14 - Load mon icon pal");
         LoadMonIconPalettes();
         gMain.state++;
         break;
     case 15:
-        SDL_Log("CAN DEBUG: [ShowPartyMenu] State 15 - Create sprites loop");
         if (CreatePartyMonSpritesLoop())
         {
             sPartyMenuInternal->data[0] = 0;
@@ -743,7 +712,6 @@ static bool8 ShowPartyMenu(void)
         }
         break;
     case 16:
-        SDL_Log("CAN DEBUG: [ShowPartyMenu] State 16 - Render boxes");
         if (RenderPartyMenuBoxes())
         {
             sPartyMenuInternal->data[0] = 0;
@@ -751,38 +719,31 @@ static bool8 ShowPartyMenu(void)
         }
         break;
     case 17:
-        SDL_Log("CAN DEBUG: [ShowPartyMenu] State 17 - Create cancel button gfx");
         CreateCancelConfirmPokeballSprites();
         gMain.state++;
         break;
     case 18:
-        SDL_Log("CAN DEBUG: [ShowPartyMenu] State 18 - Create cancel window");
         CreateCancelConfirmWindows(sPartyMenuInternal->chooseHalf);
         gMain.state++;
         break;
     case 19:
-        SDL_Log("CAN DEBUG: [ShowPartyMenu] State 19 - Skip");
         gMain.state++;
         break;
     case 20:
-        SDL_Log("CAN DEBUG: [ShowPartyMenu] State 20 - Create task & message");
         CreateTask(sPartyMenuInternal->task, 0);
         DisplayPartyMenuMessage(sActionStringTable[sPartyMenuInternal->messageId], FALSE);
         gMain.state++;
         break;
     case 21:
-        SDL_Log("CAN DEBUG: [ShowPartyMenu] State 21 - Blend palettes");
         BlendPalettes(PALETTES_ALL, 16, 0);
         gPaletteFade.bufferTransferDisabled = FALSE;
         gMain.state++;
         break;
     case 22:
-        SDL_Log("CAN DEBUG: [ShowPartyMenu] State 22 - Fade to black/normal");
         BeginNormalPaletteFade(PALETTES_ALL, 0, 16, 0, RGB_BLACK);
         gMain.state++;
         break;
     default:
-        SDL_Log("CAN DEBUG: [ShowPartyMenu] State default - Finished, callback set to Update");
         SetVBlankCallback(VBlankCB_PartyMenu);
         SetMainCallback2(CB2_UpdatePartyMenu);
         return TRUE;
@@ -792,79 +753,64 @@ static bool8 ShowPartyMenu(void)
 
 static bool8 ReloadPartyMenu(void)
 {
-    SDL_Log("CAN DEBUG: [ReloadPartyMenu] State: %d", gMain.state);
     switch (gMain.state)
     {
     case 0:
-        SDL_Log("CAN DEBUG: [ReloadPartyMenu] State 0");
         SetVBlankHBlankCallbacksToNull();
         ClearScheduledBgCopiesToVram();
         gMain.state++;
         break;
     case 1:
-        SDL_Log("CAN DEBUG: [ReloadPartyMenu] State 1");
         ScanlineEffect_Stop();
         gMain.state++;
         break;
     case 2:
-        SDL_Log("CAN DEBUG: [ReloadPartyMenu] State 2");
         ResetPaletteFade();
         gPaletteFade.bufferTransferDisabled = TRUE;
         gMain.state++;
         break;
     case 3:
-        SDL_Log("CAN DEBUG: [ReloadPartyMenu] State 3");
         ResetSpriteData();
         gMain.state++;
         break;
     case 4:
-        SDL_Log("CAN DEBUG: [ReloadPartyMenu] State 4");
         FreeAllSpritePalettes();
         gMain.state++;
         break;
     case 5:
-        SDL_Log("CAN DEBUG: [ReloadPartyMenu] State 5");
         SetPartyMonsAllowedInMinigame();
         gMain.state++;
         break;
     case 6:
-        SDL_Log("CAN DEBUG: [ReloadPartyMenu] State 6");
         sPartyMenuInternal->data[0] = 0;
         gMain.state++;
         break;
     case 7:
-        SDL_Log("CAN DEBUG: [ReloadPartyMenu] State 7");
         LoadPartyMenuWindows();
         gMain.state++;
         break;
     case 8:
-        SDL_Log("CAN DEBUG: [ReloadPartyMenu] State 8");
         LoadPartyMenuBoxes(gPartyMenu.layout);
         sPartyMenuInternal->data[0] = 0;
         gMain.state++;
         break;
     case 9:
-        SDL_Log("CAN DEBUG: [ReloadPartyMenu] State 9");
         LoadHeldItemIcons();
         gMain.state++;
         break;
     case 10:
-        SDL_Log("CAN DEBUG: [ReloadPartyMenu] State 10");
         LoadPartyMenuPokeballGfx();
         gMain.state++;
         break;
     case 11:
-        SDL_Log("CAN DEBUG: [ReloadPartyMenu] State 11");
         LoadPartyMenuAilmentGfx();
         gMain.state++;
         break;
     case 12:
-        SDL_Log("CAN DEBUG: [ReloadPartyMenu] State 12");
         LoadMonIconPalettes();
         gMain.state++;
         break;
     case 13:
-        SDL_Log("CAN DEBUG: [ReloadPartyMenu] State 13");
         if (CreatePartyMonSpritesLoop())
         {
             sPartyMenuInternal->data[0] = 0;
@@ -872,7 +818,6 @@ static bool8 ReloadPartyMenu(void)
         }
         break;
     case 14:
-        SDL_Log("CAN DEBUG: [ReloadPartyMenu] State 14");
         if (RenderPartyMenuBoxes())
         {
             sPartyMenuInternal->data[0] = 0;
@@ -880,28 +825,23 @@ static bool8 ReloadPartyMenu(void)
         }
         break;
     case 15:
-        SDL_Log("CAN DEBUG: [ReloadPartyMenu] State 15");
         CreateCancelConfirmPokeballSprites();
         gMain.state++;
         break;
     case 16:
-        SDL_Log("CAN DEBUG: [ReloadPartyMenu] State 16");
         CreateCancelConfirmWindows(sPartyMenuInternal->chooseHalf);
         gMain.state++;
         break;
     case 17:
-        SDL_Log("CAN DEBUG: [ReloadPartyMenu] State 17");
         BlendPalettes(PALETTES_ALL, 16, RGB_WHITEALPHA);
         gPaletteFade.bufferTransferDisabled = FALSE;
         gMain.state++;
         break;
     case 18:
-        SDL_Log("CAN DEBUG: [ReloadPartyMenu] State 18");
         BeginNormalPaletteFade(PALETTES_ALL, 0, 16, 0, RGB_WHITEALPHA);
         gMain.state++;
         break;
     default:
-        SDL_Log("CAN DEBUG: [ReloadPartyMenu] State default - Finished, callback set to Update");
         SetVBlankCallback(VBlankCB_PartyMenu);
         SetMainCallback2(CB2_UpdatePartyMenu);
         return TRUE;
@@ -911,7 +851,6 @@ static bool8 ReloadPartyMenu(void)
 
 static void ExitPartyMenu(void)
 {
-    SDL_Log("CAN DEBUG: [ExitPartyMenu] Fading and creating exit task");
     BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 16, RGB_BLACK);
     CreateTask(Task_ExitPartyMenu, 0);
     SetVBlankCallback(VBlankCB_PartyMenu);
@@ -922,7 +861,6 @@ static void Task_ExitPartyMenu(u8 taskId)
 {
     if (!gPaletteFade.active)
     {
-        SDL_Log("CAN DEBUG: [Task_ExitPartyMenu] Fade complete, switching CB2 to exit callback");
         SetMainCallback2(gPartyMenu.exitCallback);
         FreePartyPointers();
         DestroyTask(taskId);
@@ -1506,7 +1444,6 @@ static void SwapPartyPokemon(struct Pokemon *mon1, struct Pokemon *mon2)
 
 static void Task_ClosePartyMenu(u8 taskId)
 {
-    SDL_Log("CAN DEBUG: [Task_ClosePartyMenu] Closing. Fading out.");
     BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 16, RGB_BLACK);
     gTasks[taskId].func = Task_ClosePartyMenuAndSetCB2;
 }
@@ -1515,7 +1452,6 @@ static void Task_ClosePartyMenuAndSetCB2(u8 taskId)
 {
     if (!gPaletteFade.active)
     {
-        SDL_Log("CAN DEBUG: [Task_ClosePartyMenuAndSetCB2] Fading done. Restoring callbacks.");
         if (gPartyMenu.menuType == PARTY_MENU_TYPE_IN_BATTLE)
             UpdatePartyToFieldOrder();
 
@@ -7099,7 +7035,6 @@ static void TryTutorSelectedMon(u8 taskId)
 
 void CB2_PartyMenuFromStartMenu(void)
 {
-    SDL_Log("CAN DEBUG: [CB2_PartyMenuFromStartMenu] Opening Party Menu from Start Menu");
     InitPartyMenu(PARTY_MENU_TYPE_FIELD, PARTY_LAYOUT_SINGLE, PARTY_ACTION_CHOOSE_MON, FALSE, PARTY_MSG_CHOOSE_MON, Task_HandleChooseMonInput, CB2_ReturnToFieldWithOpenMenu);
 }
 
@@ -7510,7 +7445,6 @@ static u8 GetPartyLayoutFromBattleType(void)
 
 void OpenPartyMenuInBattle(u8 partyAction)
 {
-    SDL_Log("CAN DEBUG: [OpenPartyMenuInBattle] Action=%d", partyAction);
     if (IS_FRLG && !BtlCtrl_OakOldMan_TestState2Flag(FIRST_BATTLE_MSG_FLAG_PARTY_MENU) && (gBattleTypeFlags & BATTLE_TYPE_FIRST_BATTLE))
     {
         InitPartyMenu(PARTY_MENU_TYPE_IN_BATTLE, GetPartyLayoutFromBattleType(), partyAction, FALSE, PARTY_MSG_NONE, Task_FirstBattleEnterParty_WaitFadeIn, CB2_SetUpReshowBattleScreenAfterMenu);
