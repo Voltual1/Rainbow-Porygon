@@ -30,8 +30,6 @@
 #include "platform.h"
 #endif
 
-extern void SDL_Log(const char *fmt, ...);
-
 static void VBlankIntr(void);
 static void HBlankIntr(void);
 static void VCountIntr(void);
@@ -81,8 +79,6 @@ void EnableVCountIntrAtLine150(void);
 
 void AgbMain(void)
 {
-    SDL_Log("CAN DEBUG: [Main] AgbMain Booting...");
-    
     *(vu16 *)BG_PLTT = RGB_WHITE; 
     InitGpuRegManager();
     REG_WAITCNT = WAITCNT_PREFETCH_ENABLE
@@ -113,41 +109,28 @@ void AgbMain(void)
     gLinkTransferringData = FALSE;
 
     gAgbMainLoop_sp = __builtin_frame_address(0);
-    SDL_Log("CAN DEBUG: [Main] Entering AgbMainLoop.");
     AgbMainLoop();
 }
 
 void AgbMainLoop(void)
 {
-    int loopCount = 0;
     for (;;)
     {
-        SDL_Log("CAN DEBUG: [AgbMainLoop] LoopStart. Frame=%d, State=%d, CB2=%p", 
-                loopCount, gMain.state, (void*)gMain.callback2);
-        loopCount++;
-
-        SDL_Log("CAN DEBUG: [AgbMainLoop] Step 1: ReadKeys");
         ReadKeys();
-        SDL_Log("CAN DEBUG: [AgbMainLoop] Step 1 Done");
 
-        SDL_Log("CAN DEBUG: [AgbMainLoop] Step 2: Check Link running");
         if (Overworld_SendKeysToLinkIsRunning() == TRUE)
         {
-            SDL_Log("CAN DEBUG: [AgbMainLoop] Step 2a: SendKeysToLink");
             gLinkTransferringData = TRUE;
             UpdateLinkAndCallCallbacks();
             gLinkTransferringData = FALSE;
         }
         else
         {
-            SDL_Log("CAN DEBUG: [AgbMainLoop] Step 2b: UpdateLinkAndCallCallbacks");
             gLinkTransferringData = FALSE;
             UpdateLinkAndCallCallbacks();
 
-            SDL_Log("CAN DEBUG: [AgbMainLoop] Step 2c: Check RecvKeys");
             if (Overworld_RecvKeysFromLinkIsRunning() == TRUE)
             {
-                SDL_Log("CAN DEBUG: [AgbMainLoop] Step 2d: RecvKeysFromLink");
                 gMain.newKeys = 0;
                 ClearSpriteCopyRequests();
                 gLinkTransferringData = TRUE;
@@ -155,19 +138,10 @@ void AgbMainLoop(void)
                 gLinkTransferringData = FALSE;
             }
         }
-        SDL_Log("CAN DEBUG: [AgbMainLoop] Step 2 Done");
 
-        SDL_Log("CAN DEBUG: [AgbMainLoop] Step 3: PlayTimeCounter_Update");
         PlayTimeCounter_Update();
-        SDL_Log("CAN DEBUG: [AgbMainLoop] Step 3 Done");
-
-        SDL_Log("CAN DEBUG: [AgbMainLoop] Step 4: MapMusicMain");
         MapMusicMain();
-        SDL_Log("CAN DEBUG: [AgbMainLoop] Step 4 Done");
-        
-        SDL_Log("CAN DEBUG: [AgbMainLoop] Before WaitForVBlank. CB2=%p", (void*)gMain.callback2);
         WaitForVBlank();
-        SDL_Log("CAN DEBUG: [AgbMainLoop] After WaitForVBlank. CB2=%p", (void*)gMain.callback2);
     }
 }
 
@@ -190,24 +164,15 @@ static void InitMainCallbacks(void)
 
 static void CallCallbacks(void)
 {
-    if (gMain.callback1) {
-        SDL_Log("CAN DEBUG: [CallCallbacks] Calling CB1=%p", (void*)gMain.callback1);
+    if (gMain.callback1)
         gMain.callback1();
-        SDL_Log("CAN DEBUG: [CallCallbacks] Returned from CB1. CB2=%p", (void*)gMain.callback2);
-    }
 
-    if (gMain.callback2) {
-        SDL_Log("CAN DEBUG: [CallCallbacks] Calling CB2=%p", (void*)gMain.callback2);
+    if (gMain.callback2)
         gMain.callback2();
-        SDL_Log("CAN DEBUG: [CallCallbacks] Returned from CB2. CB2=%p", (void*)gMain.callback2);
-    } else {
-        SDL_Log("CAN DEBUG: [CallCallbacks] WARNING! CB2 is NULL during CallCallbacks!");
-    }
 }
 
 void SetMainCallback2(MainCallback callback)
 {
-    SDL_Log("CAN DEBUG: [SetMainCallback2] Changing CB2 from %p to %p", (void*)gMain.callback2, (void*)callback);
     gMain.callback2 = callback;
     gMain.state = 0;
 }
@@ -359,7 +324,6 @@ void SetSerialCallback(IntrCallback callback)
 
 static void VBlankIntr(void)
 {
-    SDL_Log("CAN DEBUG: [VBlankIntr] Start. CB2=%p", (void*)gMain.callback2);
     if (gWirelessCommType != 0)
         RfuVSync();
     else if (gLinkVSyncDisabled == FALSE)
@@ -375,16 +339,12 @@ static void VBlankIntr(void)
 
     gMain.vblankCounter2++;
 
-    SDL_Log("CAN DEBUG: [VBlankIntr] Before CopyBufferedValues. CB2=%p", (void*)gMain.callback2);
     CopyBufferedValuesToGpuRegs();
-    SDL_Log("CAN DEBUG: [VBlankIntr] Before ProcessDma3. CB2=%p", (void*)gMain.callback2);
     ProcessDma3Requests();
-    SDL_Log("CAN DEBUG: [VBlankIntr] After ProcessDma3. CB2=%p", (void*)gMain.callback2);
 
     gPcmDmaCounter = gSoundInfo.pcmDmaCounter;
 
     m4aSoundMain();
-    SDL_Log("CAN DEBUG: [VBlankIntr] After m4aSoundMain. CB2=%p", (void*)gMain.callback2);
     TryReceiveLinkBattleData();
 
     if (!gTestRunnerEnabled && (!gMain.inBattle || !(gBattleTypeFlags & (BATTLE_TYPE_LINK | BATTLE_TYPE_FRONTIER | BATTLE_TYPE_RECORDED))))
@@ -394,7 +354,6 @@ static void VBlankIntr(void)
 
     INTR_CHECK |= INTR_FLAG_VBLANK;
     gMain.intrCheck |= INTR_FLAG_VBLANK;
-    SDL_Log("CAN DEBUG: [VBlankIntr] End. CB2=%p", (void*)gMain.callback2);
 }
 
 void InitFlashTimer(void)
