@@ -15,8 +15,6 @@
 
 #include "dexnav.h"
 
-extern void SDL_Log(const char *fmt, ...);
-
 #define RAM_SCRIPT_MAGIC 51
 
 enum {
@@ -85,28 +83,21 @@ void StopScript(struct ScriptContext *ctx)
 
 bool8 RunScriptCommand(struct ScriptContext *ctx)
 {
-    SDL_Log("CAN DEBUG: RunScriptCommand entering. mode: %d", ctx->mode);
     switch (ctx->mode)
     {
     case SCRIPT_MODE_STOPPED:
-        SDL_Log("CAN DEBUG: RunScriptCommand - mode is STOPPED");
         return FALSE;
     case SCRIPT_MODE_NATIVE:
-        // Try to call a function in C
-        // Continue to bytecode if no function or it returns TRUE
         if (ctx->nativePtr)
         {
             bool8 (*nativeFunc)(void) = (bool8 (*)(void))STRIP_DOMIRROR_TAG(ctx->nativePtr);
-            SDL_Log("CAN SCRIPT: Calling Native Func at %p", (void*)nativeFunc);
             if (nativeFunc() == TRUE)
                 ctx->mode = SCRIPT_MODE_BYTECODE;
-            SDL_Log("CAN DEBUG: RunScriptCommand - Native Func returned");
             return TRUE;
         }
         ctx->mode = SCRIPT_MODE_BYTECODE;
         // fallthrough
     case SCRIPT_MODE_BYTECODE:
-        SDL_Log("CAN DEBUG: RunScriptCommand - entering BYTECODE loop. scriptPtr: %p", (void*)ctx->scriptPtr);
         while (1)
         {
             u8 cmdCode;
@@ -114,7 +105,6 @@ bool8 RunScriptCommand(struct ScriptContext *ctx)
 
             if (ctx->scriptPtr == NULL)
             {
-                SDL_Log("CAN DEBUG: RunScriptCommand - scriptPtr is NULL");
                 ctx->mode = SCRIPT_MODE_STOPPED;
                 return FALSE;
             }
@@ -125,22 +115,18 @@ bool8 RunScriptCommand(struct ScriptContext *ctx)
 
             if (func >= ctx->cmdTableEnd)
             {
-                SDL_Log("CAN DEBUG: RunScriptCommand - func out of bounds");
                 ctx->mode = SCRIPT_MODE_STOPPED;
                 return FALSE;
             }
 
             ScrCmdFunc cmdFunc = (ScrCmdFunc)STRIP_DOMIRROR_TAG(*func);
-            SDL_Log("CAN SCRIPT: Executing CmdCode 0x%02X (func: %p) at ScriptPtr: %p", cmdCode, (void*)cmdFunc, (void*)ctx->scriptPtr);
             if (cmdFunc(ctx) == TRUE)
             {
-                SDL_Log("CAN DEBUG: RunScriptCommand - cmdFunc returned TRUE");
                 return TRUE;
             }
         }
     }
 
-    SDL_Log("CAN DEBUG: RunScriptCommand - default return TRUE");
     return TRUE;
 }
 
@@ -177,9 +163,6 @@ void ScriptCall(struct ScriptContext *ctx, const u8 *ptr)
 {
     assertf(ptr != NULL, "call to NULL")
     {
-        // HINT: Returning without having pushed the current location is
-        // equivalent to branching to a script that just contains
-        // 'return'.
         return;
     }
 
@@ -232,9 +215,7 @@ u32 ScriptPeekWord(struct ScriptContext *ctx)
 void LockPlayerFieldControls(void)
 {
     sLockFieldControls = TRUE;
-    SDL_Log("CAN DEBUG: LockPlayerFieldControls - calling EndDexNavSearch");
     EndDexNavSearch();
-    SDL_Log("CAN DEBUG: LockPlayerFieldControls - EndDexNavSearch returned");
 }
 
 void UnlockPlayerFieldControls(void)
@@ -247,10 +228,6 @@ bool8 ArePlayerFieldControlsLocked(void)
     return sLockFieldControls;
 }
 
-// The ScriptContext_* functions work with the primary script context,
-// which yields control back to native code should the script make a wait call.
-
-// Checks if the global script context is able to be run right now.
 bool8 ScriptContext_IsEnabled(void)
 {
     if (sGlobalScriptContextStatus == CONTEXT_RUNNING)
@@ -259,17 +236,12 @@ bool8 ScriptContext_IsEnabled(void)
         return FALSE;
 }
 
-// Re-initializes the global script context to zero.
 void ScriptContext_Init(void)
 {
     InitScriptContext(&sGlobalScriptContext, gScriptCmdTable, gScriptCmdTableEnd);
     sGlobalScriptContextStatus = CONTEXT_SHUTDOWN;
 }
 
-// Runs the script until the script makes a wait* call, then returns true if
-// there's more script to run, or false if the script has hit the end.
-// This function also returns false if the context is finished
-// or waiting (after a call to _Stop)
 bool8 ScriptContext_RunScript(void)
 {
     if (sGlobalScriptContextStatus == CONTEXT_SHUTDOWN)
@@ -278,23 +250,18 @@ bool8 ScriptContext_RunScript(void)
     if (sGlobalScriptContextStatus == CONTEXT_WAITING)
         return FALSE;
 
-    SDL_Log("CAN DEBUG: ScriptContext_RunScript - calling LockPlayerFieldControls");
     LockPlayerFieldControls();
-    SDL_Log("CAN DEBUG: ScriptContext_RunScript - LockPlayerFieldControls returned, calling RunScriptCommand");
 
     if (!RunScriptCommand(&sGlobalScriptContext))
     {
-        SDL_Log("CAN DEBUG: ScriptContext_RunScript - RunScriptCommand returned FALSE, shutting down");
         sGlobalScriptContextStatus = CONTEXT_SHUTDOWN;
         UnlockPlayerFieldControls();
         return FALSE;
     }
 
-    SDL_Log("CAN DEBUG: ScriptContext_RunScript - RunScriptCommand returned TRUE");
     return TRUE;
 }
 
-// Sets up a new script in the global context and enables the context
 void ScriptContext_SetupScript(const u8 *ptr)
 {
     InitScriptContext(&sGlobalScriptContext, gScriptCmdTable, gScriptCmdTableEnd);
@@ -305,7 +272,6 @@ void ScriptContext_SetupScript(const u8 *ptr)
     sGlobalScriptContextStatus = CONTEXT_RUNNING;
 }
 
-// Moves a script from a local context to the global context and enables it.
 void ScriptContext_ContinueScript(struct ScriptContext *ctx)
 {
     sGlobalScriptContext = *ctx;
@@ -313,29 +279,22 @@ void ScriptContext_ContinueScript(struct ScriptContext *ctx)
     sGlobalScriptContextStatus = CONTEXT_RUNNING;
 }
 
-// Puts the script into waiting mode; usually called from a wait* script command.
 void ScriptContext_Stop(void)
 {
     sGlobalScriptContextStatus = CONTEXT_WAITING;
 }
 
-// Puts the script into running mode.
 void ScriptContext_Enable(void)
 {
     sGlobalScriptContextStatus = CONTEXT_RUNNING;
     LockPlayerFieldControls();
 }
 
-// Sets up and runs a script in its own context immediately. The script will be
-// finished when this function returns. Used mainly by all of the map header
-// scripts (except the frame table scripts).
 void RunScriptImmediately(const u8 *ptr)
 {
-    SDL_Log("CAN SCRIPT: RunScriptImmediately called with script: %p", (void*)ptr);
     InitScriptContext(&sImmediateScriptContext, gScriptCmdTable, gScriptCmdTableEnd);
     SetupBytecodeScript(&sImmediateScriptContext, ptr);
     while (RunScriptCommand(&sImmediateScriptContext) == TRUE);
-    SDL_Log("CAN SCRIPT: RunScriptImmediately finished for script: %p", (void*)ptr);
 }
 
 const u8 *MapHeaderGetScriptTable(u8 tag)
@@ -377,17 +336,14 @@ const u8 *MapHeaderCheckScriptTable(u8 tag)
         u16 varIndex1;
         u16 varIndex2;
 
-        // Read first var (or .2byte terminal value)
         varIndex1 = T1_READ_16(ptr);
         if (!varIndex1)
-            return NULL; // Reached end of table
+            return NULL;
         ptr += 2;
 
-        // Read second var
         varIndex2 = T1_READ_16(ptr);
         ptr += 2;
 
-        // Run map script if vars are equal
         if (VarGet(varIndex1) == VarGet(varIndex2))
         {
             const u8 *mapScript = T2_READ_PTR(ptr);
@@ -448,14 +404,14 @@ u32 CalculateRamScriptChecksum(void)
     return CalcCRC16WithTable((u8 *)(&gSaveBlock1Ptr->ramScript.data), sizeof(gSaveBlock1Ptr->ramScript.data));
 #else
     return 0;
-#endif //FREE_MYSTERY_EVENT_BUFFERS
+#endif
 }
 
 void ClearRamScript(void)
 {
 #if FREE_MYSTERY_EVENT_BUFFERS == FALSE
     CpuFill32(0, &gSaveBlock1Ptr->ramScript, sizeof(struct RamScript));
-#endif //FREE_MYSTERY_EVENT_BUFFERS
+#endif
 }
 
 bool8 InitRamScript(const u8 *script, u16 scriptSize, u8 mapGroup, u8 mapNum, u8 localId)
@@ -477,7 +433,7 @@ bool8 InitRamScript(const u8 *script, u16 scriptSize, u8 mapGroup, u8 mapNum, u8
     return TRUE;
 #else
     return FALSE;
-#endif //FREE_MYSTERY_EVENT_BUFFERS
+#endif
 }
 
 const u8 *GetRamScript(u8 localId, const u8 *script)
@@ -505,7 +461,7 @@ const u8 *GetRamScript(u8 localId, const u8 *script)
     }
 #else
     return script;
-#endif //FREE_MYSTERY_EVENT_BUFFERS
+#endif
 }
 
 #define NO_OBJECT LOCALID_PLAYER
@@ -527,7 +483,7 @@ bool32 ValidateSavedRamScript(void)
     return TRUE;
 #else
     return FALSE;
-#endif //FREE_MYSTERY_EVENT_BUFFERS
+#endif
 }
 
 u8 *GetSavedRamScriptIfValid(void)
@@ -555,7 +511,7 @@ u8 *GetSavedRamScriptIfValid(void)
     }
 #else
     return NULL;
-#endif //FREE_MYSTERY_EVENT_BUFFERS
+#endif
 }
 
 void InitRamScript_NoObjectEvent(u8 *script, u16 scriptSize)
@@ -564,7 +520,7 @@ void InitRamScript_NoObjectEvent(u8 *script, u16 scriptSize)
     if (scriptSize > sizeof(gSaveBlock1Ptr->ramScript.data.script))
         scriptSize = sizeof(gSaveBlock1Ptr->ramScript.data.script);
     InitRamScript(script, scriptSize, MAP_GROUP(MAP_UNDEFINED), MAP_NUM(MAP_UNDEFINED), NO_OBJECT);
-#endif //FREE_MYSTERY_EVENT_BUFFERS
+#endif
 }
 
 bool8 LoadTrainerObjectScript(void)
@@ -586,9 +542,6 @@ static bool32 Script_IsEffectInstrumentedCommand(ScrCmdFunc func)
     return IsEffectInstrumented((void*)func);
 }
 
-/* 'setjmp' and 'longjmp' cause link errors, so we use
- * '__builtin_setjmp' and '__builtin_longjmp' instead.
- * See https://gcc.gnu.org/onlinedocs/gcc/Nonlocal-Gotos.html */
 static bool32 RunScriptImmediatelyUntilEffect_InternalLoop(struct ScriptContext *ctx)
 {
     if (__builtin_setjmp(gScriptEffectContext->breakTo) == 0)
@@ -607,7 +560,6 @@ static bool32 RunScriptImmediatelyUntilEffect_InternalLoop(struct ScriptContext 
             ctx->scriptPtr++;
             func = &ctx->cmdTable[cmdCode];
 
-            // Invalid script command.
             if (func >= ctx->cmdTableEnd)
                 return TRUE;
 
@@ -615,7 +567,6 @@ static bool32 RunScriptImmediatelyUntilEffect_InternalLoop(struct ScriptContext 
                 return TRUE;
 
             ScrCmdFunc cmdFunc = (ScrCmdFunc)STRIP_DOMIRROR_TAG(*func);
-            // Command which waits for a frame.
             if (cmdFunc(ctx))
             {
                 gScriptEffectContext->nextCmd = ctx->scriptPtr;
@@ -710,7 +661,6 @@ bool32 Script_MatchesSpecial(const u8 *script, void *funcPtr)
     return FALSE;
 }
 
-// FRLG
 void DisableMsgBoxWalkaway(void)
 {
     // sMsgBoxWalkawayDisabled = TRUE;
