@@ -1532,7 +1532,7 @@ enum MapType GetMapTypeByGroupAndId(s8 mapGroup, s8 mapNum)
 
 enum MapType GetMapTypeByWarpData(struct WarpData *warp)
 {
-    return GetMapTypeByGroupAndId(warp->mapGroup, warp->warpId);
+    return GetMapTypeByGroupAndId(warp->mapGroup, warp->mapNum);
 }
 
 enum MapType GetCurrentMapType(void)
@@ -1868,8 +1868,8 @@ static void OverworldBasic(void)
         FormChangeTimeUpdate();
         if (MapHasNaturalLight(gMapHeader.mapType) &&
            (bld0[0] != bld1[0]
-| bld0[1] != bld1[1]
-| bld0[2] != bld1[2]))
+|| bld0[1] != bld1[1]
+|| bld0[2] != bld1[2]))
         {
             ApplyWeatherColorMapIfIdle(gWeatherPtr->colorMapIndex);
         }
@@ -3754,7 +3754,7 @@ void ScriptShowItemDescription(struct ScriptContext *ctx)
 
     u8 headerType = ScriptReadByte(ctx);
 
-    Script_RequestEffects(SCREFF_V1 | SCREFF_HARDWARE);
+    Script_RequestEffects(SCREFF_V1 | SCREFF_SAVE | SCREFF_HARDWARE);
 
     struct WindowTemplate template;
     enum Item item = gSpecialVar_0x8006;
