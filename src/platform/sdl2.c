@@ -3,7 +3,6 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <time.h>
-#include <math.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -30,13 +29,7 @@
 #include "platform/dma.h"
 #include "platform/framedraw.h"
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
-
-#define MODERN_SAVE_MAGIC 0x4d454b50 // 'PKEM'
-
-extern void (*gIntrTable[])(void);
+extern void (*const gIntrTable[])(void);
 
 SDL_Thread *mainLoopThread;
 SDL_Window *sdlWindow;
@@ -63,7 +56,7 @@ double timeScale = 1.0;
 struct SiiRtcInfo internalClock;
 
 static FILE *sSaveFile = NULL;
-char gSavePath[1024] = "pokeemerald.sav";
+static char sSavePath[1024] = "pokeemerald.sav";
 static char sConfigPath[1024] = "pokeemerald.cfg";
 static u8 sBorderBackground;
 static bool sHasBorderBackgroundConfig;
@@ -96,6 +89,7 @@ static void DrawTouchControls(void);
 
 int main(int argc, char **argv)
 {
+    // Open an output console on Windows
 #ifdef _WIN32
     AllocConsole() ;
     AttachConsole( GetCurrentProcessId() ) ;
@@ -109,7 +103,7 @@ int main(int argc, char **argv)
 #endif
     if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO
 #ifdef __ANDROID__
-| SDL_INIT_GAMECONTROLLER
+                | SDL_INIT_GAMECONTROLLER
 #endif
                 ) < 0)
     {
@@ -129,12 +123,12 @@ int main(int argc, char **argv)
     char *prefPath = SDL_GetPrefPath("pokeemerald", "pokeemerald");
     if (prefPath != NULL)
     {
-        SDL_snprintf(gSavePath, sizeof(gSavePath), "%spokeemerald.sav", prefPath);
+        SDL_snprintf(sSavePath, sizeof(sSavePath), "%spokeemerald.sav", prefPath);
         SDL_snprintf(sConfigPath, sizeof(sConfigPath), "%spokeemerald.cfg", prefPath);
         SDL_free(prefPath);
     }
 #endif
-    ReadSaveFile(gSavePath);
+    ReadSaveFile(sSavePath);
     ReadConfigFile();
 
 #ifdef __ANDROID__
@@ -260,7 +254,7 @@ int main(int argc, char **argv)
 
     SDL_AudioSpec want;
 
-    SDL_memset(&want, 0, sizeof(want));
+    SDL_memset(&want, 0, sizeof(want)); /* or SDL_zero(want) */
     want.freq = 42060;
     want.format = AUDIO_F32;
     want.channels = 2;
@@ -273,7 +267,7 @@ int main(int argc, char **argv)
         SDL_Log("Failed to open audio: %s", SDL_GetError());
     else
     {
-        if (want.format != AUDIO_F32)
+        if (want.format != AUDIO_F32) /* we let this one thing change. */
             SDL_Log("We didn't get Float32 audio format.");
         SDL_PauseAudioDevice(sdlAudioDevice, 0);
     }
@@ -288,15 +282,13 @@ int main(int argc, char **argv)
     internalClock.status = SIIRTCINFO_24HOUR;
     UpdateInternalClock();
 
-    SDL_Log("CAN DEBUG: SDL main loop starting");
-
     while (isRunning)
     {
         ProcessEvents();
 
         if (!paused)
         {
-            double dt = fixedTimestep / timeScale;
+            double dt = fixedTimestep / timeScale; // TODO: Fix speedup
 
             curGameTime = SDL_GetPerformanceCounter();
             double deltaTime = (double)((curGameTime - lastGameTime) / (double)SDL_GetPerformanceFrequency());
@@ -310,7 +302,6 @@ int main(int argc, char **argv)
             {
                 if (SDL_AtomicGet(&isFrameAvailable))
                 {
-                    SDL_Log("CAN DEBUG: SDL main loop - Frame available, calling VDraw");
                     VDraw(sdlTexture);
                     SDL_RenderClear(sdlRenderer);
 #if defined(NATIVE_LINUX) || defined(_WIN32)
@@ -341,8 +332,7 @@ int main(int argc, char **argv)
                     SDL_Rect gameViewport = {(outputWidth - gameWidth) / 2,
                                              (outputHeight - gameHeight) / 2,
                                              gameWidth, gameHeight};
-                    SDL_Rect gameViewportSrc = {0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT};
-                    SDL_RenderCopy(sdlRenderer, sdlTexture, &gameViewportSrc, &gameViewport);
+                    SDL_RenderCopy(sdlRenderer, sdlTexture, NULL, &gameViewport);
                     if (sPlatformSettings[PLATFORM_SETTING_BORDER] && sdlBorderTexture != NULL)
                     {
                         SDL_Rect borderSource = {141, 18, 1000, 683};
@@ -364,25 +354,31 @@ int main(int argc, char **argv)
 #endif
                     SDL_AtomicSet(&isFrameAvailable, 0);
 
-                    SDL_Log("CAN DEBUG: SDL main loop - Posting Semaphore");
+                    REG_DISPSTAT |= INTR_FLAG_VBLANK;
+
+                    RunDMAs(DMA_HBLANK);
+
+#ifdef __ANDROID__
+                    if (REG_IE & INTR_FLAG_VBLANK)
+#else
+                    if (REG_DISPSTAT & DISPSTAT_VBLANK_INTR)
+#endif
+                        gIntrTable[4]();
+                    REG_DISPSTAT &= ~INTR_FLAG_VBLANK;
+
                     SDL_SemPost(vBlankSemaphore);
 
                     accumulator -= dt;
                 }
-                else
-                {
-                    break;
-                }
             }
         }
-
-        SDL_Delay(1);
 
 #ifndef __ANDROID__
         SDL_RenderPresent(sdlRenderer);
 #endif
     }
 
+    //StoreSaveFile();
     CloseSaveFile();
 
 #if defined(NATIVE_LINUX) || defined(_WIN32)
@@ -400,31 +396,34 @@ int main(int argc, char **argv)
 
 static void ReadSaveFile(const char *path)
 {
-    FILE *f = fopen(path, "rb");
-    if (f == NULL)
+    // Check whether the saveFile exists, and create it if not
+    sSaveFile = fopen(path, "r+b");
+    if (sSaveFile == NULL)
     {
-        memset(gFlashBaseBuffer, 0xFF, sizeof(gFlashBaseBuffer));
+        sSaveFile = fopen(path, "w+b");
+    }
+
+    if (sSaveFile == NULL)
+    {
+        memset(FLASH_BASE, 0xFF, sizeof(FLASH_BASE));
+        SDL_Log("Unable to open save file: %s", path);
         return;
     }
 
-    u32 magic = 0;
-    if (fread(&magic, sizeof(magic), 1, f) == 1 && magic == MODERN_SAVE_MAGIC)
+    fseek(sSaveFile, 0, SEEK_END);
+    int fileSize = ftell(sSaveFile);
+    fseek(sSaveFile, 0, SEEK_SET);
+
+    // Only read as many bytes as fit inside the buffer
+    // or as many bytes as are in the file
+    int bytesToRead = (fileSize < sizeof(FLASH_BASE)) ? fileSize : sizeof(FLASH_BASE);
+
+    int bytesRead = fread(FLASH_BASE, 1, bytesToRead, sSaveFile);
+
+    // Fill the buffer if the savefile was just created or smaller than the buffer itself
+    for (int i = bytesRead; i < sizeof(FLASH_BASE); i++)
     {
-        fclose(f);
-        return;
-    }
-
-    fseek(f, 0, SEEK_END);
-    int fileSize = ftell(f);
-    fseek(f, 0, SEEK_SET);
-
-    int bytesToRead = (fileSize < sizeof(gFlashBaseBuffer)) ? fileSize : sizeof(gFlashBaseBuffer);
-    int bytesRead = fread(gFlashBaseBuffer, 1, bytesToRead, f);
-    fclose(f);
-
-    for (int i = bytesRead; i < sizeof(gFlashBaseBuffer); i++)
-    {
-        gFlashBaseBuffer[i] = 0xFF;
+        FLASH_BASE[i] = 0xFF;
     }
 }
 
@@ -436,7 +435,7 @@ static void ReadConfigFile(void)
 
     if (configFile == NULL)
         return;
-    while (configFile != NULL && fgets(line, sizeof(line), configFile) != NULL)
+    while (fgets(line, sizeof(line), configFile) != NULL)
     {
         if (sscanf(line, "borderBackground=%u", &value) == 1 && value < 16)
         {
@@ -495,22 +494,10 @@ static void ApplyPlatformSettings(void)
 
 static void StoreSaveFile()
 {
-    FILE *fCheck = fopen(gSavePath, "rb");
-    if (fCheck != NULL)
-    {
-        u32 magic = 0;
-        if (fread(&magic, sizeof(magic), 1, fCheck) == 1 && magic == MODERN_SAVE_MAGIC)
-        {
-            fclose(fCheck);
-            return;
-        }
-        fclose(fCheck);
-    }
-
     if (sSaveFile != NULL)
     {
         fseek(sSaveFile, 0, SEEK_SET);
-        fwrite(gFlashBaseBuffer, 1, sizeof(gFlashBaseBuffer), sSaveFile);
+        fwrite(FLASH_BASE, 1, sizeof(FLASH_BASE), sSaveFile);
     }
 }
 
@@ -522,7 +509,7 @@ void Platform_StoreSaveFile(void)
 void Platform_ReadFlash(u16 sectorNum, u32 offset, u8 *dest, u32 size)
 {
     DBGPRINTF("ReadFlash(sectorNum=0x%04X,offset=0x%08X,size=0x%02X)\n",sectorNum,offset,size);
-    FILE * savefile = fopen(gSavePath, "r+b");
+    FILE * savefile = fopen(sSavePath, "r+b");
     if (savefile == NULL)
     {
         puts("Error opening save file.");
@@ -550,7 +537,6 @@ void Platform_QueueAudio(float *audioBuffer, s32 samplesPerFrame)
         float volume = sPlatformSettings[PLATFORM_SETTING_VOLUME] / 10.0f;
         for (int i = 0; i < floatCount; i++)
             adjustedAudio[i] = audioBuffer[i] * volume;
-            
         if (SDL_QueueAudio(sdlAudioDevice, adjustedAudio, samplesPerFrame) < 0)
             SDL_Log("Failed to queue audio: %s", SDL_GetError());
     }
@@ -565,6 +551,14 @@ u8 Platform_GetBorderBackground(void)
 {
     if (sHasBorderBackgroundConfig)
         return sBorderBackground;
+    if (gSaveBlock2Ptr != NULL)
+    {
+        u8 legacySelection = gSaveBlock2Ptr->optionsBorderBackground;
+        if (legacySelection == 1)
+            return sBorderBackgroundCount;
+        if (legacySelection >= 2)
+            return legacySelection - 1;
+    }
     return 0;
 }
 
@@ -592,7 +586,7 @@ void Platform_SetSetting(enum PlatformSetting setting, u8 value)
         if (!value)
         {
             int scale = sPlatformSettings[PLATFORM_SETTING_WINDOW_SCALE];
-            SDL_SetWindowSize(sdlWindow, 320 * value, 180 * value);
+            SDL_SetWindowSize(sdlWindow, 320 * scale, 180 * scale);
             SDL_SetWindowPosition(sdlWindow, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
         }
     }
@@ -628,6 +622,7 @@ static void CloseSaveFile()
     }
 }
 
+// Key mappings
 #define KEY_A_BUTTON      SDLK_z
 #define KEY_B_BUTTON      SDLK_x
 #define KEY_START_BUTTON  SDLK_RETURN
@@ -856,7 +851,7 @@ static void DrawTouchControls(void)
     DrawControlRect((SDL_Rect){dpadX - dpadUnit * 3 / 2, dpadY - dpadUnit / 2,
                                dpadUnit, dpadUnit}, touchKeys & DPAD_LEFT, NULL);
     DrawControlRect((SDL_Rect){dpadX + dpadUnit / 2, dpadY - dpadUnit / 2,
-                          dpadUnit, dpadUnit}, touchKeys & DPAD_RIGHT, NULL);
+                               dpadUnit, dpadUnit}, touchKeys & DPAD_RIGHT, NULL);
     DrawControlRect((SDL_Rect){windowWidth - sideWidth / 4 - buttonSize,
                                windowHeight * 58 / 100, buttonSize, buttonSize}, touchKeys & A_BUTTON, "A");
     DrawControlRect((SDL_Rect){windowWidth - sideWidth + sideWidth / 4,
@@ -907,11 +902,6 @@ void ProcessEvents(void)
             isRunning = false;
             break;
 #ifdef __ANDROID__
-        case SDL_FINGERDOWN:
-        case SDL_FINGERUP:
-        case SDL_FINGERMOTION:
-            HandleTouchEvent(&event.tfinger);
-            break;
         case SDL_CONTROLLERDEVICEADDED:
             if (androidController == NULL && SDL_IsGameController(event.cdevice.which))
                 androidController = SDL_GameControllerOpen(event.cdevice.which);
@@ -1045,6 +1035,7 @@ u16 GetXInputKeys()
 
 
         /* Speedup */
+        // Note: 'speedup' variable is only (un)set on keyboard input
         double oldTimeScale = timeScale;
         timeScale = (state.Gamepad.bRightTrigger > 0x80 || speedUp) ? 5.0 : 1.0;
 
@@ -1064,7 +1055,7 @@ u16 GetXInputKeys()
 
     return xinputKeys;
 }
-#endif
+#endif // _WIN32
 
 u16 Platform_GetKeyInput(void)
 {
@@ -1072,7 +1063,7 @@ u16 Platform_GetKeyInput(void)
     u16 gamepadKeys = GetXInputKeys();
     return gamepadKeys | keyboardKeys;
 #elif defined(__ANDROID__)
-    return keyboardKeys | controllerKeys | controllerAxisKeys | touchKeys;
+    return keyboardKeys | controllerKeys | controllerAxisKeys;
 #endif
 
     return keyboardKeys;
@@ -1094,7 +1085,7 @@ void VDraw(SDL_Texture *texture)
         image[i] = 0xFF000000 | (r << 16) | (g << 8) | b;
     }
     SDL_UpdateTexture(texture, NULL, image, DISPLAY_WIDTH * sizeof(Uint32));
-    REG_VCOUNT = 161;
+    REG_VCOUNT = 161; // prep for being in VBlank period
 }
 
 int DoMain(void *data)
@@ -1106,33 +1097,7 @@ int DoMain(void *data)
 void VBlankIntrWait(void)
 {
     SDL_AtomicSet(&isFrameAvailable, 1);
-    
-    SDL_Log("CAN DEBUG: [VBlankIntrWait] Waiting for Semaphore...");
     SDL_SemWait(vBlankSemaphore);
-    SDL_Log("CAN DEBUG: [VBlankIntrWait] Semaphore Acquired!");
-
-    REG_VCOUNT = 150;
-    if (gIntrTable[0] != NULL)
-    {
-        SDL_Log("CAN DEBUG: [VBlankIntrWait] Calling gIntrTable[0] (VCountIntr) -> %p", (void*)gIntrTable[0]);
-        gIntrTable[0]();
-    }
-
-    REG_VCOUNT = 161;
-    REG_DISPSTAT |= INTR_FLAG_VBLANK;
-
-    RunDMAs(DMA_HBLANK);
-
-    if (gIntrTable[4] != NULL)
-    {
-        SDL_Log("CAN DEBUG: [VBlankIntrWait] Calling gIntrTable[4] (VBlankIntr) -> %p", (void*)gIntrTable[4]);
-        gIntrTable[4](); 
-    }
-    
-    extern void RunMixerFrame(void);
-    RunMixerFrame();
-    
-    REG_DISPSTAT &= ~INTR_FLAG_VBLANK;
 }
 
 u8 BinToBcd(u8 bin)
@@ -1223,6 +1188,7 @@ void Platform_SetTime(struct SiiRtcInfo *rtc)
 
 void Platform_SetAlarm(u8 *alarmData)
 {
+    // TODO
 }
 
 void SoftReset(u32 resetFlags)
