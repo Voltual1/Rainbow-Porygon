@@ -673,7 +673,7 @@ static void LoadCurrentMapData(void)
     sLastMapSectionId = gMapHeader.regionMapSectionId;
     gMapHeader = *Overworld_GetMapHeaderByGroupAndId(gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum);
     gSaveBlock1Ptr->mapLayoutId = gMapHeader.mapLayoutId;
-    gMapHeader.mapLayout = GetMapLayout(gMapHeader.mapLayoutId);
+    gMapHeader.mapLayout = GetMapLayout(gSaveBlock1Ptr->mapLayoutId);
 }
 
 static void LoadSaveblockMapHeader(void)
@@ -1848,18 +1848,29 @@ u8 UpdateSpritePaletteWithTime(u8 paletteNum)
 
 static void OverworldBasic(void)
 {
+    SDL_Log("CAN DEBUG: OverworldBasic start");
+    SDL_Log("CAN DEBUG: OverworldBasic calling ScriptContext_RunScript");
     ScriptContext_RunScript();
+    SDL_Log("CAN DEBUG: OverworldBasic calling RunTasks");
     RunTasks();
+    SDL_Log("CAN DEBUG: OverworldBasic calling AnimateSprites");
     AnimateSprites();
+    SDL_Log("CAN DEBUG: OverworldBasic calling CameraUpdate");
     CameraUpdate();
+    SDL_Log("CAN DEBUG: OverworldBasic calling UpdateCameraPanning");
     UpdateCameraPanning();
+    SDL_Log("CAN DEBUG: OverworldBasic calling BuildOamBuffer");
     BuildOamBuffer();
+    SDL_Log("CAN DEBUG: OverworldBasic calling UpdatePaletteFade");
     UpdatePaletteFade();
+    SDL_Log("CAN DEBUG: OverworldBasic calling UpdateTilesetAnimations");
     UpdateTilesetAnimations();
+    SDL_Log("CAN DEBUG: OverworldBasic calling DoScheduledBgTilemapCopiesToVram");
     DoScheduledBgTilemapCopiesToVram();
     // Every minute if no palette fade is active, update TOD blending as needed
     if (!gPaletteFade.active && --gTimeUpdateCounter <= 0)
     {
+        SDL_Log("CAN DEBUG: OverworldBasic updating TOD");
         struct TimeBlendSettings cachedBlend = gTimeBlend;
         u32 *bld0 = (u32*)&cachedBlend;
         u32 *bld1 = (u32*)&gTimeBlend;
@@ -1874,7 +1885,9 @@ static void OverworldBasic(void)
             ApplyWeatherColorMapIfIdle(gWeatherPtr->colorMapIndex);
         }
     }
+    SDL_Log("CAN DEBUG: OverworldBasic calling UpdateOverworldWildEncounter");
     UpdateOverworldWildEncounter();
+    SDL_Log("CAN DEBUG: OverworldBasic end");
 }
 
 // This CB2 is used when starting
@@ -1885,15 +1898,21 @@ void CB2_OverworldBasic(void)
 
 void CB2_Overworld(void)
 {
+    SDL_Log("CAN DEBUG: CB2_Overworld start");
     bool32 fading = (gPaletteFade.active != 0);
     if (fading)
+    {
+        SDL_Log("CAN DEBUG: CB2_Overworld fading is TRUE, setting VBlank callback to NULL");
         SetVBlankCallback(NULL);
+    }
+    SDL_Log("CAN DEBUG: CB2_Overworld calling OverworldBasic");
     OverworldBasic();
     if (fading)
     {
+        SDL_Log("CAN DEBUG: CB2_Overworld fading is TRUE, setting VBlank callback back to Field");
         SetFieldVBlankCallback();
-        return;
     }
+    SDL_Log("CAN DEBUG: CB2_Overworld end");
 }
 
 void SetMainCallback1(MainCallback cb)
