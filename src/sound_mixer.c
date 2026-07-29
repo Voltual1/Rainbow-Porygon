@@ -34,9 +34,8 @@ void RunMixerFrame(void) {
         }
     }
     
-    if (mixer->firstPlayerFunc != NULL) {
-        mixer->firstPlayerFunc(mixer->firstPlayer);
-    }
+    // 移除 double-tick 行为，不再此处反向调用 Sequencer。
+    // firstPlayerFunc 已由 m4aSoundMain() 统一驱动推进。
     
     mixer->cgbMixerFunc();
     
@@ -52,6 +51,16 @@ void RunMixerFrame(void) {
     SampleMixer(mixer, maxScanlines, samplesPerFrame, outBuffer, dmaCounter, MIXED_AUDIO_BUFFER_SIZE);
     #ifdef PORTABLE
         cgb_audio_generate(samplesPerFrame);
+        
+        // 将 CGB PSG PSG方波与噪声混音通道的数据合并到 DirectSound 的 float 混合音频流
+        float *cgbBuffer = cgb_get_buffer();
+        for (int i = 0; i < samplesPerFrame * 2; i++) {
+            outBuffer[i] += cgbBuffer[i];
+        }
+        
+        // 将混音后渲染结果队列投递至跨平台底层 SDL 驱动
+        extern void Platform_QueueAudio(float *audioBuffer, s32 samplesPerFrame);
+        Platform_QueueAudio(outBuffer, samplesPerFrame * 2 * (s32)sizeof(float));
     #endif
 }
 
@@ -468,14 +477,14 @@ static s8 sub_82DF758(struct MixerSource *chan, u32 current) {
     //In route 102 lotad wild battle when it growls crashes the game because it decompresses out of bounds data
     //I gave it its own printf error so it wouldn't get forgotten as this needs a more proper fix
     if (chan->wav->size < blockOffset * 0x21) {
-            DBGPRINTF("Out of bounds decompress in %s wav->size = %u blockPtr = %u\n", __func__, chan->wav->size, blockOffset * 0x21);
+            DBGPRINTF("Out of bounds decompress in %s wav->size = %u blockPtr = %u\n", __func__, (unsigned int)chan->wav->size, (unsigned int)(blockOffset * 0x21));
             return gBDPCMBlockBuffer[current & 63];
     }
     
     if(chan->blockCount != blockOffset) { // decode block if not decoded
         s32 s;
         chan->blockCount = blockOffset;
-        blockPtr = chan->wav->data + chan->blockCount * 0x21;
+        blockPtr = (u8 *)(chan->wav->data + chan->blockCount * 0x21);
         gBDPCMBlockBuffer[0] = s = (s8)*blockPtr++;
         gBDPCMBlockBuffer[1] = s += gDeltaEncodingTable[*blockPtr++ & 0xF];
         for(i = 2; i < 64; i+=2) {
