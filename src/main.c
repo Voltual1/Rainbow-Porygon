@@ -86,8 +86,8 @@ void AgbMain(void)
     *(vu16 *)BG_PLTT = RGB_WHITE; 
     InitGpuRegManager();
     REG_WAITCNT = WAITCNT_PREFETCH_ENABLE
-    | WAITCNT_WS0_S_1 | WAITCNT_WS0_N_3
-    | WAITCNT_WS1_S_1 | WAITCNT_WS1_N_3;
+                | WAITCNT_WS0_S_1 | WAITCNT_WS0_N_3
+                | WAITCNT_WS1_S_1 | WAITCNT_WS1_N_3;
     InitKeys();
     InitIntrHandlers();
     m4aSoundInit();
@@ -126,21 +126,28 @@ void AgbMainLoop(void)
                 loopCount, gMain.state, (void*)gMain.callback2);
         loopCount++;
 
+        SDL_Log("CAN DEBUG: [AgbMainLoop] Step 1: ReadKeys");
         ReadKeys();
+        SDL_Log("CAN DEBUG: [AgbMainLoop] Step 1 Done");
 
+        SDL_Log("CAN DEBUG: [AgbMainLoop] Step 2: Check Link running");
         if (Overworld_SendKeysToLinkIsRunning() == TRUE)
         {
+            SDL_Log("CAN DEBUG: [AgbMainLoop] Step 2a: SendKeysToLink");
             gLinkTransferringData = TRUE;
             UpdateLinkAndCallCallbacks();
             gLinkTransferringData = FALSE;
         }
         else
         {
+            SDL_Log("CAN DEBUG: [AgbMainLoop] Step 2b: UpdateLinkAndCallCallbacks");
             gLinkTransferringData = FALSE;
             UpdateLinkAndCallCallbacks();
 
+            SDL_Log("CAN DEBUG: [AgbMainLoop] Step 2c: Check RecvKeys");
             if (Overworld_RecvKeysFromLinkIsRunning() == TRUE)
             {
+                SDL_Log("CAN DEBUG: [AgbMainLoop] Step 2d: RecvKeysFromLink");
                 gMain.newKeys = 0;
                 ClearSpriteCopyRequests();
                 gLinkTransferringData = TRUE;
@@ -148,9 +155,15 @@ void AgbMainLoop(void)
                 gLinkTransferringData = FALSE;
             }
         }
+        SDL_Log("CAN DEBUG: [AgbMainLoop] Step 2 Done");
 
+        SDL_Log("CAN DEBUG: [AgbMainLoop] Step 3: PlayTimeCounter_Update");
         PlayTimeCounter_Update();
+        SDL_Log("CAN DEBUG: [AgbMainLoop] Step 3 Done");
+
+        SDL_Log("CAN DEBUG: [AgbMainLoop] Step 4: MapMusicMain");
         MapMusicMain();
+        SDL_Log("CAN DEBUG: [AgbMainLoop] Step 4 Done");
         
         SDL_Log("CAN DEBUG: [AgbMainLoop] Before WaitForVBlank. CB2=%p", (void*)gMain.callback2);
         WaitForVBlank();

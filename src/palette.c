@@ -347,8 +347,6 @@ static u32 UpdateNormalPaletteFade(void)
         paletteOffset += 16;
     }
 
-    
-
     if (gPaletteFade.y == gPaletteFade.targetY)
     {
         gPaletteFadeSelectedPalettes = 0;
@@ -779,9 +777,9 @@ void BlendPalettesFine(u32 palettes, u16 *src, u16 *dst, u32 coeff, u32 color)
         return;
 
     coeff *= 2;
-    newR = (color << 27) >> 27;
-    newG = (color << 22) >> 27;
-    newB = (color << 17) >> 27;
+    newR = color & 0x1F;
+    newG = (color >> 5) & 0x1F;
+    newB = (color >> 10) & 0x1F;
 
     do
     {
@@ -791,13 +789,17 @@ void BlendPalettesFine(u32 palettes, u16 *src, u16 *dst, u32 coeff, u32 color)
             while (src != srcEnd) // Transparency is blended (for backdrop reasons)
             {
                 u32 srcColor = *src;
-                s32 r = (srcColor << 27) >> 27;
-                s32 g = (srcColor << 22) >> 27;
-                s32 b = (srcColor << 16) >> 26;
+                s32 r = srcColor & 0x1F;
+                s32 g = (srcColor >> 5) & 0x1F;
+                s32 b = (srcColor >> 10) & 0x1F;
+                bool32 highBit = (srcColor >> 15) & 1;
+
+                s32 blendedB = b + (((newB - b) * (s32)coeff) >> 5);
 
                 *dst++ = ((r + (((newR - r) * (s32)coeff) >> 5)) << 0)
                        | ((g + (((newG - g) * (s32)coeff) >> 5)) << 5)
-                       | ((b + (((newB - (b & 31)) * (s32)coeff) >> 5)) << 10);
+                       | ((blendedB & 0x1F) << 10)
+                       | (highBit << 15);
                 src++;
             }
         }
@@ -815,7 +817,7 @@ void BlendPalettes(u32 selectedPalettes, u8 coeff, u32 color)
     BlendPalettesFine(selectedPalettes, gPlttBufferUnfaded, gPlttBufferFaded, coeff, color);
 }
 
-#define DEFAULT_LIGHT_COLOR RGB2GBA(248, 224, 120)
+#define DEFAULT_LIGHT_COLOR DEFAULT_LIGHT_COLOR
 
 // Like BlendPalette, but ignores blendColor if the transparency high bit is set
 // Optimization help by lucktyphlosion
@@ -824,46 +826,47 @@ void TimeBlendPalette(u16 palOffset, u32 coeff, u32 blendColor)
     s32 newR, newG, newB, defR, defG, defB;
     u16 *src = gPlttBufferUnfaded + palOffset;
     u16 *dst = gPlttBufferFaded + palOffset;
-    u32 defaultBlendColor = DEFAULT_LIGHT_COLOR;
+    u32 defaultBlendColor = RGB2GBA(248, 224, 120);
     u16 *srcEnd = src + 16;
     u32 altBlendColor = *dst++ = *src++; // color 0 is copied through unchanged
 
     coeff *= 2;
-    newR = (blendColor << 27) >> 27;
-    newG = (blendColor << 22) >> 27;
-    newB = (blendColor << 17) >> 27;
+    newR = blendColor & 0x1F;
+    newG = (blendColor >> 5) & 0x1F;
+    newB = (blendColor >> 10) & 0x1F;
 
     if (altBlendColor >> 15) // Transparency high bit set; alt blend color
     {
-        defR = (altBlendColor << 27) >> 27;
-        defG = (altBlendColor << 22) >> 27;
-        defB = (altBlendColor << 17) >> 27;
+        defR = altBlendColor & 0x1F;
+        defG = (altBlendColor >> 5) & 0x1F;
+        defB = (altBlendColor >> 10) & 0x1F;
     }
     else
     {
-        defR = (defaultBlendColor << 27) >> 27;
-        defG = (defaultBlendColor << 22) >> 27;
-        defB = (defaultBlendColor << 17) >> 27;
+        defR = defaultBlendColor & 0x1F;
+        defG = (defaultBlendColor >> 5) & 0x1F;
+        defB = (defaultBlendColor >> 10) & 0x1F;
         altBlendColor = 0;
     }
     while (src != srcEnd)
     {
         u32 srcColor = *src;
-        s32 r = (srcColor << 27) >> 27;
-        s32 g = (srcColor << 22) >> 27;
-        s32 b = (srcColor << 16) >> 26;
+        s32 r = srcColor & 0x1F;
+        s32 g = (srcColor >> 5) & 0x1F;
+        s32 b = (srcColor >> 10) & 0x1F;
 
         if (srcColor >> 15)
         {
             *dst = ((r + (((defR - r) * (s32)coeff) >> 5)) << 0)
                  | ((g + (((defG - g) * (s32)coeff) >> 5)) << 5)
-                 | ((b + (((defB - (b & 31)) * (s32)coeff) >> 5)) << 10);
+                 | ((b + (((defB - b) * (s32)coeff) >> 5)) << 10)
+                 | 0x8000;
         }
         else // Use provided blend color
         {
             *dst = ((r + (((newR - r) * (s32)coeff) >> 5)) << 0)
                  | ((g + (((newG - g) * (s32)coeff) >> 5)) << 5)
-                 | ((b + (((newB - (b & 31)) * (s32)coeff) >> 5)) << 10);
+                 | ((b + (((newB - b) * (s32)coeff) >> 5)) << 10);
         }
         src++;
         dst++;
@@ -877,7 +880,7 @@ void TimeMixPalettes(u32 palettes, u16 *src, u16 *dst, struct BlendSettings *ble
     s32 r0, g0, b0, r1, g1, b1, defR, defG, defB, altR, altG, altB;
     u32 color0, coeff0, color1, coeff1;
     bool8 tint0, tint1;
-    u32 defaultColor = DEFAULT_LIGHT_COLOR;
+    u32 defaultColor = RGB2GBA(248, 224, 120);
 
     if (!palettes)
         return;
@@ -891,31 +894,31 @@ void TimeMixPalettes(u32 palettes, u16 *src, u16 *dst, struct BlendSettings *ble
 
     if (tint0)
     {
-        r0 = (color0 << 24) >> 24;
-        g0 = (color0 << 16) >> 24;
-        b0 = (color0 << 8) >> 24;
+        r0 = (s8)(color0);
+        g0 = (s8)(color0 >> 8);
+        b0 = (s8)(color0 >> 16);
     }
     else
     {
-        r0 = (color0 << 27) >> 27;
-        g0 = (color0 << 22) >> 27;
-        b0 = (color0 << 17) >> 27;
+        r0 = color0 & 0x1F;
+        g0 = (color0 >> 5) & 0x1F;
+        b0 = (color0 >> 10) & 0x1F;
     }
     if (tint1)
     {
-        r1 = (color1 << 24) >> 24;
-        g1 = (color1 << 16) >> 24;
-        b1 = (color1 << 8) >> 24;
+        r1 = (s8)(color1);
+        g1 = (s8)(color1 >> 8);
+        b1 = (s8)(color1 >> 16);
     }
     else
     {
-        r1 = (color1 << 27) >> 27;
-        g1 = (color1 << 22) >> 27;
-        b1 = (color1 << 17) >> 27;
+        r1 = color1 & 0x1F;
+        g1 = (color1 >> 5) & 0x1F;
+        b1 = (color1 >> 10) & 0x1F;
     }
-    defR = (defaultColor << 27) >> 27;
-    defG = (defaultColor << 22) >> 27;
-    defB = (defaultColor << 17) >> 27;
+    defR = defaultColor & 0x1F;
+    defG = (defaultColor >> 5) & 0x1F;
+    defB = (defaultColor >> 10) & 0x1F;
 
     do
     {
@@ -925,20 +928,21 @@ void TimeMixPalettes(u32 palettes, u16 *src, u16 *dst, struct BlendSettings *ble
             u32 altBlendColor = *dst++ = *src++; // color 0 is copied through
             if (altBlendColor >> 15) // Transparency high bit set; alt blend color
             {
-                altR = (altBlendColor << 27) >> 27;
-                altG = (altBlendColor << 22) >> 27;
-                altB = (altBlendColor << 17) >> 27;
+                altR = altBlendColor & 0x1F;
+                altG = (altBlendColor >> 5) & 0x1F;
+                altB = (altBlendColor >> 10) & 0x1F;
             }
             else
             {
                 altBlendColor = 0;
+                altR = 0; altG = 0; altB = 0;
             }
             while (src != srcEnd)
             {
                 u32 srcColor = *src;
-                s32 r = (srcColor << 27) >> 27;
-                s32 g = (srcColor << 22) >> 27;
-                s32 b = (srcColor << 17) >> 27;
+                s32 r = srcColor & 0x1F;
+                s32 g = (srcColor >> 5) & 0x1F;
+                s32 b = (srcColor >> 10) & 0x1F;
                 s32 r2, g2, b2;
 
                 if (srcColor >> 15)
@@ -980,12 +984,9 @@ void TimeMixPalettes(u32 palettes, u16 *src, u16 *dst, struct BlendSettings *ble
                         r2 = (u16)((r1 * r)) >> 8;
                         g2 = (u16)((g1 * g)) >> 8;
                         b2 = (u16)((b1 * b)) >> 8;
-                        if (r2 > 31)
-                            r2 = 31;
-                        if (g2 > 31)
-                            g2 = 31;
-                        if (b2 > 31)
-                            b2 = 31;
+                        if (r2 > 31) r2 = 31;
+                        if (g2 > 31) g2 = 31;
+                        if (b2 > 31) b2 = 31;
                     }
                     if (!tint0)
                     {
@@ -1000,19 +1001,15 @@ void TimeMixPalettes(u32 palettes, u16 *src, u16 *dst, struct BlendSettings *ble
                         r = (u16)((r0 * r)) >> 8;
                         g = (u16)((g0 * g)) >> 8;
                         b = (u16)((b0 * b)) >> 8;
-                        if (r > 31)
-                            r = 31;
-                        if (g > 31)
-                            g = 31;
-                        if (b > 31)
-                            b = 31;
+                        if (r > 31) r = 31;
+                        if (g > 31) g = 31;
+                        if (b > 31) b = 31;
                     }
                 }
                 r  = r2 + (((r - r2) * (s32)weight0) >> 8);
                 g  = g2 + (((g - g2) * (s32)weight0) >> 8);
                 b  = b2 + (((b - b2) * (s32)weight0) >> 8);
                 *dst++ = RGB2(r, g, b);
-                // *dst++ = RGB2(r, g, b) | (srcColor >> 15) << 15;
                 src++;
             }
         }
@@ -1157,14 +1154,14 @@ void TintPalette_RGB_Copy(u16 palOffset, u32 blendColor)
     s32 newR, newG, newB, rTone = 0, gTone = 0, bTone = 0;
     u16 *src = gPlttBufferUnfaded + palOffset;
     u16 *dst = gPlttBufferFaded + palOffset;
-    u32 defaultBlendColor = DEFAULT_LIGHT_COLOR;
+    u32 defaultBlendColor = RGB2GBA(248, 224, 120);
     u16 *srcEnd = src + 16;
     u16 altBlendIndices = *dst++ = *src++; // color 0 is copied through unchanged
     u32 altBlendColor;
 
-    newR = ((blendColor << 27) >> 27) << 3;
-    newG = ((blendColor << 22) >> 27) << 3;
-    newB = ((blendColor << 17) >> 27) << 3;
+    newR = (blendColor & 0x1F) << 3;
+    newG = ((blendColor >> 5) & 0x1F) << 3;
+    newB = ((blendColor >> 10) & 0x1F) << 3;
 
     if (altBlendIndices >> 15) // High bit set; bitmask of which colors to alt-blend
     {
@@ -1173,16 +1170,16 @@ void TintPalette_RGB_Copy(u16 palOffset, u32 blendColor)
         if (altBlendColor >> 15)
         {
             // Set alternate blend color
-            rTone = ((altBlendColor << 27) >> 27) << 3;
-            gTone = ((altBlendColor << 22) >> 27) << 3;
-            bTone = ((altBlendColor << 17) >> 27) << 3;
+            rTone = (altBlendColor & 0x1F) << 3;
+            gTone = ((altBlendColor >> 5) & 0x1F) << 3;
+            bTone = ((altBlendColor >> 10) & 0x1F) << 3;
         }
         else
         {
             // Set default blend color
-            rTone = ((defaultBlendColor << 27) >> 27) << 3;
-            gTone = ((defaultBlendColor << 22) >> 27) << 3;
-            bTone = ((defaultBlendColor << 17) >> 27) << 3;
+            rTone = (defaultBlendColor & 0x1F) << 3;
+            gTone = ((defaultBlendColor >> 5) & 0x1F) << 3;
+            bTone = ((defaultBlendColor >> 10) & 0x1F) << 3;
         }
     }
     else
@@ -1193,9 +1190,9 @@ void TintPalette_RGB_Copy(u16 palOffset, u32 blendColor)
     while (src != srcEnd)
     {
         u32 srcColor = *src;
-        s32 r = (srcColor << 27) >> 27;
-        s32 g = (srcColor << 22) >> 27;
-        s32 b = (srcColor << 17) >> 27;
+        s32 r = srcColor & 0x1F;
+        s32 g = (srcColor >> 5) & 0x1F;
+        s32 b = (srcColor >> 10) & 0x1F;
 
         if (altBlendIndices & 1)
         {
@@ -1210,28 +1207,23 @@ void TintPalette_RGB_Copy(u16 palOffset, u32 blendColor)
             g = (u16)((newG * g)) >> 8;
             b = (u16)((newB * b)) >> 8;
         }
-        if (r > 31)
-            r = 31;
-        if (g > 31)
-            g = 31;
-        if (b > 31)
-            b = 31;
+        if (r > 31) r = 31;
+        if (g > 31) g = 31;
+        if (b > 31) b = 31;
         src++;
         *dst++ = RGB2(r, g, b);
         altBlendIndices >>= 1;
     }
 }
 
-#undef DEFAULT_LIGHT_COLOR
-
-#define tCoeff       data[0]
-#define tCoeffTarget data[1]
-#define tCoeffDelta  data[2]
-#define tDelay       data[3]
-#define tDelayTimer  data[4]
-#define tPalettes    5 // data[5] and data[6], set/get via Set/GetWordTaskArg
-#define tColor       data[7]
-#define tId          data[8]
+#undef tCoeff
+#undef tCoeffTarget
+#undef tCoeffDelta
+#undef tDelay
+#undef tDelayTimer
+#undef tPalettes
+#undef tColor
+#undef tId
 
 // Blend the selected palettes in a series of steps toward or away from the color.
 // Only used by the Groudon/Kyogre fight scene to flash the screen for lightning.
@@ -1241,26 +1233,26 @@ void BlendPalettesGradually(u32 selectedPalettes, s8 delay, u8 coeff, u8 coeffTa
     u8 taskId;
 
     taskId = CreateTask(Task_BlendPalettesGradually, priority);
-    gTasks[taskId].tCoeff = coeff;
-    gTasks[taskId].tCoeffTarget = coeffTarget;
+    gTasks[taskId].data[0] = coeff;
+    gTasks[taskId].data[1] = coeffTarget;
 
     if (delay >= 0)
     {
-        gTasks[taskId].tDelay = delay;
-        gTasks[taskId].tCoeffDelta = 1;
+        gTasks[taskId].data[3] = delay;
+        gTasks[taskId].data[2] = 1;
     }
     else
     {
-        gTasks[taskId].tDelay = 0;
-        gTasks[taskId].tCoeffDelta = -delay + 1;
+        gTasks[taskId].data[3] = 0;
+        gTasks[taskId].data[2] = -delay + 1;
     }
 
     if (coeffTarget < coeff)
-        gTasks[taskId].tCoeffDelta *= -1;
+        gTasks[taskId].data[2] *= -1;
 
-    SetWordTaskArg(taskId, tPalettes, selectedPalettes);
-    gTasks[taskId].tColor = color;
-    gTasks[taskId].tId = id;
+    SetWordTaskArg(taskId, 5, selectedPalettes);
+    gTasks[taskId].data[7] = color;
+    gTasks[taskId].data[8] = id;
     gTasks[taskId].func(taskId);
 }
 
@@ -1271,7 +1263,7 @@ bool32 IsBlendPalettesGraduallyTaskActive(u8 id)
     for (i = 0; i < NUM_TASKS; i++)
         if ((gTasks[i].isActive == TRUE)
          && (gTasks[i].func == Task_BlendPalettesGradually)
-         && (gTasks[i].tId == id))
+         && (gTasks[i].data[8] == id))
             return TRUE;
 
     return FALSE;
@@ -1297,30 +1289,30 @@ static void Task_BlendPalettesGradually(u8 taskId)
     s16 target;
 
     data = gTasks[taskId].data;
-    palettes = GetWordTaskArg(taskId, tPalettes);
+    palettes = GetWordTaskArg(taskId, 5);
 
-    if (++tDelayTimer > tDelay)
+    if (++data[4] > data[3])
     {
-        tDelayTimer = 0;
-        BlendPalettes(palettes, tCoeff, tColor);
-        target = tCoeffTarget;
-        if (tCoeff == target)
+        data[4] = 0;
+        BlendPalettes(palettes, data[0], data[7]);
+        target = data[1];
+        if (data[0] == target)
         {
             DestroyTask(taskId);
         }
         else
         {
-            tCoeff += tCoeffDelta;
-            if (tCoeffDelta >= 0)
+            data[0] += data[2];
+            if (data[2] >= 0)
             {
-                if (tCoeff < target)
+                if (data[0] < target)
                     return;
             }
-            else if (tCoeff > target)
+            else if (data[0] > target)
             {
                 return;
             }
-            tCoeff = target;
+            data[0] = target;
         }
     }
 }
