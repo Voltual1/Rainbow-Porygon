@@ -39,7 +39,7 @@ struct ModernSaveBlockHeader {
     u32 size;
 };
 
-extern char gSavePath[];
+extern char sSavePath[];
 
 static u16 CalculateChecksum(void *, u16);
 static bool8 ReadFlashSector(u8, struct SaveSector *);
@@ -110,7 +110,7 @@ static u8 SaveModernSave(u8 saveType)
     u8 *recBattleBuffer = NULL;
     u32 recBattleSize = 0;
 
-    FILE *fInfo = fopen(gSavePath, "rb");
+    FILE *fInfo = fopen(sSavePath, "rb");
     if (fInfo != NULL)
     {
         struct ModernSaveHeader oldHeader;
@@ -162,7 +162,7 @@ static u8 SaveModernSave(u8 saveType)
             memcpy(hofBuffer, gHoFSaveBuffer, hofSize);
     }
 
-    FILE *f = fopen(gSavePath, "wb");
+    FILE *f = fopen(sSavePath, "wb");
     if (f == NULL)
     {
         if (hofBuffer) Free(hofBuffer);
@@ -241,7 +241,7 @@ static u8 SaveModernSave(u8 saveType)
 
 static u8 LoadModernSave(u8 saveType)
 {
-    FILE *f = fopen(gSavePath, "rb");
+    FILE *f = fopen(sSavePath, "rb");
     if (f == NULL)
         return SAVE_STATUS_EMPTY;
 
@@ -336,7 +336,7 @@ static u32 WriteSpecialBlock(u32 targetBlockId, u8 *src, u32 size)
     u32 blocksId[10] = {0};
     u32 numBlocks = 0;
 
-    FILE *fInfo = fopen(gSavePath, "rb");
+    FILE *fInfo = fopen(sSavePath, "rb");
     if (fInfo != NULL)
     {
         struct ModernSaveHeader oldHeader;
@@ -392,7 +392,7 @@ static u32 WriteSpecialBlock(u32 targetBlockId, u8 *src, u32 size)
         numBlocks++;
     }
 
-    FILE *f = fopen(gSavePath, "wb");
+    FILE *f = fopen(sSavePath, "wb");
     if (f == NULL)
     {
         for (i = 0; i < numBlocks; i++)
@@ -427,7 +427,7 @@ static u32 WriteSpecialBlock(u32 targetBlockId, u8 *src, u32 size)
 
 void ClearSaveData(void)
 {
-    remove(gSavePath);
+    remove(sSavePath);
 
     memset(gFlashBaseBuffer, 0xFF, sizeof(gFlashBaseBuffer));
     
@@ -1135,7 +1135,7 @@ u8 LoadGameSave(u8 saveType)
 
 u16 GetSaveBlocksPointersBaseOffset(void)
 {
-    FILE *f = fopen(gSavePath, "rb");
+    FILE *f = fopen(sSavePath, "rb");
     if (f == NULL)
         return 0;
 
@@ -1193,7 +1193,7 @@ u32 TryReadSpecialSaveSector(u8 sector, u8 *dst)
     if (sector != SECTOR_ID_TRAINER_HILL && sector != SECTOR_ID_RECORDED_BATTLE)
         return SAVE_STATUS_ERROR;
 
-    FILE *f = fopen(gSavePath, "rb");
+    FILE *f = fopen(sSavePath, "rb");
     if (f == NULL)
         return SAVE_STATUS_ERROR;
 

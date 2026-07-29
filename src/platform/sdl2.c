@@ -56,7 +56,7 @@ double timeScale = 1.0;
 struct SiiRtcInfo internalClock;
 
 static FILE *sSaveFile = NULL;
-static char sSavePath[1024] = "pokeemerald.sav";
+char sSavePath[1024] = "pokeemerald.sav";
 static char sConfigPath[1024] = "pokeemerald.cfg";
 static u8 sBorderBackground;
 static bool sHasBorderBackgroundConfig;
