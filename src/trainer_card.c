@@ -330,6 +330,9 @@ static bool8 (*const sTrainerCardFlipTasks[])(struct Task *) =
 
 static void VblankCb_TrainerCard(void)
 {
+    if (sData == NULL)
+        return;
+
     LoadOam();
     ProcessSpriteCopyRequests();
     TransferPlttBuffer();
@@ -360,6 +363,7 @@ static void CB2_TrainerCard(void)
 
 static void CloseTrainerCard(u8 taskId)
 {
+    SetVBlankCallback(NULL); // 显式清除VBlank回调，防止在释放内存后继续执行
     SetMainCallback2(sData->callback2);
     FreeAllWindowBuffers();
     FREE_AND_SET_NULL(sData);
