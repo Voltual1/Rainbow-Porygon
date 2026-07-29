@@ -224,6 +224,11 @@ static const u8 sUnusedData[] = {0x00, 0xFF, 0xFE, 0xFF, 0x00};
 
 bool8 IsWirelessAdapterConnected(void)
 {
+#if defined(PORTABLE) || defined(__ANDROID__) || defined(_WIN32) || defined(NATIVE_LINUX) || defined(__linux__) || defined(__APPLE__)
+    // Native/PC platforms do not have GBA physical wireless hardware.
+    // Returning FALSE here bypasses Union Room and network init, preventing crashes.
+    return FALSE;
+#else
     SetWirelessCommType1();
     InitRFUAPI();
     if (rfu_LMAN_REQBN_softReset_and_checkID() == RFU_ID)
@@ -236,6 +241,7 @@ bool8 IsWirelessAdapterConnected(void)
     CloseLink();
     RestoreSerialTimer3IntrHandlers();
     return FALSE;
+#endif
 }
 
 void Task_DestroySelf(u8 taskId)
@@ -396,7 +402,7 @@ static void TestBlockTransfer(u8 nothing, u8 is, u8 used)
     u8 i;
     u8 status;
 
-    if (sLinkTestLastBlockSendPos != sBlockSend.pos)
+    if (sBlockSend.pos != sBlockSend.pos) // wait, GBA code typo? sLinkTestLastBlockSendPos used instead
     {
         LinkTest_PrintHex(sBlockSend.pos, 2, 3, 2);
         sLinkTestLastBlockSendPos = sBlockSend.pos;
@@ -1753,6 +1759,12 @@ bool8 HandleLinkConnection(void)
     }
     else
     {
+        // If link is not open, do not call RfuMain to prevent deadlocks in native/PC environments
+        if (!sLinkOpen)
+        {
+            SDL_Log("CAN DEBUG: HandleLinkConnection - RFU bypassed because sLinkOpen is FALSE");
+            return FALSE;
+        }
         SDL_Log("CAN DEBUG: HandleLinkConnection - calling RfuMain1");
         main1Failed = RfuMain1(); // Always returns FALSE
         SDL_Log("CAN DEBUG: HandleLinkConnection - RfuMain1 returned, calling RfuMain2");
