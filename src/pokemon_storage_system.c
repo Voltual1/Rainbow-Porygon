@@ -1983,6 +1983,7 @@ static void EnterPokeStorage(u8 boxOption)
     }
     else
     {
+        memset(sStorage, 0, sizeof(*sStorage));
         sStorage->boxOption = boxOption;
         sStorage->isReopening = FALSE;
         sMovingItemId = ITEM_NONE;
@@ -1999,13 +2000,14 @@ static void CB2_ReturnToPokeStorage(void)
     sStorage = Alloc(sizeof(*sStorage));
     if (sStorage == NULL)
     {
-        if (sStorage->boxOption == OPTION_SELECT_MON)
+        if (sCurrentBoxOption == OPTION_SELECT_MON)
             SetMainCallback2(CB2_ReturnToFieldContinueScript);
         else
             SetMainCallback2(CB2_ExitPokeStorage);
     }
     else
     {
+        memset(sStorage, 0, sizeof(*sStorage));
         sStorage->boxOption = sCurrentBoxOption;
         sStorage->isReopening = TRUE;
         sStorage->state = 0;
@@ -7052,6 +7054,7 @@ static void SetDisplayMonData(void *pokemon, u8 mode)
 
     if (sStorage->displayMonSpecies == SPECIES_NONE)
     {
+        sStorage->displayMonPalette = NULL;
         StringFill(sStorage->displayMonName, CHAR_SPACE, 5);
         StringFill(sStorage->displayMonNameText, CHAR_SPACE, 8);
         StringFill(sStorage->displayMonSpeciesName, CHAR_SPACE, 8);
