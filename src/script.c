@@ -85,9 +85,11 @@ void StopScript(struct ScriptContext *ctx)
 
 bool8 RunScriptCommand(struct ScriptContext *ctx)
 {
+    SDL_Log("CAN DEBUG: RunScriptCommand entering. mode: %d", ctx->mode);
     switch (ctx->mode)
     {
     case SCRIPT_MODE_STOPPED:
+        SDL_Log("CAN DEBUG: RunScriptCommand - mode is STOPPED");
         return FALSE;
     case SCRIPT_MODE_NATIVE:
         // Try to call a function in C
@@ -98,11 +100,13 @@ bool8 RunScriptCommand(struct ScriptContext *ctx)
             SDL_Log("CAN SCRIPT: Calling Native Func at %p", (void*)nativeFunc);
             if (nativeFunc() == TRUE)
                 ctx->mode = SCRIPT_MODE_BYTECODE;
+            SDL_Log("CAN DEBUG: RunScriptCommand - Native Func returned");
             return TRUE;
         }
         ctx->mode = SCRIPT_MODE_BYTECODE;
         // fallthrough
     case SCRIPT_MODE_BYTECODE:
+        SDL_Log("CAN DEBUG: RunScriptCommand - entering BYTECODE loop. scriptPtr: %p", (void*)ctx->scriptPtr);
         while (1)
         {
             u8 cmdCode;
@@ -110,6 +114,7 @@ bool8 RunScriptCommand(struct ScriptContext *ctx)
 
             if (ctx->scriptPtr == NULL)
             {
+                SDL_Log("CAN DEBUG: RunScriptCommand - scriptPtr is NULL");
                 ctx->mode = SCRIPT_MODE_STOPPED;
                 return FALSE;
             }
@@ -120,6 +125,7 @@ bool8 RunScriptCommand(struct ScriptContext *ctx)
 
             if (func >= ctx->cmdTableEnd)
             {
+                SDL_Log("CAN DEBUG: RunScriptCommand - func out of bounds");
                 ctx->mode = SCRIPT_MODE_STOPPED;
                 return FALSE;
             }
@@ -127,10 +133,14 @@ bool8 RunScriptCommand(struct ScriptContext *ctx)
             ScrCmdFunc cmdFunc = (ScrCmdFunc)STRIP_DOMIRROR_TAG(*func);
             SDL_Log("CAN SCRIPT: Executing CmdCode 0x%02X (func: %p) at ScriptPtr: %p", cmdCode, (void*)cmdFunc, (void*)ctx->scriptPtr);
             if (cmdFunc(ctx) == TRUE)
+            {
+                SDL_Log("CAN DEBUG: RunScriptCommand - cmdFunc returned TRUE");
                 return TRUE;
+            }
         }
     }
 
+    SDL_Log("CAN DEBUG: RunScriptCommand - default return TRUE");
     return TRUE;
 }
 
@@ -222,7 +232,9 @@ u32 ScriptPeekWord(struct ScriptContext *ctx)
 void LockPlayerFieldControls(void)
 {
     sLockFieldControls = TRUE;
+    SDL_Log("CAN DEBUG: LockPlayerFieldControls - calling EndDexNavSearch");
     EndDexNavSearch();
+    SDL_Log("CAN DEBUG: LockPlayerFieldControls - EndDexNavSearch returned");
 }
 
 void UnlockPlayerFieldControls(void)
@@ -266,15 +278,19 @@ bool8 ScriptContext_RunScript(void)
     if (sGlobalScriptContextStatus == CONTEXT_WAITING)
         return FALSE;
 
+    SDL_Log("CAN DEBUG: ScriptContext_RunScript - calling LockPlayerFieldControls");
     LockPlayerFieldControls();
+    SDL_Log("CAN DEBUG: ScriptContext_RunScript - LockPlayerFieldControls returned, calling RunScriptCommand");
 
     if (!RunScriptCommand(&sGlobalScriptContext))
     {
+        SDL_Log("CAN DEBUG: ScriptContext_RunScript - RunScriptCommand returned FALSE, shutting down");
         sGlobalScriptContextStatus = CONTEXT_SHUTDOWN;
         UnlockPlayerFieldControls();
         return FALSE;
     }
 
+    SDL_Log("CAN DEBUG: ScriptContext_RunScript - RunScriptCommand returned TRUE");
     return TRUE;
 }
 
