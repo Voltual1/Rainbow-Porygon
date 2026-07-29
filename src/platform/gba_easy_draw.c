@@ -33,6 +33,7 @@
 #endif
 
 extern void (*gIntrTable[])(void);
+extern void SDL_Log(const char *fmt, ...);
 
 struct scanlineData {
     uint16_t layers[4][DISPLAY_WIDTH];
@@ -768,10 +769,10 @@ static void DrawScanline(uint16_t *pixels, uint16_t vcount)
     //figure out if WIN1 masks on this scanline
     if (REG_DISPCNT & DISPCNT_WIN1_ON)
     {
-        WIN1bottom = (REG_WIN0V & 0xFF); //y2;
-        WIN1top = (REG_WIN0V & 0xFF00) >> 8; //y1;
-        WIN1right = (REG_WIN0H & 0xFF); //x2
-        WIN1left = (REG_WIN0H & 0xFF00) >> 8; //x1
+        WIN1bottom = (REG_WIN1V & 0xFF); //y2;
+        WIN1top = (REG_WIN1V & 0xFF00) >> 8; //y1;
+        WIN1right = (REG_WIN1H & 0xFF); //x2
+        WIN1left = (REG_WIN1H & 0xFF00) >> 8; //x1
         
         if (WIN1top > WIN1bottom) {
             if (vcount >= WIN1top || vcount < WIN1bottom)
@@ -894,6 +895,8 @@ uint16_t *memsetu16(uint16_t *dst, uint16_t fill, size_t count)
 void DrawFrame(uint16_t *pixels)
 {
     int i;
+    SDL_Log("CAN DRAWFRAME: DrawFrame starting. REG_DISPCNT: 0x%04X, REG_DISPSTAT: 0x%04X, IE: 0x%04X", REG_DISPCNT, REG_DISPSTAT, REG_IE);
+    
     for (i = 0; i < DISPLAY_HEIGHT; i++)
     {
         REG_VCOUNT = i;
@@ -912,26 +915,32 @@ void DrawFrame(uint16_t *pixels)
         }
 
         // Render the backdrop color before the each individual scanline.
-// backdrop color brightness effects
-unsigned int blendMode = (REG_BLDCNT >> 6) & 3;
+        // backdrop color brightness effects
+        unsigned int blendMode = (REG_BLDCNT >> 6) & 3;
 
-// 【已修复】：撤销红光 Debug，恢复真实的 GBA 调色板背景
-uint16_t backdropColor = *(uint16_t *)PLTT; 
+        // 【已修复】：撤销红光 Debug，恢复真实的 GBA 调色板背景
+        uint16_t backdropColor = *(uint16_t *)PLTT; 
 
-if (REG_BLDCNT & BLDCNT_TGT1_BD)
-{
-    switch (blendMode)
-    {
-    case 2:
-        backdropColor = alphaBrightnessIncrease(backdropColor);
-        break;
-    case 3:
-        backdropColor = alphaBrightnessDecrease(backdropColor);
-        break;
-    }
-}
+        if (REG_BLDCNT & BLDCNT_TGT1_BD)
+        {
+            switch (blendMode)
+            {
+            case 2:
+                backdropColor = alphaBrightnessIncrease(backdropColor);
+                break;
+            case 3:
+                backdropColor = alphaBrightnessDecrease(backdropColor);
+                break;
+            }
+        }
 
         memsetu16(&pixels[i * DISPLAY_WIDTH], backdropColor, DISPLAY_WIDTH);
+        
+        if (i == 0 || i == 40 || i == 80 || i == 120 || i == 159)
+        {
+            SDL_Log("CAN DRAWFRAME: Rendering scanline %d. BLDCNT: 0x%04X", i, REG_BLDCNT);
+        }
+        
         DrawScanline(&pixels[i * DISPLAY_WIDTH], i);
         
         REG_DISPSTAT |= INTR_FLAG_HBLANK;
@@ -947,5 +956,7 @@ if (REG_BLDCNT & BLDCNT_TGT1_BD)
         REG_DISPSTAT &= ~INTR_FLAG_HBLANK;
         REG_DISPSTAT &= ~INTR_FLAG_VCOUNT;
     }
+    
+    SDL_Log("CAN DRAWFRAME: DrawFrame ending");
 }
 #endif
