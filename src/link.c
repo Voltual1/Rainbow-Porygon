@@ -582,7 +582,7 @@ static void ProcessRecvCmds(u8 unused)
                         }
                         ConvertLinkPlayerName(linkPlayer);
                         if (strcmp(block->magic1, sASCIIGameFreakInc) != 0
-                            || strcmp(block->magic2, sASCIIGameFreakInc) != 0)
+|| strcmp(block->magic2, sASCIIGameFreakInc) != 0)
                         {
                             SetMainCallback2(CB2_LinkError);
                         }
@@ -738,7 +738,7 @@ static int AreAnyLinkPlayersUsingVersions(enum GameVersion version1, enum GameVe
     for (i = 0; i < nPlayers; i++)
     {
         if ((gLinkPlayers[i].version & 0xFF) == version1
-         || (gLinkPlayers[i].version & 0xFF) == version2)
+|| (gLinkPlayers[i].version & 0xFF) == version2)
             return 1;
     }
     return -1;
@@ -836,7 +836,7 @@ u8 GetLinkPlayerDataExchangeStatusTimed(int minPlayers, int maxPlayers)
                 linkType1 = gLinkPlayers[GetMultiplayerId()].linkType;
                 linkType2 = gLinkPlayers[GetMultiplayerId() ^ 1].linkType;
                 if ((linkType1 == LINKTYPE_BATTLE_TOWER_50 && linkType2 == LINKTYPE_BATTLE_TOWER_OPEN)
-                 || (linkType1 == LINKTYPE_BATTLE_TOWER_OPEN && linkType2 == LINKTYPE_BATTLE_TOWER_50))
+|| (linkType1 == LINKTYPE_BATTLE_TOWER_OPEN && linkType2 == LINKTYPE_BATTLE_TOWER_50))
                 {
                     // 3 below indicates partner made different level mode selection
                     // See BattleFrontier_BattleTowerLobby_EventScript_AbortLinkDifferentSelections
@@ -1310,7 +1310,7 @@ void CheckLinkPlayersMatchSaved(void)
     for (i = 0; i < gSavedLinkPlayerCount; i++)
     {
         if (sSavedLinkPlayers[i].trainerId != gLinkPlayers[i].trainerId
-         || StringCompare(sSavedLinkPlayers[i].name, gLinkPlayers[i].name) != 0)
+|| StringCompare(sSavedLinkPlayers[i].name, gLinkPlayers[i].name) != 0)
         {
             gLinkErrorOccurred = TRUE;
             CloseLink();
@@ -1727,7 +1727,7 @@ void LinkPlayerFromBlock(u32 who)
     ConvertLinkPlayerName(player);
 
     if (strcmp(block->magic1, sASCIIGameFreakInc) != 0
-     || strcmp(block->magic2, sASCIIGameFreakInc) != 0)
+|| strcmp(block->magic2, sASCIIGameFreakInc) != 0)
         SetMainCallback2(CB2_LinkError);
 }
 
@@ -1736,25 +1736,39 @@ bool8 HandleLinkConnection(void)
 {
     bool32 main1Failed, main2Failed;
 
+    SDL_Log("CAN DEBUG: HandleLinkConnection start. gWirelessCommType: %d, sLinkOpen: %d", gWirelessCommType, sLinkOpen);
     if (gWirelessCommType == 0)
     {
+        SDL_Log("CAN DEBUG: HandleLinkConnection - calling LinkMain1");
         gLinkStatus = LinkMain1(&gShouldAdvanceLinkState, gSendCmd, gRecvCmds);
+        SDL_Log("CAN DEBUG: HandleLinkConnection - LinkMain1 returned 0x%08X, calling LinkMain2", gLinkStatus);
         LinkMain2(&gMain.heldKeys);
+        SDL_Log("CAN DEBUG: HandleLinkConnection - LinkMain2 returned");
         if ((gLinkStatus & LINK_STAT_RECEIVED_NOTHING) && IsSendingKeysOverCable() == TRUE)
+        {
+            SDL_Log("CAN DEBUG: HandleLinkConnection end (TRUE - RECEIVED NOTHING)");
             return TRUE;
+        }
     }
     else
     {
+        SDL_Log("CAN DEBUG: HandleLinkConnection - calling RfuMain1");
         main1Failed = RfuMain1(); // Always returns FALSE
+        SDL_Log("CAN DEBUG: HandleLinkConnection - RfuMain1 returned, calling RfuMain2");
         main2Failed = RfuMain2();
+        SDL_Log("CAN DEBUG: HandleLinkConnection - RfuMain2 returned");
         if (IsSendingKeysOverCable() == TRUE)
         {
             // This will never be reached.
             // IsSendingKeysOverCable is always FALSE for wireless communication
             if (main1Failed == TRUE || IsRfuRecvQueueEmpty() || main2Failed)
+            {
+                SDL_Log("CAN DEBUG: HandleLinkConnection end (TRUE - RFU ACTIVE)");
                 return TRUE;
+            }
         }
     }
+    SDL_Log("CAN DEBUG: HandleLinkConnection end (FALSE)");
     return FALSE;
 }
 
