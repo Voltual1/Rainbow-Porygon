@@ -6,7 +6,6 @@
     #include "cgb_audio.h"
     // 引用由 m4a_tables.c 导出的标准 MIDI 指令跳转表模板
     extern const MPlayFunc gMPlayJumpTableTemplate[36];
-    extern void SDL_Log(const char *fmt, ...);
 #endif
 
 extern const u8 gCgb3Vol[];
@@ -46,10 +45,6 @@ u32 MidiKeyToFreq(struct WaveData *wav, u8 key, u8 fineAdjust)
 
     u32 freq = umul3232H32(wav->freq, val1 + umul3232H32(val2 - val1, fineAdjustShifted));
     
-    static u32 freqLogCounter = 0;
-    if (freqLogCounter++ % 120 == 0) {
-                (void*)wav, key, wav ? wav->freq : 0, freq);
-    }
     return freq;
 }
 
@@ -88,6 +83,7 @@ void MPlayFadeOut(struct MusicPlayerInfo *mplayInfo, u16 speed)
 void m4aSoundInit(void)
 {
     s32 i;
+
     SoundInit(&gSoundInfo);
     MPlayExtender(gCgbChans);
     m4aSoundMode(SOUND_MODE_DA_BIT_8 |
@@ -121,26 +117,6 @@ void m4aSoundMain(void)
 #else
     struct SoundInfo *soundInfo = SOUND_INFO_PTR;
     
-    static u32 soundMainLog = 0;
-    if (soundInfo && (soundMainLog++ % 60 == 0)) {
-        struct MusicPlayerInfo *curr = soundInfo->musicPlayerHead;
-        int idx = 0;
-        while (curr) {
-                    idx++, (void*)curr, curr->status, curr->ident, curr->priority);
-            
-            // 顺便打印活动音轨的状况
-            if (curr->tracks) {
-                for (int t = 0; t < curr->trackCount; t++) {
-                    struct MusicPlayerTrack *tr = &curr->tracks[t];
-                    if (tr->flags & MPT_FLG_EXIST) {
-                                t, tr->flags, tr->wait, (void*)tr->cmdPtr);
-                    }
-                }
-            }
-            curr = curr->musicPlayerNext;
-        }
-    }
-    
     // 推进音乐播放器状态
     if (soundInfo && soundInfo->MPlayMainHead && soundInfo->musicPlayerHead)
     {
@@ -161,7 +137,6 @@ void m4aSongNumStart(u16 n)
 
 void m4aSongNumStartOrChange(u16 n)
 {
-
     const struct MusicPlayer *mplayTable = gMPlayTable;
     const struct Song *songTable = gSongTable;
     const struct Song *song = &songTable[n];
@@ -451,12 +426,8 @@ void SoundInit(struct SoundInfo *soundInfo)
 #ifndef PORTABLE
     MPlayJumpTableCopy(gMPlayJumpTable);
 #else
-            (void*)gMPlayJumpTableTemplate[0],
-            (void*)gMPlayJumpTableTemplate[22],
-            (void*)gMPlayJumpTableTemplate[34]);
-
-                    // 在 PORTABLE 模式下拷贝 C 版本的跳转表，规避 BIOS ROM 地址越界保护
-                memcpy(gMPlayJumpTable, gMPlayJumpTableTemplate, 36 * sizeof(MPlayFunc));
+    // 在 PORTABLE 模式下拷贝 C 版本的跳转表，规避 BIOS ROM 地址越界保护
+    memcpy(gMPlayJumpTable, gMPlayJumpTableTemplate, 36 * sizeof(MPlayFunc));
 #endif
 
     soundInfo->MPlayJumpTable = gMPlayJumpTable;
@@ -488,7 +459,7 @@ void SampleFreqSet(u32 freq)
     soundInfo->divFreq = (16777216 / soundInfo->pcmFreq + 1) >> 1;
 
 #ifdef PORTABLE
-    // 核心修复：为跨平台混音器正确初始化 sampleRateReciprocal 倒数频率
+    // 为跨平台混音器正确初始化 sampleRateReciprocal 倒数频率
     soundInfo->sampleRateReciprocal = 1.0f / (float)soundInfo->pcmFreq;
 #endif
 
@@ -701,8 +672,6 @@ void MPlayStart(struct MusicPlayerInfo *mplayInfo, struct SongHeader *songHeader
 
     unk_B = mplayInfo->unk_B;
 
-            songHeader->priority, mplayInfo->priority, mplayInfo->status);
-
     if (!unk_B ||
         ((!mplayInfo->songHeader || !(mplayInfo->tracks[0].flags & MPT_FLG_START)) &&
          (((mplayInfo->status & MUSICPLAYER_STATUS_TRACK) == 0) ||
@@ -746,6 +715,7 @@ void MPlayStart(struct MusicPlayerInfo *mplayInfo, struct SongHeader *songHeader
             m4aSoundMode(songHeader->reverb);
 
 #ifdef PORTABLE
+        // 跨平台多线程保护
         // 必须等前面所有的轨道 flags 与指针写入完毕之后，再激活 status
         // 否则如果在此时 m4aSoundMain 被触发执行了 MPlayMain，就会发生竞态条件导致状态被误置为 0x80000000
         __sync_synchronize();
@@ -758,9 +728,6 @@ void MPlayStart(struct MusicPlayerInfo *mplayInfo, struct SongHeader *songHeader
 #endif
 
         mplayInfo->ident = ID_NUMBER;
-    }
-    else
-    {
     }
 }
 
