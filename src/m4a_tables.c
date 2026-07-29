@@ -39,7 +39,7 @@ extern void ply_xswee(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
 extern void ply_xwait(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
 extern void ply_xcmd_0D(struct MusicPlayerInfo *, struct MusicPlayerTrack *);
 
-// CAN FIX: 合并并定义唯一且类型正确的跨平台音频跳转表模板，保留全部占位符以确保指令映射绝对精确
+// 合并并定义跨平台音频跳转表模板，保留全部占位符以确保指令映射
 const MPlayFunc gMPlayJumpTableTemplate[36] =
 {
     (MPlayFunc)ply_fine,        // 0 (0xB1: FINE)
