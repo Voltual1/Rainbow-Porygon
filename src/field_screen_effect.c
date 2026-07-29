@@ -1262,7 +1262,7 @@ static void Task_OrbEffect(u8 taskId)
     case 0:
         tDispCnt = REG_DISPCNT;
         tBldCnt = REG_BLDCNT;
-        tBldAlpha = REG_BLDPHA;
+        tBldAlpha = REG_BLDALPHA;
         tWinIn = REG_WININ;
         tWinOut = REG_WINOUT;
         ClearGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_WIN1_ON);
