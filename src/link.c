@@ -386,6 +386,7 @@ void CloseLink(void)
     gReceivedRemoteLinkPlayers = FALSE;
     if (gWirelessCommType)
         LinkRfu_Shutdown();
+    gWirelessCommType = 0; // Fix: reset wireless comm type on CloseLink to prevent deadlocks in HandleLinkConnection
     sLinkOpen = FALSE;
     DisableSerial();
 }
