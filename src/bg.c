@@ -296,6 +296,7 @@ int BgTileAllocOp(int bg, int offset, int count, int mode)
     return result;
 }
 
+// From FRLG. Dummied out.
 int BgTileAllocOpUnchecked(int bg, int offset, int count, int mode)
 {
 #if IS_FRLG
@@ -1303,8 +1304,8 @@ static u32 GetBgType(u32 bg)
 bool32 IsTileMapOutsideWram(u32 bg)
 {
 #if PORTABLE
-    // 移植版模式下：动态内存不再受 GBA 的 0x03007FFF 物理内存段限制。
-    // 我们仅需检查 tilemap 指针是否已经被初始化分配（即非空）。
+    // 动态内存不再受 GBA 的 0x03007FFF 物理内存段限制。
+    // 仅需检查 tilemap 指针是否已经被初始化分配
     if (sGpuBgConfigs2[bg].tilemap == NULL)
         return TRUE;
     else
