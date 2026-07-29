@@ -13,7 +13,7 @@ static UNUSED bool32 IsFalse(enum Species species);
 static UNUSED bool32 IsTrue(enum Species species);
 static UNUSED bool32 IsTrueIfUndiscoveredEggGroup(enum Species species);
 
-// 修复：将 static const bool32 (*) 修改为 static bool32 (*const [])，解决返回值 const 校验冲突
+// 将 static const bool32 (*) 修改为 static bool32 (*const [])，解决返回值 const 校验冲突
 static bool32 (*const sSynchronizeModes[])(enum Species) = 
 {
 #if OW_SYNCHRONIZE_NATURE == GEN_3
