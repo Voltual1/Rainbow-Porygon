@@ -4543,6 +4543,8 @@ static void StartBoxMonIconsScrollOut(s16 speed)
 
 static void SpriteCB_BoxMonIconScrollIn(struct Sprite *sprite)
 {
+    if (sStorage == NULL)
+        return;
     if (sprite->sDistance != 0)
     {
         // Icon moving
@@ -4878,6 +4880,8 @@ static void MovePartySpriteToNextSlot(struct Sprite *sprite, u16 partyId)
 
 static void SpriteCB_MovePartyMonToNextSlot(struct Sprite *sprite)
 {
+    if (sStorage == NULL)
+        return;
     if (sprite->sMoveSteps != 0)
     {
         s16 x = sprite->sMonX += sprite->sSpeedX;
@@ -5131,6 +5135,8 @@ static void SetMovingMonPriority(u8 priority)
 
 static void SpriteCB_HeldMon(struct Sprite *sprite)
 {
+    if (sStorage == NULL)
+        return;
     sprite->x = sStorage->cursorSprite->x;
     sprite->y = sStorage->cursorSprite->y + sStorage->cursorSprite->y2 + 4;
 }
@@ -7872,6 +7878,8 @@ static bool8 SetMenuTexts_Item(void)
 
 static void SpriteCB_CursorShadow(struct Sprite *sprite)
 {
+    if (sStorage == NULL)
+        return;
     sprite->x = sStorage->cursorSprite->x;
     sprite->y = sStorage->cursorSprite->y + 20;
 }
@@ -9402,6 +9410,8 @@ static void SpriteCB_ItemIcon_WaitAnim(struct Sprite *sprite)
 
 static void SpriteCB_ItemIcon_ToHand(struct Sprite *sprite)
 {
+    if (sStorage == NULL)
+        return;
     switch (sprite->sState)
     {
     case 0:
@@ -9424,6 +9434,8 @@ static void SpriteCB_ItemIcon_ToHand(struct Sprite *sprite)
 
 static void SpriteCB_ItemIcon_SetPosToCursor(struct Sprite *sprite)
 {
+    if (sStorage == NULL)
+        return;
     sprite->x = sStorage->cursorSprite->x + 4;
     sprite->y = sStorage->cursorSprite->y + sStorage->cursorSprite->y2 + 8;
     sprite->oam.priority = sStorage->cursorSprite->oam.priority;
@@ -9431,6 +9443,8 @@ static void SpriteCB_ItemIcon_SetPosToCursor(struct Sprite *sprite)
 
 static void SpriteCB_ItemIcon_ToMon(struct Sprite *sprite)
 {
+    if (sStorage == NULL)
+        return;
     switch (sprite->sState)
     {
     case 0:
@@ -9456,6 +9470,8 @@ static void SpriteCB_ItemIcon_ToMon(struct Sprite *sprite)
 
 static void SpriteCB_ItemIcon_SwapToHand(struct Sprite *sprite)
 {
+    if (sStorage == NULL)
+        return;
     switch (sprite->sState)
     {
     case 0:
@@ -9483,6 +9499,8 @@ static void SpriteCB_ItemIcon_SwapToHand(struct Sprite *sprite)
 
 static void SpriteCB_ItemIcon_SwapToMon(struct Sprite *sprite)
 {
+    if (sStorage == NULL)
+        return;
     switch (sprite->sState)
     {
     case 0:
@@ -9510,6 +9528,8 @@ static void SpriteCB_ItemIcon_SwapToMon(struct Sprite *sprite)
 
 static void SpriteCB_ItemIcon_HideParty(struct Sprite *sprite)
 {
+    if (sStorage == NULL)
+        return;
     sprite->y -= 8;
     if (sprite->y + sprite->y2 < -16)
     {
