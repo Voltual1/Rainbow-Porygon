@@ -1090,6 +1090,9 @@ void VBlankIntrWait(void)
 {
     SDL_AtomicSet(&isFrameAvailable, 1);
     SDL_SemWait(vBlankSemaphore);
+    
+    extern void RunMixerFrame(void);
+    RunMixerFrame();
 }
 
 u8 BinToBcd(u8 bin)
