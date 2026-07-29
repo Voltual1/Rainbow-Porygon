@@ -100,10 +100,12 @@ void WarpFadeInScreen(void)
     switch (GetMapPairFadeFromType(previousMapType, GetCurrentMapType()))
     {
     case 0:
+        SDL_Log("CAN DEBUG: WarpFadeInScreen - calling FadeScreen FADE_FROM_BLACK");
         FillPalBufferBlack();
         FadeScreen(FADE_FROM_BLACK, 0);
         break;
     case 1:
+        SDL_Log("CAN DEBUG: WarpFadeInScreen - calling FadeScreen FADE_FROM_WHITE");
         FillPalBufferWhite();
         FadeScreen(FADE_FROM_WHITE, 0);
     }
@@ -472,7 +474,9 @@ static void Task_ExitNonAnimDoor(u8 taskId)
 
 static void Task_ExitNonDoor(u8 taskId)
 {
-    SDL_Log("CAN DEBUG: Task_ExitNonDoor - state: %d", gTasks[taskId].tState);
+    extern struct PaletteFadeControl gPaletteFade;
+    SDL_Log("CAN DEBUG: Task_ExitNonDoor - state: %d, WaitForWeatherFadeIn(): %d, gPaletteFade.active: %d", 
+            gTasks[taskId].tState, WaitForWeatherFadeIn(), gPaletteFade.active);
     switch (gTasks[taskId].tState)
     {
     case 0:
@@ -483,6 +487,7 @@ static void Task_ExitNonDoor(u8 taskId)
     case 1:
         if (WaitForWeatherFadeIn())
         {
+            SDL_Log("CAN DEBUG: Task_ExitNonDoor state 1 - WaitForWeatherFadeIn completed! Unfreezing object events");
             UnfreezeObjectEvents();
             // Don't unlock controls until the map preview has finished.
             if (!FadeInMapPreviewScreenIsRunning())
@@ -1257,7 +1262,7 @@ static void Task_OrbEffect(u8 taskId)
     case 0:
         tDispCnt = REG_DISPCNT;
         tBldCnt = REG_BLDCNT;
-        tBldAlpha = REG_BLDALPHA;
+        tBldAlpha = REG_BLDPHA;
         tWinIn = REG_WININ;
         tWinOut = REG_WINOUT;
         ClearGpuRegBits(REG_OFFSET_DISPCNT, DISPCNT_WIN1_ON);

@@ -21,6 +21,8 @@
 #include "field_camera.h"
 #include "overworld.h"
 
+extern void SDL_Log(const char *fmt, ...);
+
 #define DROUGHT_COLOR_INDEX(color) ((((color) >> 1) & 0xF) | (((color) >> 2) & 0xF0) | (((color) >> 3) & 0xF00))
 
 struct RGBColor
@@ -196,6 +198,7 @@ const u16 ALIGNED(4) gFogPalette[] = INCGFX_U16("graphics/weather/fog.pal", ".gb
 
 void StartWeather(void)
 {
+    SDL_Log("CAN DEBUG: StartWeather called. FuncIsActiveTask(Task_WeatherMain): %d", FuncIsActiveTask(Task_WeatherMain));
     if (!FuncIsActiveTask(Task_WeatherMain))
     {
         u8 index = AllocSpritePalette(PALTAG_WEATHER);
@@ -222,6 +225,7 @@ void StartWeather(void)
         gWeatherPtr->readyForInit = FALSE;
         gWeatherPtr->weatherChangeComplete = TRUE;
         gWeatherPtr->taskId = CreateTask(Task_WeatherInit, 80);
+        SDL_Log("CAN DEBUG: StartWeather - Created Task_WeatherInit with taskId: %d", gWeatherPtr->taskId);
     }
 }
 
@@ -280,16 +284,25 @@ static void Task_WeatherInit(u8 taskId)
 {
     // Waits until it's ok to initialize weather.
     // When the screen fades in, this is set to TRUE.
+    SDL_Log("CAN DEBUG: Task_WeatherInit - readyForInit: %d, currWeather: %d", 
+            gWeatherPtr->readyForInit, gWeatherPtr->currWeather);
     if (gWeatherPtr->readyForInit)
     {
         UpdateCameraPanning();
         sWeatherFuncs[gWeatherPtr->currWeather].initAll();
         gTasks[taskId].func = Task_WeatherMain;
+        SDL_Log("CAN DEBUG: Task_WeatherInit - transitioned to Task_WeatherMain");
     }
 }
 
 static void Task_WeatherMain(u8 taskId)
 {
+    if (gWeatherPtr->palProcessingState != WEATHER_PAL_STATE_IDLE)
+    {
+        SDL_Log("CAN DEBUG: Task_WeatherMain - palProcessingState: %d, currWeather: %d, nextWeather: %d",
+                gWeatherPtr->palProcessingState, gWeatherPtr->currWeather, gWeatherPtr->nextWeather);
+    }
+
     if (gWeatherPtr->currWeather != gWeatherPtr->nextWeather)
     {
         if (!sWeatherFuncs[gWeatherPtr->currWeather].finish()
@@ -360,6 +373,9 @@ static void FadeInScreenWithWeather(void)
     if (++gWeatherPtr->fadeInTimer > 1)
         gWeatherPtr->fadeInFirstFrame = FALSE;
 
+    SDL_Log("CAN DEBUG: FadeInScreenWithWeather - currWeather: %d, gPaletteFade.active: %d, fadeInTimer: %d",
+            gWeatherPtr->currWeather, gPaletteFade.active, gWeatherPtr->fadeInTimer);
+
     switch (gWeatherPtr->currWeather)
     {
     case WEATHER_RAIN:
@@ -394,6 +410,7 @@ static void FadeInScreenWithWeather(void)
     default:
         if (!gPaletteFade.active)
         {
+            SDL_Log("CAN DEBUG: FadeInScreenWithWeather DEFAULT - gPaletteFade.active is FALSE, setting state to IDLE");
             gWeatherPtr->colorMapIndex = gWeatherPtr->targetColorMapIndex;
             gWeatherPtr->palProcessingState = WEATHER_PAL_STATE_IDLE;
         }
@@ -848,6 +865,7 @@ void FadeScreenHardware(u32 mode, s32 delay)
 
 bool8 IsWeatherNotFadingIn(void)
 {
+    SDL_Log("CAN DEBUG: IsWeatherNotFadingIn - palProcessingState: %d", gWeatherPtr->palProcessingState);
     return (gWeatherPtr->palProcessingState != WEATHER_PAL_STATE_SCREEN_FADING_IN);
 }
 
@@ -1192,9 +1210,9 @@ void ResetPreservedPalettesInWeather(void)
 bool32 IsWeatherAlphaBlend(void)
 {
     return (gWeatherPtr->currWeather == WEATHER_FOG_HORIZONTAL
-         || gWeatherPtr->currWeather == WEATHER_FOG_DIAGONAL
-         || gWeatherPtr->currWeather == WEATHER_UNDERWATER_BUBBLES
-         || gWeatherPtr->currWeather == WEATHER_UNDERWATER);
+| gWeatherPtr->currWeather == WEATHER_FOG_DIAGONAL
+| gWeatherPtr->currWeather == WEATHER_UNDERWATER_BUBBLES
+| gWeatherPtr->currWeather == WEATHER_UNDERWATER);
 }
 
 static const u8 sWeatherNames[WEATHER_COUNT][24] = {
