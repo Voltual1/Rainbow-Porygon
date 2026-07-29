@@ -85,8 +85,6 @@
 #include "constants/weather.h"
 #include "dma3.h"
 
-extern void SDL_Log(const char *fmt, ...);
-
 STATIC_ASSERT((B_FLAG_FOLLOWERS_DISABLED == 0 || OW_FOLLOWERS_ENABLED), FollowersFlagAssignedWithoutEnablingThem);
 
 struct CableClubPlayer
@@ -710,7 +708,6 @@ void WarpIntoMap(void)
     ApplyCurrentWarp();
     LoadCurrentMapData();
     SetPlayerCoordsFromWarp();
-    SDL_Log("CAN DEBUG: WarpIntoMap - Player coordinates set to (%d, %d)", gSaveBlock1Ptr->pos.x, gSaveBlock1Ptr->pos.y);
 }
 
 void SetWarpDestination(s8 mapGroup, s8 mapNum, s8 warpId, s8 x, s8 y)
@@ -941,8 +938,6 @@ static void LoadMapFromWarp(bool32 a1)
     bool8 isIndoors;
 
     LoadCurrentMapData();
-    SDL_Log("CAN DEBUG: LoadMapFromWarp - Map group: %d, Map num: %d, Map section: %d", 
-            gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum, gMapHeader.regionMapSectionId);
     if (!(sObjectEventLoadFlag & SKIP_OBJECT_EVENT_LOAD))
     {
         if (gMapHeader.mapLayoutId == LAYOUT_BATTLE_FRONTIER_BATTLE_PYRAMID_FLOOR)
@@ -1288,7 +1283,6 @@ void Overworld_PlaySpecialMapMusic(void)
 {
     u16 music = GetCurrLocationDefaultMusic();
 
-    SDL_Log("CAN DEBUG: Overworld_PlaySpecialMapMusic - gDisableMapMusicChangeOnMapLoad: %d", gDisableMapMusicChangeOnMapLoad);
     if (gDisableMapMusicChangeOnMapLoad == MUSIC_DISABLE_STOP)
     {
         StopMapMusic();
@@ -1323,8 +1317,6 @@ void Overworld_ClearSavedMusic(void)
 
 static void TransitionMapMusic(void)
 {
-    SDL_Log("CAN DEBUG: TransitionMapMusic - gDisableMapMusicChangeOnMapLoad: %d, DONT_TRANSITION: %d", 
-            gDisableMapMusicChangeOnMapLoad, FlagGet(FLAG_DONT_TRANSITION_MUSIC));
     if (gDisableMapMusicChangeOnMapLoad == MUSIC_DISABLE_STOP)
     {
         StopMapMusic();
@@ -1381,7 +1373,6 @@ void TryFadeOutOldMapMusic(void)
 {
     u16 currentMusic = GetCurrentMapMusic();
     u16 warpMusic = GetWarpDestinationMusic();
-    SDL_Log("CAN DEBUG: TryFadeOutOldMapMusic - currentMusic: %d, warpMusic: %d", currentMusic, warpMusic);
     if (FlagGet(FLAG_DONT_TRANSITION_MUSIC) != TRUE && warpMusic != GetCurrentMapMusic())
     {
         if (currentMusic == MUS_SURF
@@ -1848,29 +1839,18 @@ u8 UpdateSpritePaletteWithTime(u8 paletteNum)
 
 static void OverworldBasic(void)
 {
-    SDL_Log("CAN DEBUG: OverworldBasic start");
-    SDL_Log("CAN DEBUG: OverworldBasic calling ScriptContext_RunScript");
     ScriptContext_RunScript();
-    SDL_Log("CAN DEBUG: OverworldBasic calling RunTasks");
     RunTasks();
-    SDL_Log("CAN DEBUG: OverworldBasic calling AnimateSprites");
     AnimateSprites();
-    SDL_Log("CAN DEBUG: OverworldBasic calling CameraUpdate");
     CameraUpdate();
-    SDL_Log("CAN DEBUG: OverworldBasic calling UpdateCameraPanning");
     UpdateCameraPanning();
-    SDL_Log("CAN DEBUG: OverworldBasic calling BuildOamBuffer");
     BuildOamBuffer();
-    SDL_Log("CAN DEBUG: OverworldBasic calling UpdatePaletteFade");
     UpdatePaletteFade();
-    SDL_Log("CAN DEBUG: OverworldBasic calling UpdateTilesetAnimations");
     UpdateTilesetAnimations();
-    SDL_Log("CAN DEBUG: OverworldBasic calling DoScheduledBgTilemapCopiesToVram");
     DoScheduledBgTilemapCopiesToVram();
     // Every minute if no palette fade is active, update TOD blending as needed
     if (!gPaletteFade.active && --gTimeUpdateCounter <= 0)
     {
-        SDL_Log("CAN DEBUG: OverworldBasic updating TOD");
         struct TimeBlendSettings cachedBlend = gTimeBlend;
         u32 *bld0 = (u32*)&cachedBlend;
         u32 *bld1 = (u32*)&gTimeBlend;
@@ -1885,9 +1865,7 @@ static void OverworldBasic(void)
             ApplyWeatherColorMapIfIdle(gWeatherPtr->colorMapIndex);
         }
     }
-    SDL_Log("CAN DEBUG: OverworldBasic calling UpdateOverworldWildEncounter");
     UpdateOverworldWildEncounter();
-    SDL_Log("CAN DEBUG: OverworldBasic end");
 }
 
 // This CB2 is used when starting
@@ -1898,21 +1876,12 @@ void CB2_OverworldBasic(void)
 
 void CB2_Overworld(void)
 {
-    SDL_Log("CAN DEBUG: CB2_Overworld start");
     bool32 fading = (gPaletteFade.active != 0);
     if (fading)
-    {
-        SDL_Log("CAN DEBUG: CB2_Overworld fading is TRUE, setting VBlank callback to NULL");
         SetVBlankCallback(NULL);
-    }
-    SDL_Log("CAN DEBUG: CB2_Overworld calling OverworldBasic");
     OverworldBasic();
     if (fading)
-    {
-        SDL_Log("CAN DEBUG: CB2_Overworld fading is TRUE, setting VBlank callback back to Field");
         SetFieldVBlankCallback();
-    }
-    SDL_Log("CAN DEBUG: CB2_Overworld end");
 }
 
 void SetMainCallback1(MainCallback cb)
@@ -1928,7 +1897,6 @@ void SetUnusedCallback(void *func)
 
 static bool8 RunFieldCallback(void)
 {
-    SDL_Log("CAN FIELDCB: RunFieldCallback entering. callback=%p, callback2=%p", (void*)gFieldCallback, (void*)gFieldCallback2);
     if (gFieldCallback2)
     {
         if (!gFieldCallback2())
@@ -1956,7 +1924,6 @@ static bool8 RunFieldCallback(void)
 
 void CB2_NewGame(void)
 {
-    SDL_Log("CAN DEBUG: CB2_NewGame Booting up...");
     FieldClearVBlankHBlankCallbacks();
     StopMapMusic();
     ResetSafariZoneFlag_();
@@ -1978,7 +1945,6 @@ void CB2_NewGame(void)
     // Wall clock now track local time so we set it to 10AM to match initial wall clock time
     RtcCalcLocalTimeOffset(0, 10, 0, 0);
 #endif
-    SDL_Log("CAN DEBUG: CB2_NewGame Boot completed successfully!");
 }
 
 void CB2_WhiteOut(void)
@@ -2009,7 +1975,6 @@ void CB2_WhiteOut(void)
 
 void CB2_LoadMap(void)
 {
-    SDL_Log("CAN DEBUG: CB2_LoadMap entering");
     FieldClearVBlankHBlankCallbacks();
     ScriptContext_Init();
     UnlockPlayerFieldControls();
@@ -2020,12 +1985,10 @@ void CB2_LoadMap(void)
 
 static void CB2_LoadMap2(void)
 {
-    SDL_Log("CAN DEBUG: CB2_LoadMap2 entering, executing DoMapLoadLoop");
     DoMapLoadLoop(&gMain.state);
     SetFieldVBlankCallback();
     SetMainCallback1(CB1_Overworld);
     SetMainCallback2(CB2_Overworld);
-    SDL_Log("CAN DEBUG: CB2_LoadMap2 finished, return to Overworld");
 }
 
 void CB2_ReturnToFieldContestHall(void)
@@ -2331,7 +2294,6 @@ static bool32 LoadMapInStepsLink(u8 *state)
 
 static bool32 LoadMapInStepsLocal(u8 *state, bool32 a2)
 {
-    SDL_Log("CAN MAPLOAD: LoadMapInStepsLocal - Step: %d", (int)*state);
     switch (*state)
     {
     case 0:
@@ -2401,7 +2363,6 @@ static bool32 LoadMapInStepsLocal(u8 *state, bool32 a2)
             (*state)++;
         break;
     case 13:
-        SDL_Log("CAN MAPLOAD: LoadMapInStepsLocal - Step finished!");
         return TRUE;
     }
 
@@ -2521,7 +2482,6 @@ static bool32 ReturnToFieldLink(u8 *state)
 
 static void DoMapLoadLoop(u8 *state)
 {
-    SDL_Log("CAN MAPLOAD: Entering DoMapLoadLoop");
     while (!LoadMapInStepsLocal(state, FALSE))
     {
 #if defined(__ANDROID__) || defined(__linux__) || defined(__APPLE__) || defined(_WIN32)
@@ -2530,7 +2490,6 @@ static void DoMapLoadLoop(u8 *state)
         ProcessDma3Requests();
 #endif
     }
-    SDL_Log("CAN MAPLOAD: Exiting DoMapLoadLoop");
 }
 
 static void ResetMirageTowerAndSaveBlockPtrs(void)
