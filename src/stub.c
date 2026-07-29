@@ -5,15 +5,14 @@
 #include <stdio.h>
 #include <string.h>
 
-// 彻底清除宏定义的物理函数
+// 清除宏定义的物理函数
 #undef RegisterRamReset
 #undef IntrMain
 
-// --- 1. 底层系统 ---
+// 底层系统 
 void RegisterRamReset(u32 resetFlags) { puts("RegisterRamReset stub"); }
 void IntrMain(void) { puts("IntrMain stub"); }
 
-// 确保 gInitialMainCB2 是正确的函数实体
 extern void CB2_InitCopyrightScreenAfterBootup(void);
 void gInitialMainCB2(void)
 {
@@ -23,11 +22,11 @@ void gInitialMainCB2(void)
 const u8 RomHeaderGameCode[4] = "BPEE";
 const u8 RomHeaderSoftwareVersion = 0;
 
-// --- 2. 内存与 Flash ---
+// 内存与 Flash 
 void ReInitializeEWRAM(void) {}
 u8 ProgramFlashSector_DUMMY(u16 sectorNum, u8 *src) { return 0; }
 
-// --- 3. 音频核心系统 (C 语言还原 m4a_1.s) ---
+// 音频 (C 语言还原 m4a_1.s) 
 u32 umul3232H32(u32 a, u32 b) { return (u32)(((u64)a * b) >> 32); }
 
 extern const u8 gClockTable[];
