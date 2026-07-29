@@ -43,10 +43,6 @@
 #include "load_save.h"
 #include "new_game.h"
 
-#ifdef PORTABLE
-extern void SDL_Log(const char *fmt, ...);
-#endif
-
 #define OPTION_MENU_FLAG (1 << 15)
 
 /*
@@ -453,15 +449,8 @@ void CB2_ReinitMainMenu(void)
 
 static u32 InitMainMenu(bool8 returningFromOptionsMenu)
 {
-#ifdef PORTABLE
-    SDL_Log("CAN DEBUG: [InitMainMenu] Entering InitMainMenu flow.");
-#endif
-
     if (gSaveBlock2Ptr == NULL)
     {
-#ifdef PORTABLE
-        SDL_Log("CAN DEBUG: [InitMainMenu] gSaveBlock2Ptr was NULL. Running Init.");
-#endif
         CheckForFlashMemory();
         SetSaveBlocksPointers(0);
         LoadGameSave(SAVE_NORMAL);
@@ -508,9 +497,6 @@ static u32 InitMainMenu(bool8 returningFromOptionsMenu)
     InitWindows(sWindowTemplates_MainMenu);
     DeactivateAllTextPrinters();
 
-#ifdef PORTABLE
-    SDL_Log("CAN DEBUG: [InitMainMenu] Loading window frame tiles...");
-#endif
     LoadMainMenuWindowFrameTiles(0, MAIN_MENU_BORDER_TILE);
 
     SetGpuReg(REG_OFFSET_WIN0H, 0);
@@ -528,9 +514,6 @@ static u32 InitMainMenu(bool8 returningFromOptionsMenu)
     ShowBg(0);
     HideBg(1);
     
-#ifdef PORTABLE
-    SDL_Log("CAN DEBUG: [InitMainMenu] Creating state machine Task...");
-#endif
     CreateTask(Task_MainMenuCheckSaveFile, 0);
 
     return 0;
@@ -551,9 +534,6 @@ static void Task_MainMenuCheckSaveFile(u8 taskId)
 
     if (!gPaletteFade.active)
     {
-#ifdef PORTABLE
-        SDL_Log("CAN DEBUG: [Task_MainMenuCheckSaveFile] Task running.");
-#endif
         SetGpuReg(REG_OFFSET_WIN0H, 0);
         SetGpuReg(REG_OFFSET_WIN0V, 0);
         SetGpuReg(REG_OFFSET_WININ, WININ_WIN0_BG0 | WININ_WIN0_OBJ);
@@ -562,7 +542,7 @@ static void Task_MainMenuCheckSaveFile(u8 taskId)
         SetGpuReg(REG_OFFSET_BLDALPHA, 0);
         SetGpuReg(REG_OFFSET_BLDY, 7);
 
-        // CAN FIX: 彻底注销硬件级的无线连接查询，防止其操作硬件I/O地址引发崩溃
+        // 注销硬件级的无线连接查询，防止其操作硬件I/O地址引发崩溃
         tWirelessAdapterConnected = FALSE;
 
         switch (gSaveFileStatus)
@@ -633,9 +613,6 @@ static void Task_MainMenuCheckBattery(u8 taskId)
 {
     if (!gPaletteFade.active)
     {
-#ifdef PORTABLE
-        SDL_Log("CAN DEBUG: [Task_MainMenuCheckBattery] Bypassing hardware battery test.");
-#endif
         SetGpuReg(REG_OFFSET_WIN0H, 0);
         SetGpuReg(REG_OFFSET_WIN0V, 0);
         SetGpuReg(REG_OFFSET_WININ, WININ_WIN0_BG0 | WININ_WIN0_OBJ);
@@ -666,9 +643,6 @@ static void Task_DisplayMainMenu(u8 taskId)
 
     if (!gPaletteFade.active)
     {
-#ifdef PORTABLE
-        SDL_Log("CAN DEBUG: [Task_DisplayMainMenu] Rendering Options now. tMenuType=%d", gTasks[taskId].tMenuType);
-#endif
         SetGpuReg(REG_OFFSET_WIN0H, 0);
         SetGpuReg(REG_OFFSET_WIN0V, 0);
         SetGpuReg(REG_OFFSET_WININ, WININ_WIN0_BG0 | WININ_WIN0_OBJ);
@@ -784,7 +758,7 @@ static void Task_DisplayMainMenu(u8 taskId)
             DrawMainMenuWindowBorder(&sWindowTemplates_MainMenu[5], MAIN_MENU_BORDER_TILE);
             DrawMainMenuWindowBorder(&sWindowTemplates_MainMenu[6], MAIN_MENU_BORDER_TILE);
             
-            // CAN FIX: 为确保极度安全，临时在 PORTABLE 环境下关闭这个也可能调用 Link 底层的指示箭头
+            // 为确保极度安全，临时在 PORTABLE 环境下关闭这个也可能调用 Link 底层的指示箭头
 #ifdef PORTABLE
             tScrollArrowTaskId = 0;
 #else
@@ -802,18 +776,12 @@ static void Task_DisplayMainMenu(u8 taskId)
             }
             break;
         }
-#ifdef PORTABLE
-        SDL_Log("CAN DEBUG: [Task_DisplayMainMenu] Rendering Done. Transition to highlight.");
-#endif
         gTasks[taskId].func = Task_HighlightSelectedMainMenuItem;
     }
 }
 
 static void Task_HighlightSelectedMainMenuItem(u8 taskId)
 {
-#ifdef PORTABLE
-    SDL_Log("CAN DEBUG: [Task_HighlightSelectedMainMenuItem] Selection: MenuType=%d, CurrItem=%d", gTasks[taskId].tMenuType, gTasks[taskId].tCurrItem);
-#endif
     HighlightSelectedMainMenuItem(gTasks[taskId].tMenuType, gTasks[taskId].tCurrItem, gTasks[taskId].tIsScrolled);
     gTasks[taskId].func = Task_HandleMainMenuInput;
 }
@@ -999,10 +967,6 @@ static void Task_HandleMainMenuAPressed(u8 taskId)
         }
         ChangeBgY(0, 0, BG_COORD_SET);
         ChangeBgY(1, 0, BG_COORD_SET);
-
-#ifdef PORTABLE
-        SDL_Log("CAN DEBUG: [Task_HandleMainMenuAPressed] Chosen action: %d", action);
-#endif
 
         switch (action)
         {
