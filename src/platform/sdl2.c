@@ -141,7 +141,7 @@ int main(int argc, char **argv)
 #endif
     if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO
 #ifdef __ANDROID__
-                | SDL_INIT_GAMECONTROLLER
+ SDL_INIT_GAMECONTROLLER
 #endif
                 ) < 0)
     {
@@ -269,8 +269,16 @@ int main(int argc, char **argv)
         SDL_FreeSurface(borderSurface);
     }
 #else
-    SDL_RenderSetLogicalSize(sdlRenderer, DISPLAY_WIDTH, DISPLAY_HEIGHT);
-    SDL_RenderSetIntegerScale(sdlRenderer, SDL_TRUE);
+    u8 scaleMode = sPlatformSettings[PLATFORM_SETTING_INTEGER_SCALE];
+    if (scaleMode == 2)
+    {
+        SDL_RenderSetLogicalSize(sdlRenderer, 0, 0);
+    }
+    else
+    {
+        SDL_RenderSetLogicalSize(sdlRenderer, DISPLAY_WIDTH, DISPLAY_HEIGHT);
+        SDL_RenderSetIntegerScale(sdlRenderer, scaleMode == 1 ? SDL_TRUE : SDL_FALSE);
+    }
 #endif
     ApplyPlatformSettings();
 
@@ -481,7 +489,7 @@ static void ReadConfigFile(void)
         else if (sscanf(line, "windowScale=%u", &value) == 1 && value >= 2 && value <= 5)
             sPlatformSettings[PLATFORM_SETTING_WINDOW_SCALE] = value;
         else if (sscanf(line, "integerScale=%u", &value) == 1)
-            sPlatformSettings[PLATFORM_SETTING_INTEGER_SCALE] = value != 0;
+            sPlatformSettings[PLATFORM_SETTING_INTEGER_SCALE] = value;
         else if (sscanf(line, "vsync=%u", &value) == 1)
             sPlatformSettings[PLATFORM_SETTING_VSYNC] = value != 0;
         else if (sscanf(line, "border=%u", &value) == 1)
@@ -618,6 +626,19 @@ void Platform_SetSetting(enum PlatformSetting setting, u8 value)
     {
         SDL_SetWindowSize(sdlWindow, 320 * value, 180 * value);
         SDL_SetWindowPosition(sdlWindow, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+    }
+#elif defined(__ANDROID__)
+    else if (setting == PLATFORM_SETTING_INTEGER_SCALE)
+    {
+        if (value == 2)
+        {
+            SDL_RenderSetLogicalSize(sdlRenderer, 0, 0);
+        }
+        else
+        {
+            SDL_RenderSetLogicalSize(sdlRenderer, DISPLAY_WIDTH, DISPLAY_HEIGHT);
+            SDL_RenderSetIntegerScale(sdlRenderer, value == 1 ? SDL_TRUE : SDL_FALSE);
+        }
     }
 #endif
     StoreConfigFile();

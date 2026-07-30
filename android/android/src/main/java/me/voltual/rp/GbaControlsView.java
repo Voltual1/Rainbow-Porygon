@@ -186,7 +186,7 @@ public final class GbaControlsView extends View {
         }
 
         int releasedPointer = event.getActionMasked() == MotionEvent.ACTION_UP
-                || event.getActionMasked() == MotionEvent.ACTION_POINTER_UP
+| event.getActionMasked() == MotionEvent.ACTION_POINTER_UP
                 ? event.getActionIndex() : -1;
         int next = 0;
         for (int i = 0; i < event.getPointerCount(); i++) {
@@ -212,27 +212,48 @@ public final class GbaControlsView extends View {
     }
 
     private void drawBorder(Canvas canvas) {
-        int scale = Math.max(1, Math.min(getWidth() / 240, getHeight() / 160));
-        int gameWidth = 240 * scale;
-        int gameHeight = 160 * scale;
+        int scaleSetting = getPlatformSetting(2); // PLATFORM_SETTING_INTEGER_SCALE
+        int gameWidth, gameHeight;
+        
+        if (scaleSetting == 1) {
+            int scale = Math.max(1, Math.min(getWidth() / 240, getHeight() / 160));
+            gameWidth = 240 * scale;
+            gameHeight = 160 * scale;
+        } else if (scaleSetting == 2) {
+            gameWidth = getWidth();
+            gameHeight = getHeight();
+        } else {
+            float scaleX = (float) getWidth() / 240f;
+            float scaleY = (float) getHeight() / 160f;
+            if (scaleX < scaleY) {
+                gameWidth = getWidth();
+                gameHeight = Math.round(getWidth() * 160f / 240f);
+            } else {
+                gameHeight = getHeight();
+                gameWidth = Math.round(getHeight() * 240f / 160f);
+            }
+        }
+
         int gameX = (getWidth() - gameWidth) / 2;
         int gameY = (getHeight() - gameHeight) / 2;
 
-        int backgroundOption = getBorderBackground();
-        if (backgroundOption < backgroundCount && backgrounds[backgroundOption] != null) {
-            Bitmap background = backgrounds[backgroundOption];
-            Rect output = new Rect(0, 0, getWidth(), getHeight());
-            Rect[] regions = {
-                    new Rect(0, 0, getWidth(), gameY),
-                    new Rect(0, gameY + gameHeight, getWidth(), getHeight()),
-                    new Rect(0, gameY, gameX, gameY + gameHeight),
-                    new Rect(gameX + gameWidth, gameY, getWidth(), gameY + gameHeight)
-            };
-            for (Rect region : regions) {
-                int state = canvas.save();
-                canvas.clipRect(region);
-                canvas.drawBitmap(background, null, output, borderPaint);
-                canvas.restoreToCount(state);
+        if (scaleSetting != 2) {
+            int backgroundOption = getBorderBackground();
+            if (backgroundOption < backgroundCount && backgrounds[backgroundOption] != null) {
+                Bitmap background = backgrounds[backgroundOption];
+                Rect output = new Rect(0, 0, getWidth(), getHeight());
+                Rect[] regions = {
+                        new Rect(0, 0, getWidth(), gameY),
+                        new Rect(0, gameY + gameHeight, getWidth(), getHeight()),
+                        new Rect(0, gameY, gameX, gameY + gameHeight),
+                        new Rect(gameX + gameWidth, gameY, getWidth(), gameY + gameHeight)
+                };
+                for (Rect region : regions) {
+                    int state = canvas.save();
+                    canvas.clipRect(region);
+                    canvas.drawBitmap(background, null, output, borderPaint);
+                    canvas.restoreToCount(state);
+                }
             }
         }
 
