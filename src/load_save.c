@@ -81,7 +81,8 @@ void SetSaveBlocksPointers(u16 offset)
 {
     struct SaveBlock1 **sav1_LocalVar = &gSaveBlock1Ptr;
 
-    offset = (offset + Random()) & (SAVEBLOCK_MOVE_RANGE - 4);
+    // 强制偏移为 0，关闭 ASLR 以防止在现代 64 位架构下出现结构体对齐偏差
+    offset = 0;
 
     gSaveBlock2Ptr = (void *)(&gSaveblock2) + offset;
     *sav1_LocalVar = (void *)(&gSaveblock1) + offset;
@@ -95,47 +96,23 @@ void MoveSaveBlocks_ResetHeap(void)
 {
     void *vblankCB, *hblankCB;
     u32 encryptionKey;
-    struct SaveBlock2 *saveBlock2Copy;
-    struct SaveBlock1 *saveBlock1Copy;
-    struct PokemonStorage *pokemonStorageCopy;
 
-    // save interrupt functions and turn them off
+    // 保存并关闭中断函数
     vblankCB = gMain.vblankCallback;
     hblankCB = gMain.hblankCallback;
     gMain.vblankCallback = NULL;
     gMain.hblankCallback = NULL;
     gTrainerHillVBlankCounter = NULL;
 
-    saveBlock2Copy = (struct SaveBlock2 *)(gHeap);
-    saveBlock1Copy = (struct SaveBlock1 *)(gHeap + sizeof(struct SaveBlock2));
-    pokemonStorageCopy = (struct PokemonStorage *)(gHeap + sizeof(struct SaveBlock2) + sizeof(struct SaveBlock1));
-
-    // backup the saves.
-    *saveBlock2Copy = *gSaveBlock2Ptr;
-    *saveBlock1Copy = *gSaveBlock1Ptr;
-    *pokemonStorageCopy = *gPokemonStoragePtr;
-
-    // change saveblocks' pointers
-    // argument is a sum of the individual trainerId bytes
-    SetSaveBlocksPointers(
-      saveBlock2Copy->playerTrainerId[0] +
-      saveBlock2Copy->playerTrainerId[1] +
-      saveBlock2Copy->playerTrainerId[2] +
-      saveBlock2Copy->playerTrainerId[3]);
-
-    // restore saveblock data since the pointers changed
-    *gSaveBlock2Ptr = *saveBlock2Copy;
-    *gSaveBlock1Ptr = *saveBlock1Copy;
-    *gPokemonStoragePtr = *pokemonStorageCopy;
-
-    // heap was destroyed in the copying process, so reset it
+    // 因为偏移量固定为0，指针不需要发生改变，所以我们不需要执行备份和恢复
+    // 这同时避免了膨胀后的结构体拷贝对 gHeap 造成的栈溢出风险
     InitHeap(gHeap, HEAP_SIZE);
 
-    // restore interrupt functions
+    // 恢复中断函数
     gMain.hblankCallback = hblankCB;
     gMain.vblankCallback = vblankCB;
 
-    // create a new encryption key
+    // 创建新的加密密钥并应用
     encryptionKey = Random32();
     ApplyNewEncryptionKeyToAllEncryptedData(encryptionKey);
     gSaveBlock2Ptr->encryptionKey = encryptionKey;
@@ -187,8 +164,6 @@ void LoadPlayerParty(void)
         u32 data;
         gParties[B_TRAINER_PLAYER][i] = *GetSavedPlayerPartyMon(i);
 
-        // TODO: Turn this into a save migration once those are available.
-        // At which point we can remove hp and status from Pokemon entirely.
         data = gParties[B_TRAINER_PLAYER][i].maxHP - gParties[B_TRAINER_PLAYER][i].hp;
         SetBoxMonData(&gParties[B_TRAINER_PLAYER][i].box, MON_DATA_HP_LOST, &data);
         data = gParties[B_TRAINER_PLAYER][i].status;
@@ -204,13 +179,9 @@ void SaveObjectEvents(void)
     for (i = 0; i < OBJECT_EVENTS_COUNT; i++)
     {
         gSaveBlock1Ptr->objectEvents[i] = gObjectEvents[i];
-        // Swap graphicsId bytes when saving and loading
-        // This keeps compatibility with vanilla,
-        // since the lower graphicsIds will be in the same place as vanilla
         graphicsId = gObjectEvents[i].graphicsId;
         gSaveBlock1Ptr->objectEvents[i].graphicsId = (graphicsId >> 8) | (graphicsId << 8);
-        gSaveBlock1Ptr->objectEvents[i].spriteId = 127; // magic number
-        // To avoid crash on vanilla, save follower as inactive
+        gSaveBlock1Ptr->objectEvents[i].spriteId = 127; 
         if (gObjectEvents[i].localId == OBJ_EVENT_ID_FOLLOWER)
             gSaveBlock1Ptr->objectEvents[i].active = FALSE;
     }
@@ -224,15 +195,11 @@ void LoadObjectEvents(void)
     for (i = 0; i < OBJECT_EVENTS_COUNT; i++)
     {
         gObjectEvents[i] = gSaveBlock1Ptr->objectEvents[i];
-        // Swap graphicsId bytes when saving and loading
-        // This keeps compatibility with vanilla,
-        // since the lower graphicsIds will be in the same place as vanilla
         graphicsId = gObjectEvents[i].graphicsId;
         gObjectEvents[i].graphicsId = (graphicsId >> 8) | (graphicsId << 8);
         if (gObjectEvents[i].spriteId != 127)
             gObjectEvents[i].graphicsId &= 0xFF;
         gObjectEvents[i].spriteId = 0;
-        // Try to restore saved inactive follower
         if (gObjectEvents[i].localId == OBJ_EVENT_ID_FOLLOWER &&
             !gObjectEvents[i].active &&
             gObjectEvents[i].graphicsId & OBJ_EVENT_MON)
@@ -257,10 +224,8 @@ void LoadPlayerBag(void)
 {
     int i;
 
-    // load player bag.
     memcpy(&gLoadedSaveData.bag, &gSaveBlock1Ptr->bag, sizeof(struct Bag));
 
-    // load mail.
     for (i = 0; i < MAIL_COUNT; i++)
         gLoadedSaveData.mail[i] = gSaveBlock1Ptr->mail[i];
 
@@ -272,17 +237,15 @@ void SavePlayerBag(void)
     int i;
     u32 encryptionKeyBackup;
 
-    // save player bag.
     memcpy(&gSaveBlock1Ptr->bag, &gLoadedSaveData.bag, sizeof(struct Bag));
 
-    // save mail.
     for (i = 0; i < MAIL_COUNT; i++)
         gSaveBlock1Ptr->mail[i] = gLoadedSaveData.mail[i];
 
     encryptionKeyBackup = gSaveBlock2Ptr->encryptionKey;
     gSaveBlock2Ptr->encryptionKey = gLastEncryptionKey;
     ApplyNewEncryptionKeyToBagItems(encryptionKeyBackup);
-    gSaveBlock2Ptr->encryptionKey = encryptionKeyBackup; // updated twice?
+    gSaveBlock2Ptr->encryptionKey = encryptionKeyBackup; 
 }
 
 void ApplyNewEncryptionKeyToHword(u16 *hWord, u32 newKey)

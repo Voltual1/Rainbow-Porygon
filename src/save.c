@@ -1,3 +1,42 @@
+// MIT License
+// 
+// Copyright (c) 2026 pokeemerald-multiplatform contributors
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of the original multiplatform-port modifications contributed through this
+// fork (the "Port Modifications"), to deal in the Port Modifications without
+// restriction, including without limitation the rights to use, copy, modify,
+// merge, publish, distribute, sublicense, and/or sell copies of the Port
+// Modifications, and to permit persons to whom the Port Modifications are
+// furnished to do so, subject to the following conditions:
+// 
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Port Modifications.
+// 
+// THE PORT MODIFICATIONS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO
+// EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+// OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+// FROM, OUT OF OR IN CONNECTION WITH THE PORT MODIFICATIONS OR THE USE OR OTHER
+// DEALINGS IN THE PORT MODIFICATIONS.
+// 
+// Scope
+// -----
+// 
+// This license applies only to original multiplatform-port modifications made by
+// contributors to this fork. It does not grant rights to, or relicense:
+// 
+// - The upstream pokeemerald decompilation or contributions from its authors.
+// - Pokemon Emerald, Pokemon characters, names, graphics, audio, story, or other
+//   copyrighted or trademarked material owned by Nintendo, Creatures Inc., GAME
+//   FREAK inc., or other respective owners.
+// - Third-party software included in this repository, which remains subject to
+//   its own license terms.
+// 
+// Users are responsible for determining which portions of a distribution are
+// covered by this license and for complying with all applicable third-party and
+// upstream terms.
 #include "global.h"
 #include "agb_flash.h"
 #include "gba/flash_internal.h"
@@ -882,7 +921,7 @@ static u8 GetSaveValidStatus(const struct SaveSectorLocation *locations)
     if (saveSlot1Status == SAVE_STATUS_OK && saveSlot2Status == SAVE_STATUS_OK)
     {
         if ((saveSlot1Counter == -1 && saveSlot2Counter ==  0)
-         || (saveSlot1Counter ==  0 && saveSlot2Counter == -1))
+|| (saveSlot1Counter ==  0 && saveSlot2Counter == -1))
         {
             if ((unsigned)(saveSlot1Counter + 1) < (unsigned)(saveSlot2Counter + 1))
                 gSaveCounter = saveSlot2Counter;
@@ -1135,57 +1174,9 @@ u8 LoadGameSave(u8 saveType)
 
 u16 GetSaveBlocksPointersBaseOffset(void)
 {
-    FILE *f = fopen(sSavePath, "rb");
-    if (f == NULL)
-        return 0;
-
-    struct ModernSaveHeader header;
-    if (fread(&header, sizeof(header), 1, f) != 1 || header.magic != MODERN_SAVE_MAGIC)
-    {
-        fclose(f);
-        if (gFlashMemoryPresent != TRUE)
-            return 0;
-        u16 i, slotOffset;
-        struct SaveSector *sector = gReadWriteSector = &gSaveDataBuffer;
-        UpdateSaveAddresses();
-        GetSaveValidStatus(gRamSaveSectorLocations);
-        slotOffset = NUM_SECTORS_PER_SLOT * (gSaveCounter % NUM_SAVE_SLOTS);
-        for (i = 0; i < NUM_SECTORS_PER_SLOT; i++)
-        {
-            ReadFlashSector(i + slotOffset, gReadWriteSector);
-            if (gReadWriteSector->id == SECTOR_ID_SAVEBLOCK2)
-                return sector->data[offsetof(struct SaveBlock2, playerTrainerId[0])] +
-                       sector->data[offsetof(struct SaveBlock2, playerTrainerId[1])] +
-                       sector->data[offsetof(struct SaveBlock2, playerTrainerId[2])] +
-                       sector->data[offsetof(struct SaveBlock2, playerTrainerId[3])];
-        }
-        return 0;
-    }
-
-    u16 offset = 0;
-    u32 i;
-    for (i = 0; i < header.numBlocks; i++)
-    {
-        struct ModernSaveBlockHeader blockHeader;
-        if (fread(&blockHeader, sizeof(blockHeader), 1, f) != 1)
-            break;
-
-        if (blockHeader.blockId == BLOCK_ID_SAVEBLOCK2)
-        {
-            struct SaveBlock2 sb2;
-            u32 readSize = min(blockHeader.size, (u32)sizeof(struct SaveBlock2));
-            fread(&sb2, readSize, 1, f);
-            offset = sb2.playerTrainerId[0] + sb2.playerTrainerId[1] + sb2.playerTrainerId[2] + sb2.playerTrainerId[3];
-            break;
-        }
-        else
-        {
-            fseek(f, blockHeader.size, SEEK_CUR);
-        }
-    }
-
-    fclose(f);
-    return offset;
+    // 在 Android/64位 平台原生移植中，为了彻底避免基于 32位 内存对齐和 ASLR 带来的数据偏移错位，
+    // 我们在此强制让所有的 BaseOffset 返回 0，与 load_save.c 中的逻辑保持一致。
+    return 0;
 }
 
 u32 TryReadSpecialSaveSector(u8 sector, u8 *dst)
