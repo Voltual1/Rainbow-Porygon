@@ -15,7 +15,7 @@ android {
         keystoreProperties.load(keystorePropertiesFile.inputStream())
     }
 
-    namespace = "me.voltual.vb"
+    namespace = "me.voltual.rp"
     compileSdk = 37
     ndkVersion = "29.0.14206865"
 
@@ -24,7 +24,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "me.voltual.vb"
+        applicationId = "me.voltual.rp"
         minSdk = 24
         targetSdk = 37
         versionCode = 1
