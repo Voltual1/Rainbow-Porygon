@@ -455,7 +455,6 @@ static void Task_ExitNonAnimDoor(u8 taskId)
 static void Task_ExitNonDoor(u8 taskId)
 {
     extern struct PaletteFadeControl gPaletteFade;
-            gTasks[taskId].tState, WaitForWeatherFadeIn(), gPaletteFade.active);
     switch (gTasks[taskId].tState)
     {
     case 0:
@@ -705,7 +704,6 @@ void Task_WarpAndLoadMap(u8 taskId)
 {
     struct Task *task = &gTasks[taskId];
 
-            task->tState, PaletteFadeActive(), BGMusicStopped());
     switch (task->tState)
     {
     case 0:
