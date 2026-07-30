@@ -5,6 +5,8 @@
     android:viewportWidth="2048"
     android:viewportHeight="2048">
     
+    <!-- Created with ImageToolbox version 4.1.0-foss -->
+    
     <!-- 使用 group 标签进行 0.55 倍等比居中收缩 -->
 	<group
 		android:scaleX="0.55"
