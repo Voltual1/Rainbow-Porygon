@@ -370,27 +370,17 @@ u8 *StringExpandPlaceholders(u8 *dest, const u8 *src)
             dest = StringExpandPlaceholders(dest, expandedString);
             break;
         case EXT_CTRL_CODE_BEGIN:
-            *dest++ = c;
-            c = *src++;
-            *dest++ = c;
-
-            switch (c)
             {
-            case EXT_CTRL_CODE_RESET_FONT:
-            case EXT_CTRL_CODE_PAUSE_UNTIL_PRESS:
-            case EXT_CTRL_CODE_FILL_WINDOW:
-            case EXT_CTRL_CODE_JPN:
-            case EXT_CTRL_CODE_ENG:
-            case EXT_CTRL_CODE_PAUSE_MUSIC:
-            case EXT_CTRL_CODE_RESUME_MUSIC:
-                break;
-            case EXT_CTRL_CODE_COLOR_HIGHLIGHT_SHADOW:
-            case EXT_CTRL_CODE_TEXT_COLORS:
-                *dest++ = *src++;
-            case EXT_CTRL_CODE_PLAY_BGM:
-                *dest++ = *src++;
-            default:
-                *dest++ = *src++;
+                u8 len;
+                *dest++ = c;
+                c = *src++;
+                *dest++ = c;
+                len = GetExtCtrlCodeLength(c);
+                while (len > 1)
+                {
+                    *dest++ = *src++;
+                    len--;
+                }
             }
             break;
         case EOS:
