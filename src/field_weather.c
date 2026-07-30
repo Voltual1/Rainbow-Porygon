@@ -280,7 +280,6 @@ static void Task_WeatherInit(u8 taskId)
 {
     // Waits until it's ok to initialize weather.
     // When the screen fades in, this is set to TRUE.
-            gWeatherPtr->readyForInit, gWeatherPtr->currWeather);
     if (gWeatherPtr->readyForInit)
     {
         UpdateCameraPanning();
@@ -291,11 +290,6 @@ static void Task_WeatherInit(u8 taskId)
 
 static void Task_WeatherMain(u8 taskId)
 {
-    if (gWeatherPtr->palProcessingState != WEATHER_PAL_STATE_IDLE)
-    {
-                gWeatherPtr->palProcessingState, gWeatherPtr->currWeather, gWeatherPtr->nextWeather);
-    }
-
     if (gWeatherPtr->currWeather != gWeatherPtr->nextWeather)
     {
         if (!sWeatherFuncs[gWeatherPtr->currWeather].finish()
@@ -365,8 +359,6 @@ static void FadeInScreenWithWeather(void)
 {
     if (++gWeatherPtr->fadeInTimer > 1)
         gWeatherPtr->fadeInFirstFrame = FALSE;
-
-            gWeatherPtr->currWeather, gPaletteFade.active, gWeatherPtr->fadeInTimer);
 
     switch (gWeatherPtr->currWeather)
     {
