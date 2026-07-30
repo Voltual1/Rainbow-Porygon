@@ -128,7 +128,6 @@ static void DrawTouchControls(void);
 
 int main(int argc, char **argv)
 {
-    // Open an output console on Windows
 #ifdef _WIN32
     AllocConsole() ;
     AttachConsole( GetCurrentProcessId() ) ;
@@ -293,20 +292,19 @@ int main(int argc, char **argv)
 
     SDL_AudioSpec want;
 
-    SDL_memset(&want, 0, sizeof(want)); /* or SDL_zero(want) */
+    SDL_memset(&want, 0, sizeof(want));
     want.freq = 42060;
     want.format = AUDIO_F32;
     want.channels = 2;
     want.samples = 1024;
     cgb_audio_init(want.freq);
 
-
     sdlAudioDevice = SDL_OpenAudioDevice(NULL, 0, &want, NULL, 0);
     if (sdlAudioDevice == 0)
         SDL_Log("Failed to open audio: %s", SDL_GetError());
     else
     {
-        if (want.format != AUDIO_F32) /* we let this one thing change. */
+        if (want.format != AUDIO_F32)
             SDL_Log("We didn't get Float32 audio format.");
         SDL_PauseAudioDevice(sdlAudioDevice, 0);
     }
@@ -327,7 +325,7 @@ int main(int argc, char **argv)
 
         if (!paused)
         {
-            double dt = fixedTimestep / timeScale; // TODO: Fix speedup
+            double dt = fixedTimestep / timeScale;
 
             curGameTime = SDL_GetPerformanceCounter();
             double deltaTime = (double)((curGameTime - lastGameTime) / (double)SDL_GetPerformanceFrequency());
@@ -417,7 +415,6 @@ int main(int argc, char **argv)
 #endif
     }
 
-    //StoreSaveFile();
     CloseSaveFile();
 
 #if defined(NATIVE_LINUX) || defined(_WIN32)
@@ -435,7 +432,6 @@ int main(int argc, char **argv)
 
 static void ReadSaveFile(const char *path)
 {
-    // Check whether the saveFile exists, and create it if not
     sSaveFile = fopen(path, "r+b");
     if (sSaveFile == NULL)
     {
@@ -453,13 +449,10 @@ static void ReadSaveFile(const char *path)
     int fileSize = ftell(sSaveFile);
     fseek(sSaveFile, 0, SEEK_SET);
 
-    // Only read as many bytes as fit inside the buffer
-    // or as many bytes as are in the file
     int bytesToRead = (fileSize < sizeof(FLASH_BASE)) ? fileSize : sizeof(FLASH_BASE);
 
     int bytesRead = fread(FLASH_BASE, 1, bytesToRead, sSaveFile);
 
-    // Fill the buffer if the savefile was just created or smaller than the buffer itself
     for (int i = bytesRead; i < sizeof(FLASH_BASE); i++)
     {
         FLASH_BASE[i] = 0xFF;
@@ -631,19 +624,19 @@ void Platform_SetSetting(enum PlatformSetting setting, u8 value)
 }
 
 #ifdef __ANDROID__
-JNIEXPORT jint JNICALL Java_com_pokeemerald_experimental_GbaControlsView_getBorderBackground(JNIEnv *env, jclass clazz)
+// Modified native JNI signature here to match the target package (me.voltual.rp)
+JNIEXPORT jint JNICALL Java_me_voltual_rp_GbaControlsView_getBorderBackground(JNIEnv *env, jclass clazz)
 {
     return Platform_GetBorderBackground();
 }
 
-JNIEXPORT jint JNICALL Java_com_pokeemerald_experimental_GbaControlsView_getPlatformSetting(JNIEnv *env, jclass clazz, jint setting)
+JNIEXPORT jint JNICALL Java_me_voltual_rp_GbaControlsView_getPlatformSetting(JNIEnv *env, jclass clazz, jint setting)
 {
     if (setting < 0 || setting >= PLATFORM_SETTING_COUNT)
         return 0;
     return Platform_GetSetting(setting);
 }
 #endif
-
 
 static void CloseSaveFile()
 {
@@ -653,7 +646,6 @@ static void CloseSaveFile()
     }
 }
 
-// Key mappings
 #define KEY_A_BUTTON      SDLK_z
 #define KEY_B_BUTTON      SDLK_x
 #define KEY_START_BUTTON  SDLK_RETURN
@@ -1043,19 +1035,17 @@ u16 GetXInputKeys()
 
     if (dwResult == ERROR_SUCCESS)
     {
-        /* A */      xinputKeys |= (state.Gamepad.wButtons & XINPUT_GAMEPAD_A) >> 12;
-        /* B */      xinputKeys |= (state.Gamepad.wButtons & XINPUT_GAMEPAD_X) >> 13;
-        /* Start */  xinputKeys |= (state.Gamepad.wButtons & XINPUT_GAMEPAD_START) >> 1;
-        /* Select */ xinputKeys |= (state.Gamepad.wButtons & XINPUT_GAMEPAD_BACK) >> 3;
-        /* L */      xinputKeys |= (state.Gamepad.wButtons & XINPUT_GAMEPAD_LEFT_SHOULDER) << 1;
-        /* R */      xinputKeys |= (state.Gamepad.wButtons & XINPUT_GAMEPAD_RIGHT_SHOULDER) >> 1;
-        /* Up */     xinputKeys |= (state.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_UP) << 6;
-        /* Down */   xinputKeys |= (state.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_DOWN) << 6;
-        /* Left */   xinputKeys |= (state.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_LEFT) << 3;
-        /* Right */  xinputKeys |= (state.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_RIGHT) << 1;
+        xinputKeys |= (state.Gamepad.wButtons & XINPUT_GAMEPAD_A) >> 12;
+        xinputKeys |= (state.Gamepad.wButtons & XINPUT_GAMEPAD_B) >> 13;
+        xinputKeys |= (state.Gamepad.wButtons & XINPUT_GAMEPAD_START) >> 1;
+        xinputKeys |= (state.Gamepad.wButtons & XINPUT_GAMEPAD_BACK) >> 3;
+        xinputKeys |= (state.Gamepad.wButtons & XINPUT_GAMEPAD_LEFT_SHOULDER) << 1;
+        xinputKeys |= (state.Gamepad.wButtons & XINPUT_GAMEPAD_RIGHT_SHOULDER) >> 1;
+        xinputKeys |= (state.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_UP) << 6;
+        xinputKeys |= (state.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_DOWN) << 6;
+        xinputKeys |= (state.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_LEFT) << 3;
+        xinputKeys |= (state.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_RIGHT) << 1;
 
-
-        /* Control Stick */
         float xAxis = (float)state.Gamepad.sThumbLX / (float)SHRT_MAX;
         float yAxis = (float)state.Gamepad.sThumbLY / (float)SHRT_MAX;
 
@@ -1064,9 +1054,6 @@ u16 GetXInputKeys()
         if (yAxis < -STICK_THRESHOLD) xinputKeys |= DPAD_DOWN;
         if (yAxis >  STICK_THRESHOLD) xinputKeys |= DPAD_UP;
 
-
-        /* Speedup */
-        // Note: 'speedup' variable is only (un)set on keyboard input
         double oldTimeScale = timeScale;
         timeScale = (state.Gamepad.bRightTrigger > 0x80 || speedUp) ? 5.0 : 1.0;
 
@@ -1086,7 +1073,7 @@ u16 GetXInputKeys()
 
     return xinputKeys;
 }
-#endif // _WIN32
+#endif
 
 u16 Platform_GetKeyInput(void)
 {
@@ -1116,7 +1103,7 @@ void VDraw(SDL_Texture *texture)
         image[i] = 0xFF000000 | (r << 16) | (g << 8) | b;
     }
     SDL_UpdateTexture(texture, NULL, image, DISPLAY_WIDTH * sizeof(Uint32));
-    REG_VCOUNT = 161; // prep for being in VBlank period
+    REG_VCOUNT = 161;
 }
 
 int DoMain(void *data)

@@ -1,0 +1,75 @@
+//Copyright (C) 2025 Voltual
+// 本程序是自由软件：你可以根据自由软件基金会发布的 GNU 通用公共许可证第3版
+//（或任意更新的版本）的条款重新分发和/或修改它。
+//本程序是基于希望它有用而分发的，但没有任何担保；甚至没有适销性或特定用途适用性的隐含担保。
+// 有关更多细节，请参阅 GNU 通用公共许可证。
+//
+// 你应该已经收到了一份 GNU 通用公共许可证的副本
+// 如果没有，请查阅 <http://www.gnu.org/licenses/>.
+
+package me.voltual.rp
+
+import android.os.Bundle
+import androidx.activity.compose.setContent
+import androidx.compose.runtime.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import me.voltual.rp.data.UserAgreementDataStore
+import me.voltual.rp.core.database.entity.LogEntry
+import me.voltual.rp.core.database.dao.LogDao
+import me.voltual.rp.ui.*
+import org.koin.android.ext.android.inject
+
+class MainActivity : PokeEmeraldActivity() {
+    private val agreementDataStore: UserAgreementDataStore by inject()    
+    
+    override fun onCreate(savedInstanceState: Bundle?) {
+        setTheme(R.style.Theme_BBQ_Main)
+        super.onCreate(savedInstanceState)
+
+        setContent {
+            PyrolysisApp(
+                agreementDataStore = agreementDataStore,
+                platformEntryProvider = { _, _ -> null }
+            )
+        }
+    }
+
+    init {
+        Thread.setDefaultUncaughtExceptionHandler { _, throwable ->
+            val crashReport = getCrashReport(throwable)
+            val logDao: LogDao by inject()
+            CoroutineScope(Dispatchers.IO).launch {
+                val logEntry = LogEntry(
+                    type = "CRASH",
+                    requestBody = "MainActivity 崩溃",
+                    responseBody = crashReport,
+                    status = "FAILURE"
+                )
+                logDao.insert(logEntry)
+            }.invokeOnCompletion {
+                CrashLogActivity.start(BBQApplication.instance, crashReport)
+                android.os.Process.killProcess(android.os.Process.myPid())
+            }
+        }
+    }
+    
+    private fun getCrashReport(throwable: Throwable): String {
+        val stackTrace = throwable.stackTraceToString()
+        val deviceInfo = """
+            设备型号: ${android.os.Build.MODEL}
+            Android 版本: ${android.os.Build.VERSION.RELEASE}
+            App 版本: ${BuildConfig.VERSION_NAME}
+        """.trimIndent()
+        return """
+            崩溃信息: ${throwable.message}
+            
+            设备信息:
+            $deviceInfo
+            
+            堆栈跟踪:
+            $stackTrace
+        """.trimIndent()
+    }
+}
