@@ -44,8 +44,6 @@
 #include "fldeff.h"
 #include "battle.h"
 
-extern void SDL_Log(const char *fmt, ...);
-
 static void Task_ExitNonAnimDoor(u8);
 static void Task_ExitNonDoor(u8);
 static void Task_DoContestHallWarp(u8);
@@ -96,16 +94,13 @@ static void FillPalBufferBlack(void)
 void WarpFadeInScreen(void)
 {
     enum MapType previousMapType = GetLastUsedWarpMapType();
-    SDL_Log("CAN DEBUG: WarpFadeInScreen - previousMapType: %d, currentMapType: %d", previousMapType, GetCurrentMapType());
     switch (GetMapPairFadeFromType(previousMapType, GetCurrentMapType()))
     {
     case 0:
-        SDL_Log("CAN DEBUG: WarpFadeInScreen - calling FadeScreen FADE_FROM_BLACK");
         FillPalBufferBlack();
         FadeScreen(FADE_FROM_BLACK, 0);
         break;
     case 1:
-        SDL_Log("CAN DEBUG: WarpFadeInScreen - calling FadeScreen FADE_FROM_WHITE");
         FillPalBufferWhite();
         FadeScreen(FADE_FROM_WHITE, 0);
     }
@@ -113,14 +108,12 @@ void WarpFadeInScreen(void)
 
 void FadeInFromWhite(void)
 {
-    SDL_Log("CAN DEBUG: FadeInFromWhite");
     FillPalBufferWhite();
     FadeScreen(FADE_FROM_WHITE, 8);
 }
 
 void FadeInFromBlack(void)
 {
-    SDL_Log("CAN DEBUG: FadeInFromBlack");
     FillPalBufferBlack();
     FadeScreen(FADE_FROM_BLACK, 0);
 }
@@ -128,7 +121,6 @@ void FadeInFromBlack(void)
 void WarpFadeOutScreen(void)
 {
     enum MapType currentMapType = GetCurrentMapType();
-    SDL_Log("CAN DEBUG: WarpFadeOutScreen - currentMapType: %d, destMapType: %d", currentMapType, GetDestinationWarpMapHeader()->mapType);
     switch (GetMapPairFadeToType(currentMapType, GetDestinationWarpMapHeader()->mapType))
     {
     case 0:
@@ -289,25 +281,20 @@ static void SetUpWarpExitTask(void)
 
     PlayerGetDestCoords(&x, &y);
     behavior = MapGridGetMetatileBehaviorAt(x, y);
-    SDL_Log("CAN DEBUG: SetUpWarpExitTask - behavior: %d at coords (%d, %d)", behavior, x, y);
     if (MetatileBehavior_IsDoor(behavior) == TRUE)
     {
-        SDL_Log("CAN DEBUG: SetUpWarpExitTask - Selecting Task_ExitDoor");
         func = Task_ExitDoor;
     }
     else if (MetatileBehavior_IsDirectionalStairWarp(behavior) == TRUE && !gExitStairsMovementDisabled)
     {
-        SDL_Log("CAN DEBUG: SetUpWarpExitTask - Selecting Task_ExitStairs");
         func = Task_ExitStairs;
     }
     else if (MetatileBehavior_IsNonAnimDoor(behavior) == TRUE)
     {
-        SDL_Log("CAN DEBUG: SetUpWarpExitTask - Selecting Task_ExitNonAnimDoor");
         func = Task_ExitNonAnimDoor;
     }
     else
     {
-        SDL_Log("CAN DEBUG: SetUpWarpExitTask - Selecting Task_ExitNonDoor");
         func = Task_ExitNonDoor;
     }
 
@@ -317,7 +304,6 @@ static void SetUpWarpExitTask(void)
 
 void FieldCB_DefaultWarpExit(void)
 {
-    SDL_Log("CAN DEBUG: FieldCB_DefaultWarpExit called");
     Overworld_PlaySpecialMapMusic();
     WarpFadeInScreen();
     SetUpWarpExitTask();
@@ -327,7 +313,6 @@ void FieldCB_DefaultWarpExit(void)
 
 void FieldCB_WarpExitFadeFromWhite(void)
 {
-    SDL_Log("CAN DEBUG: FieldCB_WarpExitFadeFromWhite called");
     Overworld_PlaySpecialMapMusic();
     FadeInFromWhite();
     SetUpWarpExitTask();
@@ -336,7 +321,6 @@ void FieldCB_WarpExitFadeFromWhite(void)
 
 void FieldCB_WarpExitFadeFromBlack(void)
 {
-    SDL_Log("CAN DEBUG: FieldCB_WarpExitFadeFromBlack called");
     if (!OnTrainerHillEReaderChallengeFloor()) // always false
         Overworld_PlaySpecialMapMusic();
     FadeInFromBlack();
@@ -346,7 +330,6 @@ void FieldCB_WarpExitFadeFromBlack(void)
 
 static void FieldCB_SpinEnterWarp(void)
 {
-    SDL_Log("CAN DEBUG: FieldCB_SpinEnterWarp called");
     Overworld_PlaySpecialMapMusic();
     WarpFadeInScreen();
     PlaySE(SE_WARP_OUT);
@@ -356,7 +339,6 @@ static void FieldCB_SpinEnterWarp(void)
 
 static void FieldCB_MossdeepGymWarpExit(void)
 {
-    SDL_Log("CAN DEBUG: FieldCB_MossdeepGymWarpExit called");
     Overworld_PlaySpecialMapMusic();
     WarpFadeInScreen();
     PlaySE(SE_WARP_OUT);
@@ -371,7 +353,6 @@ static void Task_ExitDoor(u8 taskId)
     s16 *x = &task->data[2];
     s16 *y = &task->data[3];
 
-    SDL_Log("CAN DEBUG: Task_ExitDoor - state: %d", task->tState);
     switch (task->tState)
     {
     case 0:
@@ -427,7 +408,6 @@ static void Task_ExitNonAnimDoor(u8 taskId)
     s16 *x = &task->data[2];
     s16 *y = &task->data[3];
 
-    SDL_Log("CAN DEBUG: Task_ExitNonAnimDoor - state: %d", task->tState);
     switch (task->tState)
     {
     case 0:
@@ -475,7 +455,6 @@ static void Task_ExitNonAnimDoor(u8 taskId)
 static void Task_ExitNonDoor(u8 taskId)
 {
     extern struct PaletteFadeControl gPaletteFade;
-    SDL_Log("CAN DEBUG: Task_ExitNonDoor - state: %d, WaitForWeatherFadeIn(): %d, gPaletteFade.active: %d", 
             gTasks[taskId].tState, WaitForWeatherFadeIn(), gPaletteFade.active);
     switch (gTasks[taskId].tState)
     {
@@ -487,7 +466,6 @@ static void Task_ExitNonDoor(u8 taskId)
     case 1:
         if (WaitForWeatherFadeIn())
         {
-            SDL_Log("CAN DEBUG: Task_ExitNonDoor state 1 - WaitForWeatherFadeIn completed! Unfreezing object events");
             UnfreezeObjectEvents();
             // Don't unlock controls until the map preview has finished.
             if (!FadeInMapPreviewScreenIsRunning())
@@ -561,7 +539,6 @@ static bool32 WaitForWeatherFadeIn(void)
 
 void DoWarp(void)
 {
-    SDL_Log("CAN DEBUG: DoWarp called");
     LockPlayerFieldControls();
     TryFadeOutOldMapMusic();
     WarpFadeOutScreen();
@@ -573,7 +550,6 @@ void DoWarp(void)
 
 void DoDiveWarp(void)
 {
-    SDL_Log("CAN DEBUG: DoDiveWarp called");
     LockPlayerFieldControls();
     TryFadeOutOldMapMusic();
     WarpFadeOutScreen();
@@ -585,7 +561,6 @@ void DoDiveWarp(void)
 
 void DoWhiteFadeWarp(void)
 {
-    SDL_Log("CAN DEBUG: DoWhiteFadeWarp called");
     LockPlayerFieldControls();
     TryFadeOutOldMapMusic();
     FadeScreen(FADE_TO_WHITE, 8);
@@ -596,7 +571,6 @@ void DoWhiteFadeWarp(void)
 
 void DoDoorWarp(void)
 {
-    SDL_Log("CAN DEBUG: DoDoorWarp called");
     LockPlayerFieldControls();
     gFieldCallback = FieldCB_DefaultWarpExit;
     CreateTask(Task_DoDoorWarp, 10);
@@ -604,28 +578,24 @@ void DoDoorWarp(void)
 
 void DoFallWarp(void)
 {
-    SDL_Log("CAN DEBUG: DoFallWarp called");
     DoDiveWarp();
     gFieldCallback = FieldCB_FallWarpExit;
 }
 
 void DoEscalatorWarp(u8 metatileBehavior)
 {
-    SDL_Log("CAN DEBUG: DoEscalatorWarp called");
     LockPlayerFieldControls();
     StartEscalatorWarp(metatileBehavior, 10);
 }
 
 void DoLavaridgeGymB1FWarp(void)
 {
-    SDL_Log("CAN DEBUG: DoLavaridgeGymB1FWarp called");
     LockPlayerFieldControls();
     StartLavaridgeGymB1FWarp(10);
 }
 
 void DoLavaridgeGym1FWarp(void)
 {
-    SDL_Log("CAN DEBUG: DoLavaridgeGym1FWarp called");
     LockPlayerFieldControls();
     StartLavaridgeGym1FWarp(10);
 }
@@ -635,7 +605,6 @@ void DoLavaridgeGym1FWarp(void)
 // Used by teleporting tiles, e.g. in Aqua Hideout (For the move Teleport see FldEff_TeleportWarpOut)
 void DoTeleportTileWarp(void)
 {
-    SDL_Log("CAN DEBUG: DoTeleportTileWarp called");
     LockPlayerFieldControls();
     TryFadeOutOldMapMusic();
     WarpFadeOutScreen();
@@ -646,7 +615,6 @@ void DoTeleportTileWarp(void)
 
 void DoMossdeepGymWarp(void)
 {
-    SDL_Log("CAN DEBUG: DoMossdeepGymWarp called");
     SetObjectEventLoadFlag(SKIP_OBJECT_EVENT_LOAD);
     LockPlayerFieldControls();
     SaveObjectEvents();
@@ -660,7 +628,6 @@ void DoMossdeepGymWarp(void)
 
 void DoPortholeWarp(void)
 {
-    SDL_Log("CAN DEBUG: DoPortholeWarp called");
     LockPlayerFieldControls();
     WarpFadeOutScreen();
     CreateTask(Task_WarpAndLoadMap, 10);
@@ -691,7 +658,6 @@ static void Task_DoCableClubWarp(u8 taskId)
 
 void DoCableClubWarp(void)
 {
-    SDL_Log("CAN DEBUG: DoCableClubWarp called");
     LockPlayerFieldControls();
     TryFadeOutOldMapMusic();
     WarpFadeOutScreen();
@@ -739,7 +705,6 @@ void Task_WarpAndLoadMap(u8 taskId)
 {
     struct Task *task = &gTasks[taskId];
 
-    SDL_Log("CAN DEBUG: Task_WarpAndLoadMap - state: %d, PaletteFadeActive(): %d, BGMusicStopped(): %d", 
             task->tState, PaletteFadeActive(), BGMusicStopped());
     switch (task->tState)
     {
@@ -789,7 +754,6 @@ void Task_DoDoorWarp(u8 taskId)
     u8 followerObjId = GetFollowerNPCObjectId();
     struct ObjectEvent *followerObject = GetFollowerObject();
 
-    SDL_Log("CAN DEBUG: Task_DoDoorWarp - state: %d", task->tState);
     switch (task->tState)
     {
     case DOORWARP_OPEN_DOOR:
@@ -888,7 +852,6 @@ static void Task_DoContestHallWarp(u8 taskId)
 
 void DoContestHallWarp(void)
 {
-    SDL_Log("CAN DEBUG: DoContestHallWarp called");
     LockPlayerFieldControls();
     TryFadeOutOldMapMusic();
     WarpFadeOutScreen();
