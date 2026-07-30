@@ -1,8 +1,9 @@
 <resources>
     <style name="Theme.BBQ.Launcher" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="android:windowBackground">@drawable/splash_xml</item>
+        <item name="android:windowBackground">@drawable/splash_polygon</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
+        <!-- 夜间模式状态栏图标保持浅色 -->
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowTranslucentStatus">true</item>
     </style>
@@ -10,6 +11,6 @@
     <style name="Theme.BBQ.Main" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:windowLightStatusBar">false</item>        
-        </style>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
 </resources>

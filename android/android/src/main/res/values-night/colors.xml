@@ -1,4 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="icon_background">#FFC0C1FF</color>
-    <color name="onPrimaryContainer">#FFA3A7FF</color>
+    <!-- 对应 Color.kt 中的 backgroundDark -->
+    <color name="icon_background">#121318</color>
+    <!-- 对应 Color.kt 中的 onPrimaryContainerDark -->
+    <color name="onPrimaryContainer">#DDE1FF</color>
+    <!-- 启动页背景色 -->
+    <color name="splash_background">#121318</color>
 </resources>
