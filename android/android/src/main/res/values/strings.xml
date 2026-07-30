@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_license">GNU General Public License v3.0</string>
-    <string name="app_name">Vector-Breakthrough</string>  
+    <string name="app_name">Rainbow-Porygon</string>  
         <string name="failed_to_get_update_info">获取更新信息失败</string>
         <string name="open_drawer">打开菜单</string>
             <string name="check_update_failed">检查更新失败</string>
