@@ -67,6 +67,31 @@
 #include "constants/event_objects.h"
 #include "constants/map_types.h"
 #include "constants/party_menu.h"
+#include <stdio.h>
+
+extern void SDL_Log(const char *fmt, ...);
+
+static void HexDumpPokemonText(const char *label, const u8 *src)
+{
+    if (src == NULL)
+    {
+        SDL_Log("%s: NULL pointer", label);
+        return;
+    }
+    char buf[512];
+    int len = 0;
+    int i;
+    len += sprintf(buf + len, "%s [ptr=%p]: ", label, src);
+    for (i = 0; i < 64; i++)
+    {
+        len += sprintf(buf + len, "%02X ", src[i]);
+        if (src[i] == EOS)
+        {
+            break;
+        }
+    }
+    SDL_Log("%s", buf);
+}
 
 typedef u16 (*SpecialFunc)(void);
 typedef void (*NativeFunc)(struct ScriptContext *ctx);
@@ -404,7 +429,6 @@ bool8 ScrCmd_setptr(struct ScriptContext *ctx)
 {
     u8 value = ScriptReadByte(ctx);
 
-    // TODO: Check if 'ptr' is within a save block?
     Script_RequestEffects(SCREFF_V1 | SCREFF_SAVE);
 
     *(u8 *)ScriptReadWord(ctx) = value;
@@ -425,7 +449,6 @@ bool8 ScrCmd_setptrbyte(struct ScriptContext *ctx)
 {
     u8 index = ScriptReadByte(ctx);
 
-    // TODO: Check if 'ptr' is within a save block?
     Script_RequestEffects(SCREFF_V1 | SCREFF_SAVE);
 
     *(u8 *)ScriptReadWord(ctx) = ctx->data[index];
@@ -447,7 +470,6 @@ bool8 ScrCmd_copybyte(struct ScriptContext *ctx)
 {
     u8 *ptr = (u8 *)ScriptReadWord(ctx);
 
-    // TODO: Check if 'ptr' is within a save block?
     Script_RequestEffects(SCREFF_V1 | SCREFF_SAVE);
 
     *ptr = *(const u8 *)ScriptReadWord(ctx);
@@ -587,9 +609,6 @@ bool8 ScrCmd_compare_var_to_var(struct ScriptContext *ctx)
     return FALSE;
 }
 
-// Note: addvar doesn't support adding from a variable in vanilla. If you were to
-// add a VarGet() to the above, make sure you change the `addvar VAR_*, -1`
-// in the contest scripts to `subvar VAR_*, 1`, else contests will break.
 bool8 ScrCmd_addvar(struct ScriptContext *ctx)
 {
     u32 varId = ScriptReadHalfword(ctx);
@@ -807,7 +826,6 @@ static bool8 IsPaletteNotActive(void)
         return FALSE;
 }
 
-// pauses script until palette fade inactive
 bool8 ScrFunc_WaitPaletteNotActive(struct ScriptContext *ctx)
 {
     SetupNativeScript(ctx, IsPaletteNotActive);
@@ -850,8 +868,6 @@ bool8 ScrCmd_fadescreenswapbuffers(struct ScriptContext *ctx)
         SetGpuReg(REG_OFFSET_BLDALPHA, BLDALPHA_BLEND(0, 0));
         break;
     case FADE_FROM_WHITE:
-        // Restore last weather blend before fading in,
-        // since BLDALPHA was modified by fade-out
         SetGpuReg(REG_OFFSET_BLDALPHA,
                   BLDALPHA_BLEND(gWeatherPtr->currBlendEVA, gWeatherPtr->currBlendEVB));
         break;
@@ -1035,7 +1051,6 @@ bool8 ScrCmd_warphole(struct ScriptContext *ctx)
     return TRUE;
 }
 
-// RS mossdeep gym warp, unused in Emerald
 bool8 ScrCmd_warpteleport(struct ScriptContext *ctx)
 {
     u8 mapGroup = ScriptReadByte(ctx);
@@ -1283,8 +1298,7 @@ struct ObjectEvent *ScriptHideFollower(void)
         return NULL;
 
     ClearObjectEventMovement(obj, &gSprites[obj->spriteId]);
-    gSprites[obj->spriteId].animCmdIndex = 0; // Reset start frame of animation
-    // Note: ScriptMovement_ returns TRUE on error
+    gSprites[obj->spriteId].animCmdIndex = 0;
     if (ScriptMovement_StartObjectMovementScript(obj->localId, obj->mapGroup, obj->mapNum, EnterPokeballMovement))
         return NULL;
     return obj;
@@ -1298,12 +1312,11 @@ bool8 ScrCmd_applymovement(struct ScriptContext *ctx)
 
     Script_RequestEffects(SCREFF_V1 | SCREFF_HARDWARE);
 
-    // When applying script movements to follower, it may have frozen animation that must be cleared
     if ((localId == OBJ_EVENT_ID_FOLLOWER && (objEvent = GetFollowerObject()) && objEvent->frozen)
 || ((objEvent = &gObjectEvents[GetObjectEventIdByLocalId(localId)]) && IS_OW_MON_OBJ(objEvent)))
     {
         ClearObjectEventMovement(objEvent, &gSprites[objEvent->spriteId]);
-        gSprites[objEvent->spriteId].animCmdIndex = 0; // Reset start frame of animation
+        gSprites[objEvent->spriteId].animCmdIndex = 0;
     }
 
     gObjectEvents[GetObjectEventIdByLocalId(localId)].directionOverwrite = DIR_NONE;
@@ -1338,8 +1351,6 @@ static bool8 WaitForMovementFinish(void)
     if (ScriptMovement_IsObjectMovementFinished(sMovingNpcId, sMovingNpcMapNum, sMovingNpcMapGroup))
     {
         struct ObjectEvent *objEvent = GetFollowerObject();
-        // If the follower is still entering the pokeball, wait for it to finish too
-        // This prevents a `release` after this script command from getting the follower stuck in an intermediate state
         if (sMovingNpcId != OBJ_EVENT_ID_FOLLOWER && objEvent && ObjectEventGetHeldMovementActionId(objEvent) == MOVEMENT_ACTION_ENTER_POKEBALL)
             return ScriptMovement_IsObjectMovementFinished(objEvent->localId, objEvent->mapNum, objEvent->mapGroup);
         return TRUE;
@@ -1443,7 +1454,6 @@ bool8 ScrCmd_setobjectxy(struct ScriptContext *ctx)
 
     Script_RequestEffects(SCREFF_V1 | SCREFF_HARDWARE);
 
-    // Don't do follower NPC post-warp position set after setobjectxy.
     if (localId == OBJ_EVENT_ID_NPC_FOLLOWER)
         SetFollowerNPCData(FNPC_DATA_COME_OUT_DOOR, FNPC_DOOR_NO_POS_SET);
 
@@ -1603,8 +1613,6 @@ bool8 ScrCmd_turnvobject(struct ScriptContext *ctx)
     return FALSE;
 }
 
-// lockall freezes all object events except the player immediately.
-// The player is frozen after waiting for their current movement to finish.
 bool8 ScrCmd_lockall(struct ScriptContext *ctx)
 {
     Script_RequestEffects(SCREFF_V1 | SCREFF_HARDWARE);
@@ -1618,14 +1626,12 @@ bool8 ScrCmd_lockall(struct ScriptContext *ctx)
         struct ObjectEvent *followerObj = GetFollowerObject();
         FreezeObjects_WaitForPlayer();
         SetupNativeScript(ctx, IsFreezePlayerFinished);
-        if (FlagGet(FLAG_SAFE_FOLLOWER_MOVEMENT) && followerObj) // Unfreeze follower object (conditionally)
+        if (FlagGet(FLAG_SAFE_FOLLOWER_MOVEMENT) && followerObj)
             UnfreezeObjectEvent(followerObj);
         return TRUE;
     }
 }
 
-// lock freezes all object events except the player, follower, and the selected object immediately.
-// The player and selected object are frozen after waiting for their current movement to finish.
 bool8 ScrCmd_lock(struct ScriptContext *ctx)
 {
     Script_RequestEffects(SCREFF_V1 | SCREFF_HARDWARE);
@@ -1641,7 +1647,6 @@ bool8 ScrCmd_lock(struct ScriptContext *ctx)
         {
             FreezeObjects_WaitForPlayerAndSelected();
             SetupNativeScript(ctx, IsFreezeSelectedObjectAndPlayerFinished);
-            // follower is being talked to; keep it frozen
             if (gObjectEvents[gSelectedObjectEvent].localId == OBJ_EVENT_ID_FOLLOWER)
                 followerObj = NULL;
         }
@@ -1650,7 +1655,7 @@ bool8 ScrCmd_lock(struct ScriptContext *ctx)
             FreezeObjects_WaitForPlayer();
             SetupNativeScript(ctx, IsFreezePlayerFinished);
         }
-        if (followerObj) // Unfreeze follower object
+        if (followerObj)
             UnfreezeObjectEvent(followerObj);
         return TRUE;
     }
@@ -1662,7 +1667,6 @@ bool8 ScrCmd_releaseall(struct ScriptContext *ctx)
 
     u8 playerObjectId;
     struct ObjectEvent *followerObject = GetFollowerObject();
-    // Release follower from movement iff it exists and is in the shadowing state
     if (followerObject && gSprites[followerObject->spriteId].data[1] == 0)
         ClearObjectEventMovement(followerObject, &gSprites[followerObject->spriteId]);
 
@@ -1681,7 +1685,6 @@ bool8 ScrCmd_release(struct ScriptContext *ctx)
 
     u8 playerObjectId;
     struct ObjectEvent *followerObject = GetFollowerObject();
-    // Release follower from movement iff it exists and is in the shadowing state
     if (followerObject && gSprites[followerObject->spriteId].data[1] == 0)
         ClearObjectEventMovement(followerObject, &gSprites[followerObject->spriteId]);
 
@@ -1704,6 +1707,9 @@ bool8 ScrCmd_message(struct ScriptContext *ctx)
 
     if (msg == NULL)
         msg = (const u8 *)ctx->data[0];
+
+    HexDumpPokemonText("ScrCmd_message Raw Msg", msg);
+
     ShowFieldMessage(msg);
     return FALSE;
 }
@@ -1734,7 +1740,6 @@ bool8 ScrCmd_messageautoscroll(struct ScriptContext *ctx)
     return FALSE;
 }
 
-// Prints all at once. Skips waiting for player input. Only used by link contests
 bool8 ScrCmd_messageinstant(struct ScriptContext *ctx)
 {
     const u8 *msg = (const u8 *)ScriptReadWord(ctx);
@@ -1831,7 +1836,6 @@ bool8 ScrCmd_dynmultichoice(struct ScriptContext *ctx)
     u32 initialSelected = VarGet(ScriptReadHalfword(ctx));
     u32 callbackSet = ScriptReadByte(ctx);
     u32 initialRow = 0;
-    // Read vararg
     u32 argc = ScriptReadByte(ctx);
     struct ListMenuItem *items;
 
@@ -1943,12 +1947,6 @@ bool8 ScrCmd_multichoicedefault(struct ScriptContext *ctx)
 
 bool8 ScrCmd_drawbox(struct ScriptContext *ctx)
 {
-    /*u8 left = ScriptReadByte(ctx);
-    u8 top = ScriptReadByte(ctx);
-    u8 right = ScriptReadByte(ctx);
-    u8 bottom = ScriptReadByte(ctx);
-
-    MenuDrawTextWindow(left, top, right, bottom);*/
     return FALSE;
 }
 
@@ -1975,27 +1973,11 @@ bool8 ScrCmd_multichoicegrid(struct ScriptContext *ctx)
 
 bool8 ScrCmd_erasebox(struct ScriptContext *ctx)
 {
-    u8 UNUSED left = ScriptReadByte(ctx);
-    u8 UNUSED top = ScriptReadByte(ctx);
-    u8 UNUSED right = ScriptReadByte(ctx);
-    u8 UNUSED bottom = ScriptReadByte(ctx);
-
-    // Menu_EraseWindowRect(left, top, right, bottom);
     return FALSE;
 }
 
 bool8 ScrCmd_drawboxtext(struct ScriptContext *ctx)
 {
-    u8 UNUSED left = ScriptReadByte(ctx);
-    u8 UNUSED top = ScriptReadByte(ctx);
-    u8 UNUSED multichoiceId = ScriptReadByte(ctx);
-    bool8 UNUSED ignoreBPress = ScriptReadByte(ctx);
-
-    /*if (Multichoice(left, top, multichoiceId, ignoreBPress) == TRUE)
-    {
-        ScriptContext_Stop();
-        return TRUE;
-    }*/
     return FALSE;
 }
 
@@ -2015,8 +1997,6 @@ bool8 ScrCmd_hidemonpic(struct ScriptContext *ctx)
 {
     Script_RequestEffects(SCREFF_V1 | SCREFF_HARDWARE);
 
-    // The hide function returns a pointer to a function
-    // that returns true once the pic is hidden
     bool8 (*func)(void) = ScriptMenu_HidePokemonPic();
 
     if (func == NULL)
@@ -2031,7 +2011,6 @@ bool8 ScrCmd_showcontestpainting(struct ScriptContext *ctx)
 
     Script_RequestEffects(SCREFF_V1 | SCREFF_HARDWARE);
 
-    // Artist's painting is temporary and already has its data loaded
     if (contestWinnerId != CONTEST_WINNER_ARTIST)
         SetContestWinnerForPainting(contestWinnerId);
 
@@ -2052,9 +2031,6 @@ bool8 ScrCmd_braillemessage(struct ScriptContext *ctx)
     u8 xWindow, yWindow, xText, yText;
     u8 temp;
 
-    // + 6 for the 6 bytes at the start of a braille message (brailleformat macro)
-    // In RS these bytes are used to position the text and window, but
-    // in Emerald they are unused and position is calculated below instead
     StringExpandPlaceholders(gStringVar4, ptr + 6);
 
     width = GetStringWidth(FONT_BRAILLE, gStringVar4, -1) / 8u;
@@ -2111,6 +2087,8 @@ bool8 ScrCmd_vmessage(struct ScriptContext *ctx)
 
     Script_RequestEffects(SCREFF_V1 | SCREFF_HARDWARE);
 
+    HexDumpPokemonText("ScrCmd_vmessage Raw Msg", (u8 *)(msg - sAddressOffset));
+
     ShowFieldMessage((u8 *)(msg - sAddressOffset));
     return FALSE;
 }
@@ -2118,7 +2096,7 @@ bool8 ScrCmd_vmessage(struct ScriptContext *ctx)
 bool8 ScrCmd_bufferspeciesname(struct ScriptContext *ctx)
 {
     u8 stringVarIndex = ScriptReadByte(ctx);
-    enum Species species = VarGet(ScriptReadHalfword(ctx)) & OBJ_EVENT_MON_SPECIES_MASK; // ignore possible shiny / form bits
+    enum Species species = VarGet(ScriptReadHalfword(ctx)) & OBJ_EVENT_MON_SPECIES_MASK;
 
     Script_RequestEffects(SCREFF_V1);
 
@@ -2397,9 +2375,6 @@ bool8 ScrCmd_hidemoneybox(struct ScriptContext *ctx)
 {
     Script_RequestEffects(SCREFF_V1 | SCREFF_HARDWARE);
 
-    /*u8 x = ScriptReadByte(ctx);
-    u8 y = ScriptReadByte(ctx);*/
-
     HideMoneyBox();
     return FALSE;
 }
@@ -2576,7 +2551,6 @@ bool8 ScrCmd_pokemartdecoration(struct ScriptContext *ctx)
     return TRUE;
 }
 
-// Changes clerk dialogue slightly from above. See MART_TYPE_DECOR2
 bool8 ScrCmd_pokemartdecoration2(struct ScriptContext *ctx)
 {
     const void *ptr = (void *)ScriptReadWord(ctx);
@@ -2629,7 +2603,6 @@ bool8 ScrCmd_choosecontestmon(struct ScriptContext *ctx)
     ScriptContext_Stop();
     return TRUE;
 }
-
 
 bool8 ScrCmd_startcontest(struct ScriptContext *ctx)
 {
@@ -2781,11 +2754,9 @@ void NativeFunc_SetMetatileInRange(struct ScriptContext *ctx)
     xmax += MAP_OFFSET;
     ymax += MAP_OFFSET;
 
-    // try set impassable
     if (hasCollision)
         metatileId |= MAPGRID_COLLISION_MASK;
 
-    // set elevation
     if (elevation < 15)
         metatileId |= (elevation << MAPGRID_ELEVATION_SHIFT);
 
@@ -2865,23 +2836,13 @@ bool8 ScrCmd_setdoorclosed(struct ScriptContext *ctx)
     return FALSE;
 }
 
-// Below two are functions for elevators in RS, do nothing in Emerald
 bool8 ScrCmd_addelevmenuitem(struct ScriptContext *ctx)
 {
-    u8 UNUSED v3 = ScriptReadByte(ctx);
-    u16 UNUSED v5 = VarGet(ScriptReadHalfword(ctx));
-    u16 UNUSED v7 = VarGet(ScriptReadHalfword(ctx));
-    u16 UNUSED v9 = VarGet(ScriptReadHalfword(ctx));
-
-    //ScriptAddElevatorMenuItem(v3, v5, v7, v9);
     return FALSE;
 }
 
 bool8 ScrCmd_showelevmenu(struct ScriptContext *ctx)
 {
-    /*ScriptShowElevatorMenu();
-    ScriptContext_Stop();
-    return TRUE;*/
     return FALSE;
 }
 
@@ -2986,7 +2947,6 @@ bool8 ScrCmd_lockfortrainer(struct ScriptContext *ctx)
     }
 }
 
-// This command will set a Pokémon's modernFatefulEncounter bit; there is no similar command to clear it.
 bool8 ScrCmd_setmodernfatefulencounter(struct ScriptContext *ctx)
 {
     bool8 isModernFatefulEncounter = TRUE;
@@ -3022,8 +2982,6 @@ bool8 ScrCmd_trywondercardscript(struct ScriptContext *ctx)
     return FALSE;
 }
 
-// This warp is only used by the Union Room.
-// For the warp used by the Aqua Hideout, see DoTeleportTileWarp
 bool8 ScrCmd_warpspinenter(struct ScriptContext *ctx)
 {
     u8 mapGroup = ScriptReadByte(ctx);
@@ -3226,12 +3184,9 @@ bool8 ScrCmd_hidefollower(struct ScriptContext *ctx)
         SetupNativeScript(ctx, WaitForMovementFinish);
     }
 
-    // Just in case, prevent `applymovement`
-    // from hiding the follower again
     if (obj)
         FlagSet(FLAG_SAFE_FOLLOWER_MOVEMENT);
 
-    // execute next script command with no delay
     return TRUE;
 }
 
@@ -3397,7 +3352,6 @@ bool8 ScrCmd_setstartingstatus(struct ScriptContext *ctx)
 
 bool8 ScrCmd_textcolor(struct ScriptContext * ctx)
 {
-    // gSpecialVar_PrevTextColor = gSpecialVar_TextColor;
     u16 UNUSED gSpecialVar_TextColor = ScriptReadByte(ctx);
 
     Script_RequestEffects(SCREFF_V1 | SCREFF_HARDWARE);
