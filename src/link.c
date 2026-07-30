@@ -1743,17 +1743,12 @@ bool8 HandleLinkConnection(void)
 {
     bool32 main1Failed, main2Failed;
 
-    SDL_Log("CAN DEBUG: HandleLinkConnection start. gWirelessCommType: %d, sLinkOpen: %d", gWirelessCommType, sLinkOpen);
     if (gWirelessCommType == 0)
     {
-        SDL_Log("CAN DEBUG: HandleLinkConnection - calling LinkMain1");
         gLinkStatus = LinkMain1(&gShouldAdvanceLinkState, gSendCmd, gRecvCmds);
-        SDL_Log("CAN DEBUG: HandleLinkConnection - LinkMain1 returned 0x%08X, calling LinkMain2", gLinkStatus);
         LinkMain2(&gMain.heldKeys);
-        SDL_Log("CAN DEBUG: HandleLinkConnection - LinkMain2 returned");
         if ((gLinkStatus & LINK_STAT_RECEIVED_NOTHING) && IsSendingKeysOverCable() == TRUE)
         {
-            SDL_Log("CAN DEBUG: HandleLinkConnection end (TRUE - RECEIVED NOTHING)");
             return TRUE;
         }
     }
@@ -1762,26 +1757,20 @@ bool8 HandleLinkConnection(void)
         // If link is not open, do not call RfuMain to prevent deadlocks in native/PC environments
         if (!sLinkOpen)
         {
-            SDL_Log("CAN DEBUG: HandleLinkConnection - RFU bypassed because sLinkOpen is FALSE");
             return FALSE;
         }
-        SDL_Log("CAN DEBUG: HandleLinkConnection - calling RfuMain1");
         main1Failed = RfuMain1(); // Always returns FALSE
-        SDL_Log("CAN DEBUG: HandleLinkConnection - RfuMain1 returned, calling RfuMain2");
         main2Failed = RfuMain2();
-        SDL_Log("CAN DEBUG: HandleLinkConnection - RfuMain2 returned");
         if (IsSendingKeysOverCable() == TRUE)
         {
             // This will never be reached.
             // IsSendingKeysOverCable is always FALSE for wireless communication
             if (main1Failed == TRUE || IsRfuRecvQueueEmpty() || main2Failed)
             {
-                SDL_Log("CAN DEBUG: HandleLinkConnection end (TRUE - RFU ACTIVE)");
                 return TRUE;
             }
         }
     }
-    SDL_Log("CAN DEBUG: HandleLinkConnection end (FALSE)");
     return FALSE;
 }
 
