@@ -2,40 +2,45 @@
 // 本程序是自由软件：你可以根据自由软件基金会发布的 GNU 通用公共许可证第3版
 //（或任意更新的版本）的条款重新分发和/或修改它。
 //本程序是基于希望它有用而分发的，但没有任何担保；甚至没有适销性或特定用途适用性的隐含担保。
-// 有关更多细节，请参阅 GNU 通用公共许可证。
+// 有关更多细节，参阅 GNU 通用公共许可证。
 //
-// 你应该已经收到了一份 GNU 通用公共许可证的副本
-// 如果没有，请查阅 <http://www.gnu.org/licenses/>.
+// 你应该已经收到了一份 GNU 通用公共许可证副本
+// 如果没有，请查阅 <http://www.gnu.org/licenses/>。
 package me.voltual.rp.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MergeType
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import me.voltual.rp.core.ui.icons.drawable.* // 导入转换后的图标
+import me.voltual.rp.core.ui.icons.drawable.*
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation3.runtime.NavKey        
-import coil3.compose.AsyncImage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import me.voltual.rp.core.ui.theme.AppShapes
 import me.voltual.rp.data.DrawerMenuDataStore
 import org.koin.compose.koinInject 
 
 sealed class IconSource {
     data class Vector(val imageVector: ImageVector) : IconSource()
-    data class Remote(val url: String) : IconSource()
 }
 
 data class DrawerItem(
@@ -47,17 +52,20 @@ data class DrawerItem(
 
 @Composable
 fun DrawerHeader(modifier: Modifier = Modifier, backgroundUri: String?) {
-    Box(
-        modifier = modifier.background(MaterialTheme.colorScheme.primaryContainer)
-    ) {
-        if (backgroundUri != null) {
-            AsyncImage(
-                model = backgroundUri,
-                contentDescription = "Drawer Header Background",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
+    Column(
+        modifier = modifier
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
             )
-        }
+            .padding(16.dp)
+    ) {
+        Text(
+            text = "Rainbow-Porygon",
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black, letterSpacing = 2.sp),
+            color = MaterialTheme.colorScheme.primary
+        )
     }
 }
 
@@ -68,7 +76,6 @@ fun NavigationDrawerItems(
     drawerState: DrawerState,
     scope: CoroutineScope
 ) {
-
     val allDrawerItems = remember {
         mutableListOf(
             DrawerItem("home", "首页", IconSource.Vector(IcMenuHome), Home),
@@ -82,7 +89,7 @@ fun NavigationDrawerItems(
     var draggedItem by remember { mutableStateOf<DrawerItem?>(null) }
     var dragOffsetY by remember { mutableStateOf(0f) }
     var itemHeight by remember { mutableStateOf(0) }
-    val drawerMenuDataStore: DrawerMenuDataStore = koinInject()
+    val drawerMenuDataStore: DrawerMenuDataStore = org.koin.compose.koinInject()
 
     var selectedItemId by remember { mutableStateOf("home") }
 
@@ -99,7 +106,9 @@ fun NavigationDrawerItems(
 
     LaunchedEffect(currentTopLevelRoute) {
         currentTopLevelRoute?.let { currentRoute ->
-            val matchedItem = orderedItems.find { it.route == currentRoute && it.id != "logout" }
+            val matchedItem = orderedItems.find { 
+                it.route::class == currentRoute::class 
+            }
             if (matchedItem != null && matchedItem.id != selectedItemId) {
                 selectedItemId = matchedItem.id
             }
@@ -110,7 +119,7 @@ fun NavigationDrawerItems(
         derivedStateOf {
             draggedItem?.let {
                 val initialIndex = orderedItems.indexOf(it)
-                val displacement = (dragOffsetY / itemHeight).toInt()
+                val displacement = if (itemHeight > 0) (dragOffsetY / itemHeight).toInt() else 0
                 (initialIndex + displacement).coerceIn(0, orderedItems.size - 1)
             }
         }
@@ -126,31 +135,16 @@ fun NavigationDrawerItems(
             items(orderedItems, key = { it.id }) { item ->
                 val isBeingDragged = item.id == draggedItem?.id
                 val index = orderedItems.indexOf(item)
-                val showPlaceholder = placeholderIndex == index && placeholderIndex != orderedItems.indexOf(draggedItem)
+                val showPlaceholder = placeholderIndex == index && draggedItem != null && placeholderIndex != orderedItems.indexOf(draggedItem)
 
                 if (showPlaceholder) {
-                    if (placeholderIndex!! > orderedItems.indexOf(draggedItem)) {
-                        ItemContent(
-                            item = item,
-                            selectedItemId = selectedItemId,
-                            onItemClick = { selectedItemId = it },
-                            isDragged = false,
-                            scope = scope,
-                            drawerState = drawerState,
-                            navigator = navigator
-                        )
+                    val isDraggedDown = placeholderIndex!! > orderedItems.indexOf(draggedItem)
+                    if (isDraggedDown) {
+                        ItemContent(item, selectedItemId, { selectedItemId = it }, false, scope, drawerState, navigator)
                         PlaceholderItem(modifier = Modifier.onSizeChanged { itemHeight = it.height })
                     } else {
                         PlaceholderItem(modifier = Modifier.onSizeChanged { itemHeight = it.height })
-                        ItemContent(
-                            item = item,
-                            selectedItemId = selectedItemId,
-                            onItemClick = { selectedItemId = it },
-                            isDragged = false,
-                            scope = scope,
-                            drawerState = drawerState,
-                            navigator = navigator
-                        )
+                        ItemContent(item, selectedItemId, { selectedItemId = it }, false, scope, drawerState, navigator)
                     }
                 } else {
                     ItemContent(
@@ -206,15 +200,7 @@ fun NavigationDrawerItems(
                     }
                     .padding(horizontal = 12.dp)
             ) {
-                ItemContent(
-                    item = item,
-                    selectedItemId = selectedItemId,
-                    onItemClick = { selectedItemId = it },
-                    isDragged = false,
-                    scope = scope,
-                    drawerState = drawerState,
-                    navigator = navigator
-                )
+                ItemContent(item, selectedItemId, { selectedItemId = it }, false, scope, drawerState, navigator)
             }
         }
     }
@@ -233,16 +219,28 @@ private fun ItemContent(
 ) {
     val isSelected = selectedItemId == item.id
 
+    val itemBorder = if (isSelected) {
+        BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
+    } else {
+        BorderStroke(1.dp, Color.Transparent)
+    }
+
     NavigationDrawerItem(
-        label = { Text(item.label) },
+        label = { 
+            Text(
+                text = item.label,
+                fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium,
+                style = MaterialTheme.typography.labelLarge
+            ) 
+        },
         icon = {
-            val iconModifier = Modifier.size(24.dp)
+            val iconModifier = Modifier.size(20.dp)
             when (val source = item.icon) {
-                is IconSource.Vector -> Icon(source.imageVector, null, modifier = iconModifier)
-                is IconSource.Remote -> AsyncImage(
-                    model = source.url,
-                    contentDescription = null,
-                    modifier = iconModifier
+                is IconSource.Vector -> Icon(
+                    imageVector = source.imageVector, 
+                    contentDescription = null, 
+                    modifier = iconModifier,
+                    tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         },
@@ -253,11 +251,15 @@ private fun ItemContent(
             navigator.navigate(item.route)
         },
         modifier = modifier
-            .padding(vertical = 4.dp)
+            .padding(vertical = 2.dp)
+            .border(itemBorder, AppShapes.small)
             .graphicsLayer { alpha = if (isDragged) 0f else 1f },
+        shape = AppShapes.small,
         colors = NavigationDrawerItemDefaults.colors(
-            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f),
-            unselectedContainerColor = Color.Transparent
+            selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+            unselectedContainerColor = Color.Transparent,
+            selectedTextColor = MaterialTheme.colorScheme.primary,
+            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
         )
     )
 }
@@ -267,9 +269,10 @@ private fun PlaceholderItem(modifier: Modifier = Modifier) {
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .height(56.dp)
-            .padding(vertical = 4.dp),
-        shape = MaterialTheme.shapes.medium,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+            .height(48.dp)
+            .padding(vertical = 2.dp),
+        shape = AppShapes.small,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
     ) {}
 }
