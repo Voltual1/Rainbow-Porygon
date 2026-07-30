@@ -8,6 +8,10 @@
 // 如果没有，请查阅 <http://www.gnu.org/licenses/>.
 package me.voltual.rp
 
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.preferencesDataStoreFile
 import me.voltual.rp.core.database.*
 import me.voltual.rp.core.database.dao.*
 import me.voltual.rp.data.*
@@ -26,13 +30,36 @@ val DRAWER_MENU_STORE_QUALIFIER = named("drawer_menu_store")
 val THEME_SETTINGS_STORE_QUALIFIER = named("theme_settings_store")
 
 val appModule = module {
-      viewModel { UpdateSettingsViewModel(get()) }
-  single { BBQApplication.instance.database }
-  single { get<AppDatabase>().logDao() }
-      single { LogRepository(get()) }
+    viewModel { UpdateSettingsViewModel(get()) }
+    single { BBQApplication.instance.database }
+    single { get<AppDatabase>().logDao() }
+    single { LogRepository(get()) }
       
-          single { UserAgreementDataStore(get(USER_AGREEMENT_STORE_QUALIFIER)) }
-              single { UpdateSettingsDataStore(get(UPDATE_SETTINGS_STORE_QUALIFIER)) }
-                  single { ThemeColorDataStore(get(THEME_SETTINGS_STORE_QUALIFIER)) }
-        single { DrawerMenuDataStore(get(DRAWER_MENU_STORE_QUALIFIER)) }
+    // 底层 DataStore<Preferences> 依赖注入定义
+    single<DataStore<Preferences>>(USER_AGREEMENT_STORE_QUALIFIER) {
+        PreferenceDataStoreFactory.create(
+            produceFile = { androidContext().preferencesDataStoreFile("user_agreement") }
+        )
+    }
+    single<DataStore<Preferences>>(UPDATE_SETTINGS_STORE_QUALIFIER) {
+        PreferenceDataStoreFactory.create(
+            produceFile = { androidContext().preferencesDataStoreFile("update_settings") }
+        )
+    }
+    single<DataStore<Preferences>>(THEME_SETTINGS_STORE_QUALIFIER) {
+        PreferenceDataStoreFactory.create(
+            produceFile = { androidContext().preferencesDataStoreFile("theme_settings") }
+        )
+    }
+    single<DataStore<Preferences>>(DRAWER_MENU_STORE_QUALIFIER) {
+        PreferenceDataStoreFactory.create(
+            produceFile = { androidContext().preferencesDataStoreFile("drawer_menu") }
+        )
+    }
+      
+    // 业务层 DataStore 包装类
+    single { UserAgreementDataStore(get(USER_AGREEMENT_STORE_QUALIFIER)) }
+    single { UpdateSettingsDataStore(get(UPDATE_SETTINGS_STORE_QUALIFIER)) }
+    single { ThemeColorDataStore(get(THEME_SETTINGS_STORE_QUALIFIER)) }
+    single { DrawerMenuDataStore(get(DRAWER_MENU_STORE_QUALIFIER)) }
 }
