@@ -3,31 +3,6 @@
 #include "text.h"
 #include "strings.h"
 #include "union_room_chat.h"
-#include <stdio.h>
-
-extern void SDL_Log(const char *fmt, ...);
-
-static void HexDumpPokemonText(const char *label, const u8 *src)
-{
-    if (src == NULL)
-    {
-        SDL_Log("%s: NULL pointer", label);
-        return;
-    }
-    char buf[512];
-    int len = 0;
-    int i;
-    len += sprintf(buf + len, "%s [ptr=%p]: ", label, src);
-    for (i = 0; i < 64; i++)
-    {
-        len += sprintf(buf + len, "%02X ", src[i]);
-        if (src[i] == EOS)
-        {
-            break;
-        }
-    }
-    SDL_Log("%s", buf);
-}
 
 EWRAM_DATA u8 gStringVar1[0x100] = {0};
 EWRAM_DATA u8 gStringVar2[0x100] = {0};
@@ -381,8 +356,6 @@ u8 *ConvertIntToHexStringN(u8 *dest, s32 value, enum StringConvertMode mode, u8 
 
 u8 *StringExpandPlaceholders(u8 *dest, const u8 *src)
 {
-    HexDumpPokemonText("StringExpandPlaceholders Src", src);
-
     for (;;)
     {
         u8 c = *src++;
@@ -397,17 +370,27 @@ u8 *StringExpandPlaceholders(u8 *dest, const u8 *src)
             dest = StringExpandPlaceholders(dest, expandedString);
             break;
         case EXT_CTRL_CODE_BEGIN:
+            *dest++ = c;
+            c = *src++;
+            *dest++ = c;
+
+            switch (c)
             {
-                u8 len;
-                *dest++ = c;
-                c = *src++;
-                *dest++ = c;
-                len = GetExtCtrlCodeLength(c);
-                while (len > 1)
-                {
-                    *dest++ = *src++;
-                    len--;
-                }
+            case EXT_CTRL_CODE_RESET_FONT:
+            case EXT_CTRL_CODE_PAUSE_UNTIL_PRESS:
+            case EXT_CTRL_CODE_FILL_WINDOW:
+            case EXT_CTRL_CODE_JPN:
+            case EXT_CTRL_CODE_ENG:
+            case EXT_CTRL_CODE_PAUSE_MUSIC:
+            case EXT_CTRL_CODE_RESUME_MUSIC:
+                break;
+            case EXT_CTRL_CODE_COLOR_HIGHLIGHT_SHADOW:
+            case EXT_CTRL_CODE_TEXT_COLORS:
+                *dest++ = *src++;
+            case EXT_CTRL_CODE_PLAY_BGM:
+                *dest++ = *src++;
+            default:
+                *dest++ = *src++;
             }
             break;
         case EOS:

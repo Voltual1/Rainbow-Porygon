@@ -13,30 +13,23 @@ import androidx.datastore.preferences.core.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-object AgreementVersions {
-    const val USER_AGREEMENT = 3
-    const val XIAOQU_AGREEMENT = 2 
+object UserAgreementVersion {
+    const val CURRENT = 1
 }
 
 class UserAgreementDataStore(private val dataStore: DataStore<Preferences>) {
 
     private object Keys {
         val USER_AGREEMENT_VER = intPreferencesKey("user_agreement_ver")
-        val XIAOQU_AGREEMENT_VER = intPreferencesKey("xiaoqu_user_agreement_ver")
     }
 
-    private fun isAccepted(key: Preferences.Key<Int>, currentVersion: Int): Flow<Boolean> =
-        dataStore.data.map { prefs ->
-            (prefs[key] ?: 0) >= currentVersion
+    val isUserAgreementAccepted: Flow<Boolean> = dataStore.data.map { prefs ->
+        (prefs[Keys.USER_AGREEMENT_VER] ?: 0) >= UserAgreementVersion.CURRENT
+    }
+
+    suspend fun acceptUserAgreement() {
+        dataStore.edit { prefs ->
+            prefs[Keys.USER_AGREEMENT_VER] = UserAgreementVersion.CURRENT
         }
-
-    val isUserAgreementAccepted = isAccepted(Keys.USER_AGREEMENT_VER, AgreementVersions.USER_AGREEMENT)
-    val isXiaoquAccepted = isAccepted(Keys.XIAOQU_AGREEMENT_VER, AgreementVersions.XIAOQU_AGREEMENT)
-
-    suspend fun acceptUserAgreement() = saveVersion(Keys.USER_AGREEMENT_VER, AgreementVersions.USER_AGREEMENT)
-    suspend fun acceptXiaoquAgreement() = saveVersion(Keys.XIAOQU_AGREEMENT_VER, AgreementVersions.XIAOQU_AGREEMENT)
-
-    private suspend fun saveVersion(key: Preferences.Key<Int>, version: Int) {
-        dataStore.edit { it[key] = version }
     }
 }

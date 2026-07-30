@@ -78,7 +78,6 @@ fun PyrolysisApp(
         val snackbarHostState = remember { SnackbarHostState() }
 
         val userAccepted by agreementDataStore.isUserAgreementAccepted.collectAsState(initial = true)
-        val xiaoquAccepted by agreementDataStore.isXiaoquAccepted.collectAsState(initial = true)
 
         var isAgreementDataLoaded by remember { mutableStateOf(false) }
         LaunchedEffect(Unit) {
@@ -86,7 +85,8 @@ fun PyrolysisApp(
             isAgreementDataLoaded = true
         }
 
-        val showAgreementDialog = isAgreementDataLoaded && !(userAccepted && xiaoquAccepted)
+        // 弹窗显示条件简化为只判断用户协议是否接受
+        val showAgreementDialog = isAgreementDataLoaded && !userAccepted
 
         BBQTheme() {
             MainScreenContent(
@@ -157,7 +157,6 @@ fun MainScreenContent(
     ) {
         Scaffold(
             topBar = {
-                // If we are at Home (Game rendering screen), do not draw the standard TopAppBar.
                 if (currentRoute != Home) {
                     TopAppBar(
                         title = {
@@ -218,7 +217,6 @@ fun MainScreenContent(
                         }
                     )
 
-                    // If we are in Home and the TopAppBar is hidden, overlay a floating hamburger menu button.
                     if (currentRoute == Home) {
                         Box(
                             modifier = Modifier
