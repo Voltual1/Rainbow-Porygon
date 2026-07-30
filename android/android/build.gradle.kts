@@ -20,7 +20,7 @@ android {
     ndkVersion = "29.0.14206865"
 
     base {
-        archivesName.set("Vector-Breakthrough")
+        archivesName.set("Rainbow-Porygon")
     }
 
     defaultConfig {

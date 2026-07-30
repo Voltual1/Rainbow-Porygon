@@ -65,7 +65,7 @@ object KtorClient {
   }
 
   object ApiServiceImpl : ApiService {
-private const val GITHUB_RELEASE_URL = "https://gitee.com/api/v5/repos/Voltula/VB/releases/latest"
+private const val GITHUB_RELEASE_URL = "https://gitee.com/api/v5/repos/Voltula/RP/releases/latest"
             override suspend fun getLatestRelease(): Result<UpdateInfo> = safeApiCall {
             httpClient.get(GITHUB_RELEASE_URL)
         }

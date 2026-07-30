@@ -17,5 +17,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "PokeEmeraldExperimental"
+rootProject.name = "Rainbow-Porygon"
 include(":android")
