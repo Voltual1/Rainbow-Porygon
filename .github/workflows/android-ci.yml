@@ -97,8 +97,8 @@ jobs:
         uses: actions/cache@v3
         with:
           path: |
-            ~/android/.gradle/caches
-            ~/android/.gradle/wrapper
+            ~/.gradle/caches
+            ~/.gradle/wrapper
             ${{ github.workspace }}/.gradle
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/build.gradle.kts', '**/settings.gradle.kts') }}
           restore-keys: |
@@ -109,7 +109,7 @@ jobs:
         env:
           ENCODED_STRING: ${{ secrets.SIGNING_KEY }}
         run: |
-          echo $ENCODED_STRING | base64 -d > android/android/release.keystore
+          echo $ENCODED_STRING | base64 -d > release.keystore
 
       - name: Build Android APK
         run: |
@@ -140,7 +140,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: |
-            ~/android/.gradle/caches
-            ~/android/.gradle/wrapper
+            ~/.gradle/caches
+            ~/.gradle/wrapper
             ${{ github.workspace }}/.gradle
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/build.gradle.kts', '**/settings.gradle.kts') }}          
