@@ -137,12 +137,11 @@ fun MainScreenContent(
                         .roundScreenPadding()
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                 ) {
-                    DrawerHeader(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(180.dp),
-                        backgroundUri = drawerHeaderBackgroundUri
-                    )
+                    Text(
+            text = "Rainbow-Porygon",
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black, letterSpacing = 2.sp),
+            color = MaterialTheme.colorScheme.primary
+        )
                     NavigationDrawerItems(
                         navigator = navigator,
                         currentTopLevelRoute = currentTopLevelRoute,
@@ -215,29 +214,7 @@ fun MainScreenContent(
                         platformEntryProvider = { key ->
                             platformEntryProvider(key, navigator)
                         }
-                    )
-
-                    if (currentRoute == Home) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-                            contentAlignment = Alignment.TopStart
-                        ) {
-                            FilledIconButton(
-                                onClick = { scope.launch { drawerState.open() } },
-                                colors = IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                                    contentColor = MaterialTheme.colorScheme.onSurface
-                                )
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Menu,
-                                    contentDescription = "打开菜单"
-                                )
-                            }
-                        }
-                    }
+                    )        
 
                     if (showAgreementDialog) {
                         UserAgreementDialog(
