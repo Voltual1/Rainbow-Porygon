@@ -9,18 +9,11 @@
 
 package me.voltual.vb
 
-import android.content.Context
-import android.content.Intent
-import android.app.ActivityOptions
 import android.os.Bundle
 import androidx.activity.compose.setContent
-import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.*
-import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import me.voltual.vb.data.UserAgreementDataStore
 import me.voltual.vb.core.database.entity.LogEntry
@@ -28,7 +21,7 @@ import me.voltual.vb.core.database.dao.LogDao
 import me.voltual.vb.ui.*
 import org.koin.android.ext.android.inject
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : PokeEmeraldActivity() {
     private val agreementDataStore: UserAgreementDataStore by inject()    
     
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,11 +29,13 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         setContent {
-                PyrolysisApp(agreementDataStore = agreementDataStore,
-                    platformEntryProvider = { _, _ -> null }
-                )
+            PyrolysisApp(
+                agreementDataStore = agreementDataStore,
+                platformEntryProvider = { _, _ -> null }
+            )
+        }
     }
-}
+
     init {
         Thread.setDefaultUncaughtExceptionHandler { _, throwable ->
             val crashReport = getCrashReport(throwable)

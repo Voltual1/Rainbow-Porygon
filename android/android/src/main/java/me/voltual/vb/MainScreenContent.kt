@@ -3,7 +3,6 @@
 
 package me.voltual.vb
 
-// Jetpack Compose 核心基础与布局
 import androidx.compose.foundation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -14,7 +13,6 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.unit.dp
 
-// Jetpack Material 3 设计组件与图标
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -23,18 +21,14 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
 
-// Jetpack Compose 状态管理
 import androidx.compose.runtime.*
 
-// Jetpack Lifecycle & ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
-// Jetpack Navigation 3
 import androidx.navigation3.runtime.*
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.NavBackStack
 
-// Kotlin 协程与流
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -42,10 +36,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-// Koin 依赖注入
 import org.koin.compose.koinInject
 
-// 项目核心基础库、数据层与网络 (Core & Data)
 import me.voltual.vb.KtorClient
 import me.voltual.vb.data.UpdateInfo
 import me.voltual.vb.data.UpdateSettingsDataStore
@@ -53,7 +45,6 @@ import me.voltual.vb.data.UserAgreementDataStore
 import me.voltual.vb.core.utils.UpdateCheckResult
 import me.voltual.vb.core.utils.UpdateChecker
 
-// 项目通用 UI 组件、主题与动画 (Core UI)
 import me.voltual.vb.core.ui.theme.*
 import me.voltual.vb.core.ui.theme.ThemeCustomizeScreen
 import me.voltual.vb.core.ui.components.UserAgreementDialog
@@ -136,8 +127,6 @@ fun MainScreenContent(
     val darkBgUri by themeStore.drawerHeaderDarkBackgroundUriFlow.collectAsState(initial = null)
     val drawerHeaderBackgroundUri = if (useDarkTheme) darkBgUri else lightBgUri
 
-    val isLoggedIn = remember { mutableStateOf(false) }
-
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -168,47 +157,48 @@ fun MainScreenContent(
     ) {
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = topAppBarController.customTitle ?: getTitleForDestination(currentRoute),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1
+                // If we are at Home (Game rendering screen), do not draw the standard TopAppBar.
+                if (currentRoute != Home) {
+                    TopAppBar(
+                        title = {
+                            Text(
+                                text = topAppBarController.customTitle ?: getTitleForDestination(currentRoute),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1
+                            )
+                        },
+                        navigationIcon = {
+                            if (showBackButton) {
+                                IconButton(onClick = { navigator.goBack() }) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = "返回",
+                                        tint = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            } else {
+                                IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Menu,
+                                        contentDescription = "打开菜单",
+                                        tint = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        },
+                        actions = {
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            titleContentColor = MaterialTheme.colorScheme.onSurface
                         )
-                    },
-                    navigationIcon = {
-                        if (showBackButton) {
-                            IconButton(onClick = { navigator.goBack() }) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "返回",
-                                    tint = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        } else {
-                            IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                                Icon(
-                                    imageVector = Icons.Default.Menu,
-                                    contentDescription = "打开菜单",
-                                    tint = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-                    },
-                    actions = {
-                        // Actions can be added here
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        titleContentColor = MaterialTheme.colorScheme.onSurface
                     )
-                )
+                }
             },
             snackbarHost = { BBQSnackbarHost(hostState = snackbarHostState) },
             content = { innerPadding ->
-                val contentPadding = innerPadding
+                val contentPadding = if (currentRoute == Home) PaddingValues(0.dp) else innerPadding
                 
-
                 val currentBackStack = navigationState.backStacks[currentTopLevelRoute]
                     ?: navigationState.backStacks[navigationState.startRoute]!!
 
@@ -227,6 +217,29 @@ fun MainScreenContent(
                             platformEntryProvider(key, navigator)
                         }
                     )
+
+                    // If we are in Home and the TopAppBar is hidden, overlay a floating hamburger menu button.
+                    if (currentRoute == Home) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            contentAlignment = Alignment.TopStart
+                        ) {
+                            FilledIconButton(
+                                onClick = { scope.launch { drawerState.open() } },
+                                colors = IconButtonDefaults.filledIconButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                                    contentColor = MaterialTheme.colorScheme.onSurface
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Menu,
+                                    contentDescription = "打开菜单"
+                                )
+                            }
+                        }
+                    }
 
                     if (showAgreementDialog) {
                         UserAgreementDialog(
