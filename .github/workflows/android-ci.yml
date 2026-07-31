@@ -94,11 +94,9 @@ jobs:
 
           echo "==> Switching to original src/include for asset generation"
 
-          # 把当前修改过的挪走
           mv src src_modified
           mv include include_modified
 
-          # 用 original 顶上
           mv src_original src
           mv include_original include
 
@@ -108,12 +106,31 @@ jobs:
           echo "==> Generating assets (ignore final link error)"
           make -j$(nproc) all KEEP_TEMPS=1 || true
 
-          echo "==> Restoring modified src/include"
-          # 先把 original 挪回去
+          echo "==> Copying generated files back to modified src/include"
+
+          # include/constants/
+          cp -f include/constants/heal_locations.h          include_modified/constants/
+          cp -f include/constants/layouts.h                 include_modified/constants/
+          cp -f include/constants/map_event_ids.h           include_modified/constants/
+          cp -f include/constants/map_groups.h              include_modified/constants/
+          cp -f include/constants/region_map_sections.h     include_modified/constants/
+          cp -f include/constants/script_commands.h         include_modified/constants/
+
+          # src/data/
+          cp -f src/data/battle_partners.h                  src_modified/data/
+          cp -f src/data/debug_trainers.h                   src_modified/data/
+          cp -f src/data/heal_locations.h                   src_modified/data/
+          cp -f src/data/map_group_count.h                  src_modified/data/
+          cp -f src/data/pokemon/teachable_learnsets.h      src_modified/data/pokemon/
+          cp -f src/data/region_map/region_map_entries.h    src_modified/data/region_map/
+          cp -f src/data/trainers.h                         src_modified/data/
+          cp -f src/data/trainers_frlg.h                    src_modified/data/
+          cp -f src/data/tutor_moves.h                      src_modified/data/
+          cp -f src/data/wild_encounters.h                  src_modified/data/
+
+          echo "==> Restoring directories"
           mv src src_original
           mv include include_original
-
-          # 恢复你改过的版本
           mv src_modified src
           mv include_modified include
 
