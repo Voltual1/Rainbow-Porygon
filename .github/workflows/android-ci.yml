@@ -92,19 +92,25 @@ jobs:
           mkdir -p .ccache
           export PATH="/usr/lib/ccache:$PATH"
 
-          echo "==> Swapping src with src_hello for asset generation"
+          echo "==> Preparing dummy src (with real data) for asset generation"
           if [ ! -d src_hello ]; then
             echo "ERROR: src_hello directory not found!"
             exit 1
           fi
+
+          # 备份真正的 src
           mv src src_real
+
+          # 用 hello 覆盖
           cp -a src_hello src
+
+          # 把真正的 data 拷进去
+          cp -a src_real/data src/
 
           echo "==> Building tools"
           make -j$(nproc) tools
 
           echo "==> Generating assets (ignore final link error)"
-          # 用 || true 保证即使链接失败也继续，资源已经生成
           make -j$(nproc) all KEEP_TEMPS=1 || true
 
           echo "==> Restoring original src"
