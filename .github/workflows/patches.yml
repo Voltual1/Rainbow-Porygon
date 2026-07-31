@@ -1,0 +1,51 @@
+name: Generate Patches Between Commits
+
+on:
+  workflow_dispatch:   # 手动触发
+    inputs:
+      from_commit:
+        description: '起始提交 (不含)'
+        required: true
+        default: 'df30c0b1a25467a808167dd80e18ca850a73cb7e'
+      to_commit:
+        description: '结束提交 (含)'
+        required: true
+        default: '4f7cf1516d385cb9b5764dcc24c47ca7f6a51392'
+
+jobs:
+  generate-patches:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout upstream repo
+        uses: actions/checkout@v4
+        with:
+          repository: rh-hideout/pokeemerald-expansion
+          fetch-depth: 0          # 需要完整历史才能 format-patch
+          path: upstream
+
+      - name: Generate patches
+        working-directory: upstream
+        run: |
+          mkdir -p ../patches
+          git format-patch \
+            ${{ inputs.from_commit }}..${{ inputs.to_commit }} \
+            -o ../patches \
+            --stdout > ../patches/all-patches.patch || true
+
+          # 同时生成单独的 patch 文件（更方便选择性应用）
+          git format-patch \
+            ${{ inputs.from_commit }}..${{ inputs.to_commit }} \
+            -o ../patches
+
+          echo "=== Generated patches ==="
+          ls -lh ../patches
+          echo ""
+          echo "=== Commit range ==="
+          git log --oneline ${{ inputs.from_commit }}..${{ inputs.to_commit }}
+
+      - name: Upload patches as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: patches-${{ inputs.from_commit }}-to-${{ inputs.to_commit }}
+          path: patches/
+          retention-days: 30
