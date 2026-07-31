@@ -83,6 +83,7 @@ jobs:
           restore-keys: |
             gba-assets-${{ runner.os }}-
 
+      # 只有当 cache key 未命中时才编译 GBA 资源
       - name: Build GBA Assets
         if: steps.cache-gba-assets.outputs.cache-hit != 'true'
         env:
@@ -157,7 +158,7 @@ jobs:
       - name: Build Android APK
         run: |
           chmod +x android/SDL2/android-project/gradlew
-          android/SDL2/android-project/gradlew -p android :android:assembleDebug
+          android/SDL2/android-project/gradlew -p android :android:assembleRelease
         env:
           KEYSTORE_PATH: ../../release.keystore
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
