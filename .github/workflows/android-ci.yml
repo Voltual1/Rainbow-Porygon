@@ -88,11 +88,31 @@ jobs:
         env:
           CCACHE_DIR: ${{ github.workspace }}/.ccache
         run: |
+          set -e
           mkdir -p .ccache
           export PATH="/usr/lib/ccache:$PATH"
+
+          echo "==> Swapping src with src_hello for asset generation"
+          if [ ! -d src_hello ]; then
+            echo "ERROR: src_hello directory not found!"
+            exit 1
+          fi
+          mv src src_real
+          cp -a src_hello src
+
+          echo "==> Building tools"
           make -j$(nproc) tools
-          make -j$(nproc) all KEEP_TEMPS=1 || echo "Assets generated, ignoring link error"
-          
+
+          echo "==> Generating assets (ignore final link error)"
+          # 用 || true 保证即使链接失败也继续，资源已经生成
+          make -j$(nproc) all KEEP_TEMPS=1 || true
+
+          echo "==> Restoring original src"
+          rm -rf src
+          mv src_real src
+
+          echo "==> Asset generation finished"
+
       - name: Gradle Cache
         uses: actions/cache@v3
         with:
@@ -102,7 +122,7 @@ jobs:
             ${{ github.workspace }}/.gradle
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/build.gradle.kts', '**/settings.gradle.kts') }}
           restore-keys: |
-            ${{ runner.os }}-gradle-          
+            ${{ runner.os }}-gradle-
 
       - name: Decode Keystore
         if: github.event_name != 'pull_request'
@@ -134,7 +154,7 @@ jobs:
             android/android/build/*.map
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
+
       - name: Save Gradle cache
         if: success()
         uses: actions/cache@v3
@@ -143,4 +163,4 @@ jobs:
             ~/.gradle/caches
             ~/.gradle/wrapper
             ${{ github.workspace }}/.gradle
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/build.gradle.kts', '**/settings.gradle.kts') }}          
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/build.gradle.kts', '**/settings.gradle.kts') }}
