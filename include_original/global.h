@@ -1,16 +1,8 @@
 #ifndef GUARD_GLOBAL_H
 #define GUARD_GLOBAL_H
 
-#include <stdio.h>
 #include <string.h>
 #include <limits.h>
-
-#ifndef NO_STD_LIB_ENABLED
-#define DBGPRINTF(...) printf(__VA_ARGS__)
-#else
-#define DBGPRINTF(...)
-#endif
-
 #include "config/general.h" // we need to define config before gba headers as print stuff needs the functions nulled before defines.
 #include "gba/gba.h"
 #include "assertf.h"
@@ -61,9 +53,6 @@
 #define INCGFX_U16  INCGFX
 #define INCGFX_U32  INCGFX
 #define INCGFX_COMP INCGFX
-void * memcpy(void *, const void *, size_t);
-void * memset(void *, int, size_t);
-int strcmp(const char *, const char*);
 #endif // IDE support
 
 #define ARRAY_COUNT(array) (size_t)(sizeof(array) / sizeof((array)[0]))

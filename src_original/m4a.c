@@ -2,10 +2,6 @@
 #include "gba/m4a_internal.h"
 #include "global.h"
 
-#ifdef PORTABLE
-    #include "cgb_audio.h"
-#endif
-
 extern const u8 gCgb3Vol[];
 
 #define BSS_CODE __attribute__((section(".bss.code")))
@@ -77,9 +73,9 @@ void m4aSoundInit(void)
     SoundInit(&gSoundInfo);
     MPlayExtender(gCgbChans);
     m4aSoundMode(SOUND_MODE_DA_BIT_8
- | SOUND_MODE_FREQ_13379
- | (12 << SOUND_MODE_MASVOL_SHIFT)
- | (5 << SOUND_MODE_MAXCHN_SHIFT));
+               | SOUND_MODE_FREQ_13379
+               | (12 << SOUND_MODE_MASVOL_SHIFT)
+               | (5 << SOUND_MODE_MAXCHN_SHIFT));
 
     for (i = 0; i < NUM_MUSIC_PLAYERS; i++)
     {
@@ -102,12 +98,7 @@ void m4aSoundInit(void)
 
 void m4aSoundMain(void)
 {
-#ifndef PORTABLE
     SoundMain();
-#else
-    extern void RunMixerFrame(void);
-    RunMixerFrame();
-#endif
 }
 
 void m4aSongNumStart(u16 n)
@@ -280,13 +271,6 @@ void MPlayExtender(struct CgbChannel *cgbChans)
     REG_NR30 = 0;
     REG_NR50 = 0x77;
 
-#ifdef PORTABLE
-    for(u8 i = 0; i < 4; i++){
-        cgb_set_envelope(i, 8);
-        cgb_trigger_note(i);
-    }
-#endif
-
     soundInfo = SOUND_INFO_PTR;
 
     ident = soundInfo->ident;
@@ -416,13 +400,7 @@ void SampleFreqSet(u32 freq)
 
     freq = (freq & 0xF0000) >> 16;
     soundInfo->freq = freq;
-
-#ifndef PORTABLE
     soundInfo->pcmSamplesPerVBlank = gPcmSamplesPerVBlankTable[freq - 1];
-#else
-    soundInfo->pcmSamplesPerVBlank = 701;
-#endif
-
     soundInfo->pcmDmaPeriod = PCM_DMA_BUF_SIZE / soundInfo->pcmSamplesPerVBlank;
 
     // LCD refresh rate 59.7275Hz
@@ -439,13 +417,11 @@ void SampleFreqSet(u32 freq)
 
     m4aSoundVSyncOn();
 
-#ifndef PORTABLE
     while (*(vu8 *)REG_ADDR_VCOUNT == 159)
         ;
 
     while (*(vu8 *)REG_ADDR_VCOUNT != 159)
         ;
-#endif
 
     REG_TM0CNT_H = TIMER_ENABLE | TIMER_1CLK;
 }
@@ -641,10 +617,10 @@ void MPlayStart(struct MusicPlayerInfo *mplayInfo, struct SongHeader *songHeader
     unk_B = mplayInfo->unk_B;
 
     if (!unk_B
-     || ((!mplayInfo->songHeader || !(mplayInfo->tracks[0].flags & MPT_FLG_START))
+        || ((!mplayInfo->songHeader || !(mplayInfo->tracks[0].flags & MPT_FLG_START))
             && ((mplayInfo->status & MUSICPLAYER_STATUS_TRACK) == 0
-             || (mplayInfo->status & MUSICPLAYER_STATUS_PAUSE)))
-     || (mplayInfo->priority <= songHeader->priority))
+                || (mplayInfo->status & MUSICPLAYER_STATUS_PAUSE)))
+        || (mplayInfo->priority <= songHeader->priority))
     {
         mplayInfo->ident++;
         mplayInfo->status = 0;
@@ -894,11 +870,6 @@ void CgbOscOff(u8 chanNum)
         REG_NR42 = 8;
         REG_NR44 = 0x80;
     }
-
-#ifdef PORTABLE
-    cgb_set_envelope(chanNum - 1, 8);
-    cgb_trigger_note(chanNum - 1);
-#endif
 }
 
 static inline int CgbPan(struct CgbChannel *chan)
@@ -1022,9 +993,6 @@ void CgbSound(void)
                 {
                 case 1:
                     *nrx0ptr = channels->sweep;
-#ifdef PORTABLE
-                    cgb_set_sweep(channels->sweep);
-#endif
                     // fallthrough
                 case 2:
                     *nrx1ptr = ((u32)channels->wavePointer << 6) + channels->length;
@@ -1038,9 +1006,6 @@ void CgbSound(void)
                         REG_WAVE_RAM2 = channels->wavePointer[2];
                         REG_WAVE_RAM3 = channels->wavePointer[3];
                         channels->currentPointer = channels->wavePointer;
-#ifdef PORTABLE
-                        cgb_set_wavram();
-#endif
                     }
                     *nrx0ptr = 0;
                     *nrx1ptr = channels->length;
@@ -1060,9 +1025,6 @@ void CgbSound(void)
                         channels->n4 = 0x00;
                     break;
                 }
-#ifdef PORTABLE
-                cgb_set_length(ch - 1, channels->length);
-#endif
                 channels->envelopeCounter = channels->attack;
                 if ((s8)(channels->attack & mask))
                 {
@@ -1259,12 +1221,6 @@ void CgbSound(void)
                 if (ch == 1 && !(*nrx0ptr & 0x08))
                     *nrx4ptr = channels->n4 | 0x80;
             }
-
-#ifdef PORTABLE
-            cgb_set_envelope(ch - 1, *nrx2ptr);
-            cgb_toggle_length(ch - 1, (*nrx4ptr & 0x40));
-            cgb_trigger_note(ch - 1);
-#endif
         }
 
     channel_complete:

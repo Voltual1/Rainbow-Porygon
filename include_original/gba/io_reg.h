@@ -1,11 +1,7 @@
 #ifndef GUARD_GBA_IO_REG_H
 #define GUARD_GBA_IO_REG_H
 
-#ifndef PORTABLE
 #define REG_BASE 0x4000000 // I/O register base address
-#else
-extern unsigned char REG_BASE[];
-#endif
 
 // I/O register offsets
 
@@ -497,15 +493,6 @@ extern unsigned char REG_BASE[];
 
 #define REG_RCNT        (*(vu16 *)REG_ADDR_RCNT)
 
-#define REG_JOYCNT      (*(vu16 *)REG_ADDR_JOYCNT)
-#define REG_JOYSTAT     (*(vu16 *)REG_ADDR_JOYSTAT)
-#define REG_JOY_RECV    (*(vu32 *)REG_ADDR_JOY_RECV)
-#define REG_JOY_RECV_L  (*(vu16 *)REG_ADDR_JOY_RECV_L)
-#define REG_JOY_RECV_H  (*(vu16 *)REG_ADDR_JOY_RECV_H)
-#define REG_JOY_TRANS   (*(vu32 *)REG_ADDR_JOY_TRANS)
-#define REG_JOY_TRANS_L (*(vu16 *)REG_ADDR_JOY_TRANS_L)
-#define REG_JOY_TRANS_H (*(vu16 *)REG_ADDR_JOY_TRANS_H)
-
 #define REG_IME         (*(vu16 *)REG_ADDR_IME)
 #define REG_IE          (*(vu16 *)REG_ADDR_IE)
 #define REG_IF          (*(vu16 *)REG_ADDR_IF)
@@ -660,11 +647,9 @@ extern unsigned char REG_BASE[];
 #define DMA_DEST_DEC      0x0020
 #define DMA_DEST_FIXED    0x0040
 #define DMA_DEST_RELOAD   0x0060
-#define DMA_DEST_MASK     0x0060
 #define DMA_SRC_INC       0x0000
 #define DMA_SRC_DEC       0x0080
 #define DMA_SRC_FIXED     0x0100
-#define DMA_SRC_MASK      0x0180
 #define DMA_REPEAT        0x0200
 #define DMA_16BIT         0x0000
 #define DMA_32BIT         0x0400
