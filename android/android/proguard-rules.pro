@@ -1,4 +1,4 @@
--keepnames class ** { *; }
+-keep class me.voltual.rb.** { *; }
 
 -assumenosideeffects class android.util.Log { *; }
  
