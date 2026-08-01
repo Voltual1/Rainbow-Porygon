@@ -140,6 +140,12 @@ dependencies {
     implementation(libs.room3.runtime)
     implementation(libs.sqlite.bundled)
     
+    implementation(libs.datastore.tink)
+    implementation(libs.tink.android)
+    
+    implementation(libs.ftpserver.core)
+    implementation(libs.ftpserver.api)
+    
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.components.resources)    
     implementation(libs.androidx.ui)

@@ -5,3 +5,8 @@
 -assumenosideeffects class kotlinx.coroutines.DebugStrings {
     public static *** toString(...);
 }
+
+-keepclassmembers class org.apache.mina.transport.socket.nio.NioProcessor {
+    protected <methods>;
+    public <methods>;
+}

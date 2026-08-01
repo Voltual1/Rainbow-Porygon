@@ -19,4 +19,6 @@ sealed interface AppDestination : NavKey
 
 @Serializable data object UpdateSettings : AppDestination
 
+@Serializable data object FtpSettings : AppDestination
+
 @Serializable data object ThemeCustomize : AppDestination

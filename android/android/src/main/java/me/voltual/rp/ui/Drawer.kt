@@ -80,6 +80,7 @@ fun NavigationDrawerItems(
         mutableListOf(
             DrawerItem("home", "首页", IconSource.Vector(IcMenuHome), Home),
             DrawerItem("update_settings", "更新设置", IconSource.Vector(Asusupdate), UpdateSettings),
+            DrawerItem("ftp_settings", "文件管理 // FTP", IconSource.Vector(Icons.Default.Share), FtpSettings),
             DrawerItem("settings", "主题设置", IconSource.Vector(IcMenuSettings), ThemeCustomize),
         )
     }

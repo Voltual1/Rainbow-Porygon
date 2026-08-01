@@ -20,6 +20,7 @@ import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDe
 import androidx.navigation3.runtime.*
 import androidx.navigation3.scene.DialogSceneStrategy
 import androidx.navigation3.ui.NavDisplay
+import me.voltual.rp.ui.settings.ftp.FtpSettingsScreen
 import me.voltual.rp.core.ui.animation.*
 import me.voltual.rp.core.ui.theme.ThemeCustomizeScreen
 import me.voltual.rp.ui.settings.update.UpdateSettingsScreen
@@ -94,6 +95,13 @@ fun BBQNavDisplay(
                             val viewModel: UpdateSettingsViewModel = koinViewModel()
                             UpdateSettingsScreen(
                                 viewModel = viewModel,
+                                snackbarHostState = snackbarHostState
+                            )
+                        }
+                        
+                        is FtpSettings -> {
+                            FtpSettingsScreen(
+                                modifier = Modifier.fillMaxSize(),
                                 snackbarHostState = snackbarHostState
                             )
                         }
