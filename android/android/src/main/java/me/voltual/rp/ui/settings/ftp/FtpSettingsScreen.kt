@@ -40,8 +40,9 @@ fun FtpSettingsScreen(
     val ftpSettingsStore: FtpSettingsDataStore = koinInject()
     val scope = rememberCoroutineScope()
     
+    // 使用 ?: 提供一个非空的兜底目录，
     val worldDir = remember {
-    context.getExternalFilesDir(null)
+        context.getExternalFilesDir(null) ?: context.filesDir
     }
 
     val ftpSettingsState by ftpSettingsStore.ftpSettingsFlow.collectAsState(initial = null)
