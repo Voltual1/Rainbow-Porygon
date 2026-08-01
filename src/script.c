@@ -15,6 +15,8 @@
 
 #include "dexnav.h"
 
+extern void SDL_Log(const char *fmt, ...);
+
 #define RAM_SCRIPT_MAGIC 51
 
 enum {
@@ -110,11 +112,21 @@ bool8 RunScriptCommand(struct ScriptContext *ctx)
             }
 
             cmdCode = *(ctx->scriptPtr);
+            if (ctx == &sImmediateScriptContext)
+            {
+                SDL_Log("RunScriptCommand (Immediate): cmdCode = 0x%02X, scriptPtr = %p", cmdCode, ctx->scriptPtr);
+            }
+            else if (ctx == &sGlobalScriptContext)
+            {
+                SDL_Log("RunScriptCommand (Global): cmdCode = 0x%02X, scriptPtr = %p", cmdCode, ctx->scriptPtr);
+            }
+
             ctx->scriptPtr++;
             func = &ctx->cmdTable[cmdCode];
 
             if (func >= ctx->cmdTableEnd)
             {
+                SDL_Log("RunScriptCommand: command 0x%02X out of bounds, stopping", cmdCode);
                 ctx->mode = SCRIPT_MODE_STOPPED;
                 return FALSE;
             }
@@ -122,6 +134,10 @@ bool8 RunScriptCommand(struct ScriptContext *ctx)
             ScrCmdFunc cmdFunc = (ScrCmdFunc)STRIP_DOMIRROR_TAG(*func);
             if (cmdFunc(ctx) == TRUE)
             {
+                if (ctx == &sImmediateScriptContext || ctx == &sGlobalScriptContext)
+                {
+                    SDL_Log("RunScriptCommand: cmdCode 0x%02X yielded (returned TRUE)", cmdCode);
+                }
                 return TRUE;
             }
         }
@@ -292,9 +308,20 @@ void ScriptContext_Enable(void)
 
 void RunScriptImmediately(const u8 *ptr)
 {
+    SDL_Log("RunScriptImmediately: Start ptr = %p", ptr);
     InitScriptContext(&sImmediateScriptContext, gScriptCmdTable, gScriptCmdTableEnd);
     SetupBytecodeScript(&sImmediateScriptContext, ptr);
-    while (RunScriptCommand(&sImmediateScriptContext) == TRUE);
+    int loopCount = 0;
+    while (RunScriptCommand(&sImmediateScriptContext) == TRUE)
+    {
+        loopCount++;
+        if (loopCount > 5000)
+        {
+            SDL_Log("RunScriptImmediately: WARNING! Infinite loop detected inside immediate script! loopCount = %d", loopCount);
+            break;
+        }
+    }
+    SDL_Log("RunScriptImmediately: End ptr = %p, total loops = %d", ptr, loopCount);
 }
 
 const u8 *MapHeaderGetScriptTable(u8 tag)
@@ -319,40 +346,12 @@ const u8 *MapHeaderGetScriptTable(u8 tag)
 
 void MapHeaderRunScriptType(u8 tag)
 {
+    SDL_Log("MapHeaderRunScriptType: tag = %d", tag);
     const u8 *ptr = MapHeaderGetScriptTable(tag);
+    SDL_Log("MapHeaderRunScriptType: tag = %d, script table ptr = %p", tag, ptr);
     if (ptr)
         RunScriptImmediately(ptr);
-}
-
-const u8 *MapHeaderCheckScriptTable(u8 tag)
-{
-    const u8 *ptr = MapHeaderGetScriptTable(tag);
-
-    if (!ptr)
-        return NULL;
-
-    while (1)
-    {
-        u16 varIndex1;
-        u16 varIndex2;
-
-        varIndex1 = T1_READ_16(ptr);
-        if (!varIndex1)
-            return NULL;
-        ptr += 2;
-
-        varIndex2 = T1_READ_16(ptr);
-        ptr += 2;
-
-        if (VarGet(varIndex1) == VarGet(varIndex2))
-        {
-            const u8 *mapScript = T2_READ_PTR(ptr);
-            if (!Script_HasNoEffect(mapScript))
-                return mapScript;
-        }
-
-        ptr += 4;
-    }
+    SDL_Log("MapHeaderRunScriptType: tag = %d finished", tag);
 }
 
 void RunOnLoadMapScript(void)
