@@ -85,6 +85,8 @@
 #include "constants/weather.h"
 #include "dma3.h"
 
+extern void SDL_Log(const char *fmt, ...);
+
 STATIC_ASSERT((B_FLAG_FOLLOWERS_DISABLED == 0 || OW_FOLLOWERS_ENABLED), FollowersFlagAssignedWithoutEnablingThem);
 
 struct CableClubPlayer
@@ -926,7 +928,7 @@ void LoadMapFromCameraTransition(u8 mapGroup, u8 mapNum)
     else
     {
         if (gMapHeader.regionMapSectionId != MAPSEC_BATTLE_FRONTIER
-| gMapHeader.regionMapSectionId != sLastMapSectionId)
+            && gMapHeader.regionMapSectionId != sLastMapSectionId)
             ShowMapNamePopup();
     }
     SetMinimumOWESpawnTimer();
@@ -1053,7 +1055,7 @@ bool8 MetatileBehavior_IsSurfableInSeafoamIslands(u16 metatileBehavior)
         return FALSE;
     if ((gSaveBlock1Ptr->location.mapGroup == MAP_GROUP(MAP_SEAFOAM_ISLANDS_B3F)
           && gSaveBlock1Ptr->location.mapNum == MAP_NUM(MAP_SEAFOAM_ISLANDS_B3F))
-| (gSaveBlock1Ptr->location.mapGroup == MAP_GROUP(MAP_SEAFOAM_ISLANDS_B4F)
+        || (gSaveBlock1Ptr->location.mapGroup == MAP_GROUP(MAP_SEAFOAM_ISLANDS_B4F)
           && gSaveBlock1Ptr->location.mapNum == MAP_NUM(MAP_SEAFOAM_ISLANDS_B4F)))
     {
         return TRUE;
@@ -1083,7 +1085,7 @@ static enum Direction GetAdjustedInitialDirection(struct InitialPlayerAvatarStat
     else if (MetatileBehavior_IsDirectionalUpLeftStairWarp(metatileBehavior) == TRUE || MetatileBehavior_IsDirectionalDownLeftStairWarp(metatileBehavior) == TRUE)
         return DIR_EAST;
     else if ((playerStruct->transitionFlags == PLAYER_AVATAR_FLAG_UNDERWATER  && transitionFlags == PLAYER_AVATAR_FLAG_SURFING)
-| (playerStruct->transitionFlags == PLAYER_AVATAR_FLAG_SURFING && transitionFlags == PLAYER_AVATAR_FLAG_UNDERWATER))
+        || (playerStruct->transitionFlags == PLAYER_AVATAR_FLAG_SURFING && transitionFlags == PLAYER_AVATAR_FLAG_UNDERWATER))
         return playerStruct->direction;
     else if (MetatileBehavior_IsLadder(metatileBehavior) == TRUE)
         return playerStruct->direction;
@@ -1199,7 +1201,7 @@ static bool16 IsInfiltratedWeatherInstitute(struct WarpData *warp)
     else if (warp->mapGroup != MAP_GROUP(MAP_ROUTE119_WEATHER_INSTITUTE_1F))
         return FALSE;
     else if (warp->mapNum == MAP_NUM(MAP_ROUTE119_WEATHER_INSTITUTE_1F)
-| warp->mapNum == MAP_NUM(MAP_ROUTE119_WEATHER_INSTITUTE_2F))
+        || warp->mapNum == MAP_NUM(MAP_ROUTE119_WEATHER_INSTITUTE_2F))
         return TRUE;
     else
         return FALSE;
@@ -1214,7 +1216,7 @@ static bool16 IsInfiltratedSpaceCenter(struct WarpData *warp)
     else if (warp->mapGroup != MAP_GROUP(MAP_MOSSDEEP_CITY_SPACE_CENTER_1F))
         return FALSE;
     else if (warp->mapNum == MAP_NUM(MAP_MOSSDEEP_CITY_SPACE_CENTER_1F)
-| warp->mapNum == MAP_NUM(MAP_MOSSDEEP_CITY_SPACE_CENTER_2F))
+        || warp->mapNum == MAP_NUM(MAP_MOSSDEEP_CITY_SPACE_CENTER_2F))
         return TRUE;
     return FALSE;
 }
@@ -1544,10 +1546,10 @@ mapsec_u8_t GetLastUsedWarpMapSectionId(void)
 bool8 IsMapTypeOutdoors(enum MapType mapType)
 {
     if (mapType == MAP_TYPE_ROUTE
-| mapType == MAP_TYPE_TOWN
-| mapType == MAP_TYPE_UNDERWATER
-| mapType == MAP_TYPE_CITY
-| mapType == MAP_TYPE_OCEAN_ROUTE)
+ || mapType == MAP_TYPE_TOWN
+ || mapType == MAP_TYPE_UNDERWATER
+ || mapType == MAP_TYPE_CITY
+ || mapType == MAP_TYPE_OCEAN_ROUTE)
         return TRUE;
     else
         return FALSE;
@@ -1556,9 +1558,9 @@ bool8 IsMapTypeOutdoors(enum MapType mapType)
 bool8 Overworld_MapTypeAllowsTeleportAndFly(enum MapType mapType)
 {
     if (mapType == MAP_TYPE_ROUTE
-| mapType == MAP_TYPE_TOWN
-| mapType == MAP_TYPE_OCEAN_ROUTE
-| mapType == MAP_TYPE_CITY)
+ || mapType == MAP_TYPE_TOWN
+ || mapType == MAP_TYPE_OCEAN_ROUTE
+ || mapType == MAP_TYPE_CITY)
         return TRUE;
     else
         return FALSE;
@@ -1567,7 +1569,7 @@ bool8 Overworld_MapTypeAllowsTeleportAndFly(enum MapType mapType)
 bool8 IsMapTypeIndoors(enum MapType mapType)
 {
     if (mapType == MAP_TYPE_INDOOR
-| mapType == MAP_TYPE_SECRET_BASE)
+ || mapType == MAP_TYPE_SECRET_BASE)
         return TRUE;
     else
         return FALSE;
@@ -1770,9 +1772,9 @@ bool32 MapHasNaturalLight(enum MapType mapType)
 {
     return (OW_ENABLE_DNS
          && (mapType == MAP_TYPE_TOWN
-| mapType == MAP_TYPE_CITY
-| mapType == MAP_TYPE_ROUTE
-| mapType == MAP_TYPE_OCEAN_ROUTE));
+ || mapType == MAP_TYPE_CITY
+ || mapType == MAP_TYPE_ROUTE
+ || mapType == MAP_TYPE_OCEAN_ROUTE));
 }
 
 bool32 CurrentMapHasShadows(void)
@@ -1859,10 +1861,10 @@ static void OverworldBasic(void)
         FormChangeTimeUpdate();
         if (MapHasNaturalLight(gMapHeader.mapType) &&
            (bld0[0] != bld1[0]
-|| bld0[1] != bld1[1]
-|| bld0[2] != bld1[2]))
+            || bld0[1] != bld1[1]
+            || bld0[2] != bld1[2]))
         {
-            ApplyWeatherColorMapIfIdle(gWeatherPtr->colorMapIndex);
+            ApplyWeatherColorIfIdle(gWeatherPtr->colorMapIndex);
         }
     }
     UpdateOverworldWildEncounter();
@@ -1924,27 +1926,42 @@ static bool8 RunFieldCallback(void)
 
 void CB2_NewGame(void)
 {
+    SDL_Log("CB2_NewGame: Start");
     FieldClearVBlankHBlankCallbacks();
+    SDL_Log("CB2_NewGame: FieldClearVBlankHBlankCallbacks done");
     StopMapMusic();
+    SDL_Log("CB2_NewGame: StopMapMusic done");
     ResetSafariZoneFlag_();
+    SDL_Log("CB2_NewGame: ResetSafariZoneFlag_ done");
     NewGameInitData();
+    SDL_Log("CB2_NewGame: NewGameInitData done");
     ResetInitialPlayerAvatarState();
+    SDL_Log("CB2_NewGame: ResetInitialPlayerAvatarState done");
     PlayTimeCounter_Start();
+    SDL_Log("CB2_NewGame: PlayTimeCounter_Start done");
     ScriptContext_Init();
+    SDL_Log("CB2_NewGame: ScriptContext_Init done");
     UnlockPlayerFieldControls();
+    SDL_Log("CB2_NewGame: UnlockPlayerFieldControls done");
     if (IS_FRLG)
         gFieldCallback = FieldCB_WarpExitFadeFromBlack;
     else
         gFieldCallback = ExecuteTruckSequence;
     gFieldCallback2 = NULL;
+    SDL_Log("CB2_NewGame: Starting DoMapLoadLoop");
     DoMapLoadLoop(&gMain.state);
+    SDL_Log("CB2_NewGame: DoMapLoadLoop finished");
     SetFieldVBlankCallback();
+    SDL_Log("CB2_NewGame: SetFieldVBlankCallback done");
     SetMainCallback1(CB1_Overworld);
     SetMainCallback2(CB2_Overworld);
+    SDL_Log("CB2_NewGame: Callback setup done");
 #if OW_USE_FAKE_RTC
     // Wall clock now track local time so we set it to 10AM to match initial wall clock time
     RtcCalcLocalTimeOffset(0, 10, 0, 0);
+    SDL_Log("CB2_NewGame: RtcCalcLocalTimeOffset done");
 #endif
+    SDL_Log("CB2_NewGame: End");
 }
 
 void CB2_WhiteOut(void)
@@ -2294,75 +2311,106 @@ static bool32 LoadMapInStepsLink(u8 *state)
 
 static bool32 LoadMapInStepsLocal(u8 *state, bool32 a2)
 {
+    SDL_Log("LoadMapInStepsLocal: current state = %d", *state);
     switch (*state)
     {
     case 0:
+        SDL_Log("LoadMapInStepsLocal: Step 0");
         FieldClearVBlankHBlankCallbacks();
         LoadMapFromWarp(a2);
         (*state)++;
         break;
     case 1:
+        SDL_Log("LoadMapInStepsLocal: Step 1");
         ResetMirageTowerAndSaveBlockPtrs();
         ResetScreenForMapLoad();
         (*state)++;
         break;
     case 2:
+        SDL_Log("LoadMapInStepsLocal: Step 2");
         ResumeMap(a2);
         (*state)++;
         break;
     case 3:
+        SDL_Log("LoadMapInStepsLocal: Step 3");
         InitObjectEventsLocal();
         SetCameraToTrackPlayer();
         (*state)++;
         break;
     case 4:
+        SDL_Log("LoadMapInStepsLocal: Step 4");
         InitCurrentFlashLevelScanlineEffect();
         InitOverworldGraphicsRegisters();
         InitTextBoxGfxAndPrinters();
         (*state)++;
         break;
     case 5:
+        SDL_Log("LoadMapInStepsLocal: Step 5");
         ResetFieldCamera();
         (*state)++;
         break;
     case 6:
+        SDL_Log("LoadMapInStepsLocal: Step 6");
         CopyPrimaryTilesetToVram(gMapHeader.mapLayout);
         (*state)++;
         break;
     case 7:
+        SDL_Log("LoadMapInStepsLocal: Step 7");
         CopySecondaryTilesetToVram(gMapHeader.mapLayout);
         (*state)++;
         break;
     case 8:
+        SDL_Log("LoadMapInStepsLocal: Step 8");
         if (FreeTempTileDataBuffersIfPossible() != TRUE)
         {
+            SDL_Log("LoadMapInStepsLocal: Step 8 - FreeTempTileDataBuffersIfPossible returned false, moving to next step");
             LoadMapTilesetPalettes(gMapHeader.mapLayout);
             (*state)++;
         }
+        else
+        {
+            SDL_Log("LoadMapInStepsLocal: Step 8 - FreeTempTileDataBuffersIfPossible returned true, waiting...");
+        }
         break;
     case 9:
+        SDL_Log("LoadMapInStepsLocal: Step 9");
         DrawWholeMapView();
         (*state)++;
         break;
     case 10:
+        SDL_Log("LoadMapInStepsLocal: Step 10");
         InitTilesetAnimations();
         (*state)++;
         break;
     case 11:
+        SDL_Log("LoadMapInStepsLocal: Step 11");
         if (ShouldRunMapPreview() && CurrentMapHasPreviewScreen(MPS_TYPE_FADE_IN) == TRUE)
         {
+            SDL_Log("LoadMapInStepsLocal: Step 11 - Map preview running");
             MapPreview_LoadGfx(gMapHeader.regionMapSectionId);
             RunMapPreviewScreenFadeIn(gMapHeader.regionMapSectionId);
         }
         else if (gMapHeader.showMapName == TRUE && SecretBaseMapPopupEnabled() == TRUE)
+        {
+            SDL_Log("LoadMapInStepsLocal: Step 11 - Showing map name popup");
             ShowMapNamePopup();
+        }
         (*state)++;
         break;
     case 12:
+        SDL_Log("LoadMapInStepsLocal: Step 12");
         if (RunFieldCallback())
+        {
+            SDL_Log("LoadMapInStepsLocal: Step 12 - RunFieldCallback returned true");
             (*state)++;
+        }
+        else
+        {
+            SDL_Log("LoadMapInStepsLocal: Step 12 - RunFieldCallback returned false");
+        }
         break;
     case 13:
+        SDL_Log("LoadMapInStepsLocal: Step 13 (Done)");
         return TRUE;
     }
 
@@ -2482,14 +2530,17 @@ static bool32 ReturnToFieldLink(u8 *state)
 
 static void DoMapLoadLoop(u8 *state)
 {
+    SDL_Log("DoMapLoadLoop: Entering loop, initial state = %d", *state);
     while (!LoadMapInStepsLocal(state, FALSE))
     {
+        SDL_Log("DoMapLoadLoop: Loop tick, state = %d", *state);
 #if defined(__ANDROID__) || defined(__linux__) || defined(__APPLE__) || defined(_WIN32)
         // Pump DMA3 requests so that FreeTempTileDataBuffersIfPossible does not deadlock
         // waiting for DMA3 completion in environments without hardware preemption.
         ProcessDma3Requests();
 #endif
     }
+    SDL_Log("DoMapLoadLoop: Exited loop, final state = %d", *state);
 }
 
 static void ResetMirageTowerAndSaveBlockPtrs(void)
@@ -3615,7 +3666,7 @@ static u8 LinkPlayerGetCollision(u8 selfObjEventId, enum Direction direction, s1
         if (i != selfObjEventId)
         {
             if ((gObjectEvents[i].currentCoords.x == x && gObjectEvents[i].currentCoords.y == y)
-| (gObjectEvents[i].previousCoords.x == x && gObjectEvents[i].previousCoords.y == y))
+             || (gObjectEvents[i].previousCoords.x == x && gObjectEvents[i].previousCoords.y == y))
             {
                 return 1;
             }

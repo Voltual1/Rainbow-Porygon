@@ -52,6 +52,8 @@
 #include "difficulty.h"
 #include "follower_npc.h"
 
+extern void SDL_Log(const char *fmt, ...);
+
 extern const u8 EventScript_ResetAllMapFlags[];
 extern const u8 EventScript_ResetAllMapFlagsFrlg[];
 
@@ -164,10 +166,16 @@ void NewGameInitData(void)
     u8 rivalName[PLAYER_NAME_LENGTH + 1];
 #endif
     
+    SDL_Log("NewGameInitData: Start");
     SetSaveBlocksPointers(0);
+    SDL_Log("NewGameInitData: SetSaveBlocksPointers done");
     
     if (gSaveFileStatus == SAVE_STATUS_EMPTY || gSaveFileStatus == SAVE_STATUS_CORRUPT)
+    {
+        SDL_Log("NewGameInitData: RtcReset starting");
         RtcReset();
+        SDL_Log("NewGameInitData: RtcReset done");
+    }
 
 #if IS_FRLG
     StringCopy(rivalName, gSaveBlock1Ptr->rivalName);
@@ -183,10 +191,14 @@ void NewGameInitData(void)
     ClearAllMail();
     gSaveBlock2Ptr->specialSaveWarpFlags = 0;
     gSaveBlock2Ptr->gcnLinkFlags = 0;
+    SDL_Log("NewGameInitData: InitPlayerTrainerId starting");
     InitPlayerTrainerId();
+    SDL_Log("NewGameInitData: InitPlayerTrainerId done");
     PlayTimeCounter_Reset();
     ClearPokedexFlags();
+    SDL_Log("NewGameInitData: InitEventData starting");
     InitEventData();
+    SDL_Log("NewGameInitData: InitEventData done");
     ClearTVShowData();
     ResetGabbyAndTy();
     ClearSecretBases();
@@ -214,11 +226,21 @@ void NewGameInitData(void)
     ResetFanClub();
     ResetLotteryCorner();
     UpdateDailySeed();
+    SDL_Log("NewGameInitData: WarpToTruck starting");
     WarpToTruck();
+    SDL_Log("NewGameInitData: WarpToTruck done");
     if (IS_FRLG)
+    {
+        SDL_Log("NewGameInitData: RunScriptImmediately EventScript_ResetAllMapFlagsFrlg starting");
         RunScriptImmediately(EventScript_ResetAllMapFlagsFrlg);
+        SDL_Log("NewGameInitData: RunScriptImmediately done");
+    }
     else
+    {
+        SDL_Log("NewGameInitData: RunScriptImmediately EventScript_ResetAllMapFlags starting");
         RunScriptImmediately(EventScript_ResetAllMapFlags);
+        SDL_Log("NewGameInitData: RunScriptImmediately done");
+    }
 #if IS_FRLG
         StringCopy(gSaveBlock1Ptr->rivalName, rivalName);
 #endif
@@ -237,6 +259,7 @@ void NewGameInitData(void)
     ResetItemFlags();
     ResetDexNav();
     ClearFollowerNPCData();
+    SDL_Log("NewGameInitData: End");
 }
 
 static void ResetMiniGamesRecords(void)
