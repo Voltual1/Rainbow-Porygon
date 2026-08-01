@@ -18,4 +18,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "Rainbow-Porygon"
-include(":android")
+include(":android","legacy")
