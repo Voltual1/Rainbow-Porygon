@@ -1864,7 +1864,7 @@ static void OverworldBasic(void)
             || bld0[1] != bld1[1]
             || bld0[2] != bld1[2]))
         {
-            ApplyWeatherColorIfIdle(gWeatherPtr->colorMapIndex);
+            ApplyWeatherColorMapIfIdle(gWeatherPtr->colorMapIndex);
         }
     }
     UpdateOverworldWildEncounter();
