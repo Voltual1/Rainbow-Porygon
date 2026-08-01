@@ -13,7 +13,7 @@ android {
 
     namespace = "me.voltual.rp.legacy"
     compileSdk = 37
-    ndkVersion = "29.0.14206865"
+    ndkVersion = "25.2.9519653"
 
     base {
         archivesName.set("Rainbow-Porygon")
