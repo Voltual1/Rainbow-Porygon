@@ -15,6 +15,7 @@ import androidx.datastore.preferences.preferencesDataStoreFile
 import me.voltual.rp.core.database.*
 import me.voltual.rp.core.database.dao.*
 import me.voltual.rp.data.*
+import me.voltual.rp.core.ftp.FtpServerManager
 import me.voltual.rp.ui.settings.update.*
 import org.koin.android.ext.koin.androidApplication
 import org.koin.android.ext.koin.androidContext
@@ -59,6 +60,8 @@ val appModule = module {
       
     // 业务层 DataStore 包装类
     single { UserAgreementDataStore(get(USER_AGREEMENT_STORE_QUALIFIER)) }
+    single { FtpSettingsDataStore(androidContext()) }
+    single { FtpServerManager(androidContext(), get()) }
     single { UpdateSettingsDataStore(get(UPDATE_SETTINGS_STORE_QUALIFIER)) }
     single { ThemeColorDataStore(get(THEME_SETTINGS_STORE_QUALIFIER)) }
     single { DrawerMenuDataStore(get(DRAWER_MENU_STORE_QUALIFIER)) }
