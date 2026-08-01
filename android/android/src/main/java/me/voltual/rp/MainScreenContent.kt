@@ -237,6 +237,7 @@ fun getTitleForDestination(route: NavKey?): String {
         Home -> "主页"
         ThemeCustomize -> "主题定制"
         UpdateSettings -> "更新设置"
+        FtpSettings -> "FTP文件管理"        
         else -> "在~ $route ~里~哦"
     }
 }

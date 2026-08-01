@@ -41,7 +41,7 @@ fun FtpSettingsScreen(
     val scope = rememberCoroutineScope()
     
     val worldDir = remember {
-    context.filesDir
+    context.getExternalFilesDir(null)
     }
 
     val ftpSettingsState by ftpSettingsStore.ftpSettingsFlow.collectAsState(initial = null)
