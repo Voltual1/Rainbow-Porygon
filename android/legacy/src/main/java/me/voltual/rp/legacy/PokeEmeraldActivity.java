@@ -42,6 +42,7 @@ package me.voltual.rp.legacy;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.Build;
+import me.voltual.rp.GbaControlsView
 import android.view.View;
 import android.view.ViewGroup;
 
