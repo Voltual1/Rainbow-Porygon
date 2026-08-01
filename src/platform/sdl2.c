@@ -158,12 +158,19 @@ int main(int argc, char **argv)
 #endif
 
 #ifdef __ANDROID__
-    char *prefPath = SDL_GetPrefPath("pokeemerald", "pokeemerald");
-    if (prefPath != NULL)
-    {
-        SDL_snprintf(sSavePath, sizeof(sSavePath), "%spokeemerald.sav", prefPath);
-        SDL_snprintf(sConfigPath, sizeof(sConfigPath), "%spokeemerald.cfg", prefPath);
-        SDL_free(prefPath);
+    // 优先用外部 files 目录（Android/data/包名/files/）
+    char *extPath = SDL_AndroidGetExternalStoragePath();
+    if (extPath != NULL) {
+        SDL_snprintf(sSavePath, sizeof(sSavePath), "%s/pokeemerald.sav", extPath);
+        SDL_snprintf(sConfigPath, sizeof(sConfigPath), "%s/pokeemerald.cfg", extPath);
+    } else {
+        // 回退到原来的 prefPath（极少情况）
+        char *prefPath = SDL_GetPrefPath("pokeemerald", "pokeemerald");
+        if (prefPath) {
+            SDL_snprintf(sSavePath, sizeof(sSavePath), "%spokeemerald.sav", prefPath);
+            SDL_snprintf(sConfigPath, sizeof(sConfigPath), "%spokeemerald.cfg", prefPath);
+            SDL_free(prefPath);
+        }
     }
 #endif
     ReadSaveFile(sSavePath);
