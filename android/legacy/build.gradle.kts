@@ -109,7 +109,7 @@ android {
 
     sourceSets {
         getByName("main") {
-            java.srcDirs("../SDL2/android-project/app/src/main/java")
+//            java.srcDirs("../SDL2/android-project/app/src/main/java")
             assets.srcDir(layout.buildDirectory.dir("generated/borderAssets"))
         }
     }

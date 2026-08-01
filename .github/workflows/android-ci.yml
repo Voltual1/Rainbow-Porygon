@@ -158,7 +158,7 @@ jobs:
       - name: Build Android APK
         run: |
           chmod +x android/SDL2/android-project/gradlew
-          android/SDL2/android-project/gradlew -p android :android:assembleDebug
+          android/SDL2/android-project/gradlew -p android :android:assembleRelease
         env:
           KEYSTORE_PATH: ../../release.keystore
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}

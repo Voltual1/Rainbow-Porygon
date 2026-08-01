@@ -153,8 +153,8 @@ jobs:
 
       - name: Build Android Legacy APK
         run: |
-          chmod +x android/SDL2/android-project/gradlew
-          android/SDL2/android-project/gradlew -p android :legacy:assembleDebug
+          chmod +x android/gradlew
+          android/gradlew legacy:assembleRelease
         env:
           KEYSTORE_PATH: ../../release.keystore
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
