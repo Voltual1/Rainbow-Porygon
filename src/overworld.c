@@ -939,60 +939,105 @@ static void LoadMapFromWarp(bool32 a1)
     bool8 isOutdoors;
     bool8 isIndoors;
 
+    SDL_Log("LoadMapFromWarp: Start");
     LoadCurrentMapData();
+    SDL_Log("LoadMapFromWarp: LoadCurrentMapData done");
     if (!(sObjectEventLoadFlag & SKIP_OBJECT_EVENT_LOAD))
     {
         if (gMapHeader.mapLayoutId == LAYOUT_BATTLE_FRONTIER_BATTLE_PYRAMID_FLOOR)
+        {
+            SDL_Log("LoadMapFromWarp: LoadBattlePyramidObjectEventTemplates starting");
             LoadBattlePyramidObjectEventTemplates();
+        }
         else if (InTrainerHill())
+        {
+            SDL_Log("LoadMapFromWarp: LoadTrainerHillObjectEventTemplates starting");
             LoadTrainerHillObjectEventTemplates();
+        }
         else
+        {
+            SDL_Log("LoadMapFromWarp: LoadObjEventTemplatesFromHeader starting");
             LoadObjEventTemplatesFromHeader();
+        }
+        SDL_Log("LoadMapFromWarp: ObjectEventTemplates loading done");
     }
 
     isOutdoors = IsMapTypeOutdoors(gMapHeader.mapType);
     isIndoors = IsMapTypeIndoors(gMapHeader.mapType);
 
+    SDL_Log("LoadMapFromWarp: CheckLeftFriendsSecretBase starting");
     CheckLeftFriendsSecretBase();
+    SDL_Log("LoadMapFromWarp: TrySetMapSaveWarpStatus starting");
     TrySetMapSaveWarpStatus();
+    SDL_Log("LoadMapFromWarp: ClearTempFieldEventData starting");
     ClearTempFieldEventData();
+    SDL_Log("LoadMapFromWarp: ResetDexNavSearch starting");
     ResetDexNavSearch();
     // reset hours override on every warp
     sHoursOverride = 0;
+    SDL_Log("LoadMapFromWarp: ResetCyclingRoadChallengeData starting");
     ResetCyclingRoadChallengeData();
+    SDL_Log("LoadMapFromWarp: RestartWildEncounterImmunitySteps starting");
     RestartWildEncounterImmunitySteps();
 #if FREE_MATCH_CALL == FALSE
+    SDL_Log("LoadMapFromWarp: TryUpdateRandomTrainerRematches starting");
     TryUpdateRandomTrainerRematches(gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum);
 #endif //FREE_MATCH_CALL
 
     if (I_VS_SEEKER_CHARGING != 0)
+    {
+         SDL_Log("LoadMapFromWarp: MapResetTrainerRematches starting");
          MapResetTrainerRematches(gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum);
+    }
 
     if (a1 != TRUE)
+    {
+        SDL_Log("LoadMapFromWarp: DoTimeBasedEvents starting");
         DoTimeBasedEvents();
+    }
+    SDL_Log("LoadMapFromWarp: SetSavedWeatherFromCurrMapHeader starting");
     SetSavedWeatherFromCurrMapHeader();
+    SDL_Log("LoadMapFromWarp: ChooseAmbientCrySpecies starting");
     ChooseAmbientCrySpecies();
     if (isOutdoors)
         FlagClear(FLAG_SYS_USE_FLASH);
+    SDL_Log("LoadMapFromWarp: SetDefaultFlashLevel starting");
     SetDefaultFlashLevel();
+    SDL_Log("LoadMapFromWarp: Overworld_ClearSavedMusic starting");
     Overworld_ClearSavedMusic();
+    SDL_Log("LoadMapFromWarp: RunOnTransitionMapScript starting");
     RunOnTransitionMapScript();
+    SDL_Log("LoadMapFromWarp: UpdateLocationHistoryForRoamer starting");
     UpdateLocationHistoryForRoamer();
+    SDL_Log("LoadMapFromWarp: MoveAllRoamersToOtherLocationSets starting");
     MoveAllRoamersToOtherLocationSets();
     gChainFishingDexNavStreak = 0;
     if (gMapHeader.mapLayoutId == LAYOUT_BATTLE_FRONTIER_BATTLE_PYRAMID_FLOOR)
+    {
+        SDL_Log("LoadMapFromWarp: InitBattlePyramidMap starting");
         InitBattlePyramidMap(FALSE);
+    }
     else if (InTrainerHill())
+    {
+        SDL_Log("LoadMapFromWarp: InitTrainerHillMap starting");
         InitTrainerHillMap();
+    }
     else
+    {
+        SDL_Log("LoadMapFromWarp: InitMap starting");
         InitMap();
+    }
 
     if (a1 != TRUE && isIndoors)
     {
+        SDL_Log("LoadMapFromWarp: UpdateTVScreensOnMap starting");
         UpdateTVScreensOnMap(gBackupMapLayout.width, gBackupMapLayout.height);
+        SDL_Log("LoadMapFromWarp: InitSecretBaseAppearance starting");
         InitSecretBaseAppearance(TRUE);
     }
+    SDL_Log("LoadMapFromWarp: SetMinimumOWESpawnTimer starting");
     SetMinimumOWESpawnTimer();
+    SDL_Log("LoadMapFromWarp: End");
 }
 
 void ResetInitialPlayerAvatarState(void)
