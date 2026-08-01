@@ -354,6 +354,37 @@ void MapHeaderRunScriptType(u8 tag)
     SDL_Log("MapHeaderRunScriptType: tag = %d finished", tag);
 }
 
+const u8 *MapHeaderCheckScriptTable(u8 tag)
+{
+    const u8 *ptr = MapHeaderGetScriptTable(tag);
+
+    if (!ptr)
+        return NULL;
+
+    while (1)
+    {
+        u16 varIndex1;
+        u16 varIndex2;
+
+        varIndex1 = T1_READ_16(ptr);
+        if (!varIndex1)
+            return NULL;
+        ptr += 2;
+
+        varIndex2 = T1_READ_16(ptr);
+        ptr += 2;
+
+        if (VarGet(varIndex1) == VarGet(varIndex2))
+        {
+            const u8 *mapScript = T2_READ_PTR(ptr);
+            if (!Script_HasNoEffect(mapScript))
+                return mapScript;
+        }
+
+        ptr += 4;
+    }
+}
+
 void RunOnLoadMapScript(void)
 {
     MapHeaderRunScriptType(MAP_SCRIPT_ON_LOAD);
