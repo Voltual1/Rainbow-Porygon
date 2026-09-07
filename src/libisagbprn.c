@@ -163,7 +163,11 @@ void AGBAssert(const char *pFile, int nLine, const char *pExpression, int nStopP
     {
         AGBPrintf("ASSERTION FAILED  FILE=[%s] LINE=[%d]  EXP=[%s] \n", pFile, nLine, pExpression);
         AGBPrintFlush();
+#if defined(__arm__) && !defined(PORTABLE)
         asm(".hword 0xEFFF");
+#else
+        __builtin_trap();
+#endif
     }
     else
     {
@@ -176,7 +180,7 @@ void AGBAssert(const char *pFile, int nLine, const char *pExpression, int nStopP
 #if (LOG_HANDLER == LOG_HANDLER_NOCASH_PRINT)
 void NoCashGBAPrint(const char *pBuf)
 {
-    *(volatile u32 *)NOCASHGBAPRINTADDR2 = (u32)pBuf;
+    *(volatile u32 *)NOCASHGBAPRINTADDR2 = (u32)(uintptr_t)pBuf;
 }
 
 void NoCashGBAPrintf(const char *pBuf, ...)
@@ -200,7 +204,11 @@ void NoCashGBAAssert(const char *pFile, s32 nLine, const char *pExpression, bool
     if (nStopProgram)
     {
         NoCashGBAPrintf("ASSERTION FAILED  FILE=[%s] LINE=[%d]  EXP=[%s]", pFile, nLine, pExpression);
+#if defined(__arm__) && !defined(PORTABLE)
         asm(".hword 0xEFFF");
+#else
+        __builtin_trap();
+#endif
     }
     else
     {
@@ -246,7 +254,11 @@ void MgbaAssert(const char *pFile, s32 nLine, const char *pExpression, bool32 nS
     if (nStopProgram)
     {
         MgbaPrintf(MGBA_LOG_ERROR, "ASSERTION FAILED  FILE=[%s] LINE=[%d]  EXP=[%s]", pFile, nLine, pExpression);
+#if defined(__arm__) && !defined(PORTABLE)
         asm(".hword 0xEFFF");
+#else
+        __builtin_trap();
+#endif
     }
     else
     {
