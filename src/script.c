@@ -1,3 +1,4 @@
+#include <setjmp.h>
 #include "global.h"
 #include "script.h"
 #include "event_data.h"
@@ -537,7 +538,7 @@ bool8 LoadTrainerObjectScript(void)
 
 struct ScriptEffectContext {
     u32 breakOn;
-    intptr_t breakTo[5];
+    jmp_buf breakTo;
     const u8 *nextCmd;
 };
 
@@ -550,7 +551,7 @@ static bool32 Script_IsEffectInstrumentedCommand(ScrCmdFunc func)
 
 static bool32 RunScriptImmediatelyUntilEffect_InternalLoop(struct ScriptContext *ctx)
 {
-    if (__builtin_setjmp(gScriptEffectContext->breakTo) == 0)
+    if (setjmp(gScriptEffectContext->breakTo) == 0)
     {
         while (TRUE)
         {
@@ -588,7 +589,7 @@ static bool32 RunScriptImmediatelyUntilEffect_InternalLoop(struct ScriptContext 
 
 void Script_GotoBreak_Internal(void)
 {
-    __builtin_longjmp(gScriptEffectContext->breakTo, 1);
+    longjmp(gScriptEffectContext->breakTo, 1);
 }
 
 bool32 RunScriptImmediatelyUntilEffect_Internal(u32 effects, const u8 *ptr, struct ScriptContext *ctx)
@@ -625,7 +626,7 @@ bool32 Script_HasNoEffect(const u8 *ptr)
 void Script_RequestEffects_Internal(u32 effects)
 {
     if (gScriptEffectContext->breakOn & effects)
-        __builtin_longjmp(gScriptEffectContext->breakTo, 1);
+        longjmp(gScriptEffectContext->breakTo, 1);
 }
 
 void Script_RequestWriteVar_Internal(u32 varId)
@@ -642,7 +643,7 @@ bool32 Script_MatchesCallNative(const u8 *script, void *funcPtr, bool32 requestE
     if (script[0] != SCR_OP_CALLNATIVE)
         return FALSE;
     u32 callnativeFunc = (((((script[4] << 8) + script[3]) << 8) + script[2]) << 8) + script[1];
-    u32 targetFunc = (u32)funcPtr;
+    uintptr_t targetFunc = (uintptr_t)funcPtr;
     if (requestEffects) {
 #if defined(__ANDROID__) || defined(__linux__) || defined(__APPLE__) || defined(_WIN32)
         targetFunc += 0x02000000;
@@ -650,7 +651,7 @@ bool32 Script_MatchesCallNative(const u8 *script, void *funcPtr, bool32 requestE
         targetFunc |= 0xA000000;
 #endif
     }
-    if (callnativeFunc == targetFunc)
+    if ((uintptr_t)callnativeFunc == targetFunc)
         return TRUE;
     return FALSE;
 }
@@ -662,7 +663,7 @@ bool32 Script_MatchesSpecial(const u8 *script, void *funcPtr)
     typedef u16 (*SpecialFunc)(void);
     extern const SpecialFunc gSpecials[];
     SpecialFunc specialFunc = gSpecials[(script[2] << 8) + script[1]];
-    if ((u32)specialFunc == ((u32)funcPtr))
+    if ((uintptr_t)specialFunc == ((uintptr_t)funcPtr))
         return TRUE;
     return FALSE;
 }
