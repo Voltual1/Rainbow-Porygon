@@ -395,6 +395,7 @@ static void STWI_init_slave(void)
     REG_SIOCNT = SIO_INTR_ENABLE | SIO_32BIT_MODE | SIO_57600_BPS | SIO_ENABLE;
 }
 
+#if defined(__arm__) && !defined(PORTABLE)
 NAKED
 #if __STDC_VERSION__ < 202311L
 static void Callback_Dummy_M(int reqCommandId, int error, void (*callbackM)())
@@ -416,3 +417,30 @@ static void Callback_Dummy_ID(void (*callbackId)(void))
 {
     asm("bx r0");
 }
+#else
+#if __STDC_VERSION__ < 202311L
+static void Callback_Dummy_M(int reqCommandId, int error, void (*callbackM)())
+{
+    if (callbackM != NULL)
+        ((void (*)(int, int))callbackM)(reqCommandId, error);
+}
+#else
+static void Callback_Dummy_M(int reqCommandId, int error, void (*callbackM)(...))
+{
+    if (callbackM != NULL)
+        ((void (*)(int, int))callbackM)(reqCommandId, error);
+}
+#endif
+
+static void Callback_Dummy_S(u16 reqCommandId, void (*callbackS)(u16))
+{
+    if (callbackS != NULL)
+        callbackS(reqCommandId);
+}
+
+static void Callback_Dummy_ID(void (*callbackId)(void))
+{
+    if (callbackId != NULL)
+        callbackId();
+}
+#endif
