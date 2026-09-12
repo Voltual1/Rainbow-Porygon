@@ -3,9 +3,9 @@ project(pokeemerald_android C ASM)
 
 set(ROOT "${CMAKE_CURRENT_LIST_DIR}/../../../../..")
 
-# 自动寻找交叉编译工具
-find_program(ARM_NONE_EABI_AS arm-none-eabi-as REQUIRED)
-find_program(ARM_NONE_EABI_LD arm-none-eabi-ld REQUIRED)
+# 自动寻找 64位 ARM (AArch64) 交叉编译工具
+find_program(AARCH64_AS aarch64-linux-gnu-as REQUIRED)
+find_program(AARCH64_LD aarch64-linux-gnu-ld REQUIRED)
 
 set(SDL_STATIC ON CACHE BOOL "" FORCE)
 set(SDL_SHARED ON CACHE BOOL "" FORCE)
@@ -60,7 +60,7 @@ add_custom_command(
     DEPENDS "${ROOT}/data/specials.inc"
     VERBATIM)
 
-# 汇编预处理与编译管道 (使用 sed 将 .rodata/.ewram/ewram_data/common_data 替换为 .data，解决重定位丢失和文本重定位报错问题)
+# 汇编预处理与编译管道 (.4byte / .word -> .quad 转换以在 64 位模式下支持指针符号引用)
 foreach(SOURCE IN LISTS DATA_ASM SONG_ASM)
     file(RELATIVE_PATH RELATIVE_SOURCE "${ROOT}" "${SOURCE}")
     set(OUTPUT "${CMAKE_BINARY_DIR}/generated/${RELATIVE_SOURCE}.o")
@@ -69,14 +69,14 @@ foreach(SOURCE IN LISTS DATA_ASM SONG_ASM)
         add_custom_command(
             OUTPUT "${OUTPUT}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${OUTPUT_DIR}"
-            COMMAND /bin/sh -c "sed -e 's/\\.4byte/\\.word/g;s/\\.2byte/\\.short/g;s/\\.rodata/\\.data/g;s/\\.ewram/\\.data/g;s/ewram_data/\\.data/g;s/common_data/\\.data/g;s/gbadata/\\.data/g;s/\\.sbss/\\.bss/g' '${SOURCE}' > '${OUTPUT}.s' && '${ARM_NONE_EABI_AS}' -march=armv7-a -I'${ROOT}/sound' -o '${OUTPUT}' '${OUTPUT}.s'"
+            COMMAND /bin/sh -c "sed -e 's/\\.4byte/\\.quad/g;s/\\.word/\\.quad/g;s/\\.2byte/\\.short/g;s/\\.rodata/\\.data/g;s/\\.ewram/\\.data/g;s/ewram_data/\\.data/g;s/common_data/\\.data/g;s/gbadata/\\.data/g;s/\\.sbss/\\.bss/g' '${SOURCE}' > '${OUTPUT}.s' && '${AARCH64_AS}' -I'${ROOT}/sound' -o '${OUTPUT}' '${OUTPUT}.s'"
             DEPENDS "${SOURCE}"
             VERBATIM)
     else()
         add_custom_command(
             OUTPUT "${OUTPUT}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${OUTPUT_DIR}"
-            COMMAND /bin/sh -c "cd '${ROOT}' && { printf \".include \\\"${SPECIAL_IDS}\\\"\\n\"; PORTABLE=1 '${ROOT}/tools/preproc/preproc' -s '${SOURCE}' '${ROOT}/charmap.txt' | /usr/bin/cpp -I'${ROOT}/include' -I'${ROOT}/sound' -I'${ROOT}/src/platform' -DMODERN=1 -DPORTABLE=1 -DUBFIX -DTESTING=0 -DEMERALD=1 | PORTABLE=1 '${ROOT}/tools/preproc/preproc' -ie -g '${ASSETS_DIR}' '${SOURCE}' '${ROOT}/charmap.txt' | sed -e 's/\\.rodata/\\.data/g;s/\\.ewram/\\.data/g;s/ewram_data/\\.data/g;s/common_data/\\.data/g;s/gbadata/\\.data/g;s/\\.sbss/\\.bss/g'; } > '${OUTPUT}.s' && '${ARM_NONE_EABI_AS}' -march=armv7-a -I'${ROOT}' -I'${ROOT}/sound' -o '${OUTPUT}' '${OUTPUT}.s'"
+            COMMAND /bin/sh -c "cd '${ROOT}' && { printf \".include \\\"${SPECIAL_IDS}\\\"\\n\"; PORTABLE=1 '${ROOT}/tools/preproc/preproc' -s '${SOURCE}' '${ROOT}/charmap.txt' | /usr/bin/cpp -I'${ROOT}/include' -I'${ROOT}/sound' -I'${ROOT}/src/platform' -DMODERN=1 -DPORTABLE=1 -DUBFIX -DTESTING=0 -DEMERALD=1 | PORTABLE=1 '${ROOT}/tools/preproc/preproc' -ie -g '${ASSETS_DIR}' '${SOURCE}' '${ROOT}/charmap.txt' | sed -e 's/\\.4byte/\\.quad/g;s/\\.word/\\.quad/g;s/\\.rodata/\\.data/g;s/\\.ewram/\\.data/g;s/ewram_data/\\.data/g;s/common_data/\\.data/g;s/gbadata/\\.data/g;s/\\.sbss/\\.bss/g'; } > '${OUTPUT}.s' && '${AARCH64_AS}' -I'${ROOT}' -I'${ROOT}/sound' -o '${OUTPUT}' '${OUTPUT}.s'"
             DEPENDS "${SOURCE}" "${ROOT}/tools/preproc/preproc" "${ROOT}/charmap.txt" "${SPECIAL_IDS}"
             VERBATIM)
     endif()
@@ -86,7 +86,7 @@ endforeach()
 set(GAME_DATA_OBJECT "${CMAKE_BINARY_DIR}/generated/game_data.o")
 add_custom_command(
     OUTPUT "${GAME_DATA_OBJECT}"
-    COMMAND "${ARM_NONE_EABI_LD}" -r -o "${GAME_DATA_OBJECT}" ${GENERATED_ASM}
+    COMMAND "${AARCH64_LD}" -r -o "${GAME_DATA_OBJECT}" ${GENERATED_ASM}
     DEPENDS ${GENERATED_ASM}
     VERBATIM)
 set_source_files_properties("${GAME_DATA_OBJECT}" PROPERTIES GENERATED TRUE EXTERNAL_OBJECT TRUE)
@@ -101,10 +101,14 @@ target_include_directories(main PRIVATE
 
 target_compile_definitions(main PRIVATE
     NONMATCHING PORTABLE PLATFORM_SDL2 RENDERER_EASY_DRAW MODERN=1 UBFIX TESTING=0 EMERALD=1
-    COMMON_DATA= EWRAM_DATA= BSS_CODE=) # 屏蔽GBA的特定数据段宏
+    COMMON_DATA= EWRAM_DATA= BSS_CODE=)
 
+# 根据构建类型自动选择优化级别
 target_compile_options(main PRIVATE
-    -O3
+    $<$<CONFIG:Debug>:-Og -g -fno-omit-frame-pointer>
+    $<$<CONFIG:RelWithDebInfo>:-Og -g -fno-omit-frame-pointer>
+    $<$<CONFIG:Release>:-O3>
+    $<$<CONFIG:MinSizeRel>:-Os>
     -fno-builtin
     -Wno-implicit-function-declaration
     -Wno-trigraphs
@@ -116,6 +120,11 @@ target_compile_options(main PRIVATE
 
 target_link_libraries(main PRIVATE SDL2::SDL2 m)
 
-target_link_options(main PRIVATE 
+target_link_options(main PRIVATE
     "-Wl,-Map=${CMAKE_SOURCE_DIR}/../../../build/libmain.map"
+    -Wl,-z,relro
+    -Wl,-z,now
+    -Wl,-z,noexecstack
+    -Wl,--build-id
 )
+
