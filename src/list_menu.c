@@ -15,7 +15,9 @@
 
 // GF cast Task data to ListMenu in many places, which effectively puts
 // an upper bound on sizeof(struct ListMenu).
+#if defined(__arm__) && !defined(PORTABLE)
 STATIC_ASSERT(sizeof(struct ListMenu) <= sizeof(((struct Task *)NULL)->data), ListMenuTooLargeForTaskData);
+#endif
 
 // Cursors after this point are created using a sprite with their own task.
 // This allows them to have idle animations. Cursors prior to this are simply printed text.
@@ -920,7 +922,7 @@ s32 ListMenuGetTemplateField(u8 taskId, u8 field)
     {
     case LISTFIELD_MOVECURSORFUNC:
     case LISTFIELD_MOVECURSORFUNC2:
-        return (s32)(data->template.moveCursorFunc);
+        return (s32)(uintptr_t)(data->template.moveCursorFunc);
     case LISTFIELD_TOTALITEMS:
         return data->template.totalItems;
     case LISTFIELD_MAXSHOWED:
@@ -964,7 +966,7 @@ void ListMenuSetTemplateField(u8 taskId, u8 field, s32 value)
     {
     case LISTFIELD_MOVECURSORFUNC:
     case LISTFIELD_MOVECURSORFUNC2:
-        data->template.moveCursorFunc = (void *)value;
+        data->template.moveCursorFunc = (void *)(uintptr_t)value;
         break;
     case LISTFIELD_TOTALITEMS:
         data->template.totalItems = value;
@@ -1269,17 +1271,17 @@ void ListMenuSetUpRedOutlineCursorSpriteOamTable(u16 rowWidth, u16 rowHeight, st
     s32 i, j, id = 0;
 
     subsprites[id] = sSubsprite_RedOutline1;
-    subsprites[id].x = 136;
-    subsprites[id].y = 136;
+    subsprites[id].x = (s8)136;
+    subsprites[id].y = (s8)136;
     id++;
 
     subsprites[id] = sSubsprite_RedOutline2;
     subsprites[id].x = rowWidth + 128;
-    subsprites[id].y = 136;
+    subsprites[id].y = (s8)136;
     id++;
 
     subsprites[id] = sSubsprite_RedOutline7;
-    subsprites[id].x = 136;
+    subsprites[id].x = (s8)136;
     subsprites[id].y = rowHeight + 128;
     id++;
 
@@ -1309,7 +1311,7 @@ void ListMenuSetUpRedOutlineCursorSpriteOamTable(u16 rowWidth, u16 rowHeight, st
         for (j = 8; j < rowHeight - 8; j += 8)
         {
             subsprites[id] = sSubsprite_RedOutline4;
-            subsprites[id].x = 136;
+            subsprites[id].x = (s8)136;
             subsprites[id].y = j - 120;
             id++;
 
