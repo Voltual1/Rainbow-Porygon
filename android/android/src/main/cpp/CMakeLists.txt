@@ -103,12 +103,8 @@ target_compile_definitions(main PRIVATE
     NONMATCHING PORTABLE PLATFORM_SDL2 RENDERER_EASY_DRAW MODERN=1 UBFIX TESTING=0 EMERALD=1
     COMMON_DATA= EWRAM_DATA= BSS_CODE=)
 
-# 根据构建类型自动选择优化级别
 target_compile_options(main PRIVATE
-    $<$<CONFIG:Debug>:-Og -g -fno-omit-frame-pointer>
-    $<$<CONFIG:RelWithDebInfo>:-Og -g -fno-omit-frame-pointer>
-    $<$<CONFIG:Release>:-O3>
-    $<$<CONFIG:MinSizeRel>:-Os>
+    -O3
     -fno-builtin
     -Wno-implicit-function-declaration
     -Wno-trigraphs
@@ -120,11 +116,6 @@ target_compile_options(main PRIVATE
 
 target_link_libraries(main PRIVATE SDL2::SDL2 m)
 
-target_link_options(main PRIVATE
+target_link_options(main PRIVATE 
     "-Wl,-Map=${CMAKE_SOURCE_DIR}/../../../build/libmain.map"
-    -Wl,-z,relro
-    -Wl,-z,now
-    -Wl,-z,noexecstack
-    -Wl,--build-id
 )
-
